@@ -16,14 +16,15 @@ Bundles: `popup.ts` -> `dist/popup.js`, `dashboard.ts` -> `dist/dashboard.js`. S
 
 ## Dashboard hash routes
 
-| Route                 | View                        | Requests                                                                                                         |
-| --------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `#overview` (default) | `views/overview.ts`         | `get_status` (incl. optional `metrics`), `list_detections` (`{ limit: 5 }`)                                      |
-| `#detections`         | `views/detections.ts`       | `list_detections` (`DetectionFilter` built by `filter.ts`)                                                       |
-| `#detection/<id>`     | `views/detection-detail.ts` | `get_detection`, `get_events`, `export_evidence` (`detectionIds: [id]`)                                          |
-| `#indicators`         | `views/indicators.ts`       | `get_status` (`indicatorSets`)                                                                                   |
-| `#rules`              | `views/rules.ts`            | `list_rules`                                                                                                     |
-| `#settings`           | `views/settings.ts`         | `get_settings`, `get_status`, `update_settings`, `request_host_permission`, `export_evidence`, `delete_all_data` |
+| Route                 | View                        | Requests                                                                                                                                                                                |
+| --------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#overview` (default) | `views/overview.ts`         | `get_status` (incl. optional `metrics`), `list_detections` (`{ limit: 5 }`)                                                                                                             |
+| `#detections`         | `views/detections.ts`       | `list_detections` (`DetectionFilter` built by `filter.ts`)                                                                                                                              |
+| `#detection/<id>`     | `views/detection-detail.ts` | `get_detection` (`DetectionWithNote`), `get_events`, `set_detection_note`, `export_evidence` / `export_stix` / `export_siem` / `export_handoff` (all with `detectionIds: [id]`)         |
+| `#timeline`           | `views/timeline.ts`         | `get_timeline` (`{ limit: 500, since?, tabId? }`)                                                                                                                                       |
+| `#indicators`         | `views/indicators.ts`       | `get_status` (`indicatorSets`), `import_indicator_set`, `set_indicator_set_enabled`, `remove_indicator_set`                                                                             |
+| `#rules`              | `views/rules.ts`            | `list_rules`                                                                                                                                                                            |
+| `#settings`           | `views/settings.ts`         | `get_settings`, `get_status`, `update_settings`, `request_host_permission`, `export_evidence` / `export_stix` / `export_siem` / `export_handoff` (no `detectionIds`), `delete_all_data` |
 
 ## Assumptions about the background
 
@@ -35,11 +36,28 @@ Bundles: `popup.ts` -> `dist/popup.js`, `dashboard.ts` -> `dist/dashboard.js`. S
   `NormalizedEvent[]` (missing ids may be omitted), `export_evidence` returns an object or string
   that is saved verbatim as JSON.
 
+## Research integration (analyst notes, exports, timeline, imports)
+
+- `views/export-actions.ts` is the shared "Export" button group (detection detail: `detectionIds: [id]`;
+  Settings: all). Evidence JSON keeps its original saving; STIX, SIEM and hand-off responses are
+  `ExportFile` and are saved with `downloadText(filename, text, mediaType)` after `safeFilename`.
+  STIX is always requested with `includeIndicators: true`. The redaction profile select applies to
+  evidence JSON and the hand-off package only.
+- Analyst notes: plain text in a `<textarea maxlength=4000>`; "Saved at" is the client clock at the time
+  the `set_detection_note` call succeeded (the protocol returns no note timestamp).
+- Timeline: oldest first, consecutive entries with the same `tabId` share a `<tbody>` with a "Tab N" label
+  row. "Since" select maps to `since` (1 h / 24 h / 7 d; "all" omits it); the tab filter is a whole number.
+  Pure helpers are in `timeline.ts`.
+- Indicators: imported sets (`imported: true`) get an enable checkbox and a Remove button that needs a
+  second click ("Confirm removal"). The import card reads the chosen file in the page with `FileReader`
+  (max 5 MB) and sends its text; the UI never fetches anything. Pure helpers are in `exports.ts`.
+
 ## Helpers
 
 - `format.ts`: labels, relative time, URL/size/ms formatting, visibility summary, validation, page-signal
   and sensor labels (`pageSignalLabel`, `sensorLabel`, `describePageSignal`), `metricRows`,
   `missingCapabilitiesText`.
+- `exports.ts`: export/import/note helpers. `timeline.ts`: timeline filters and grouping.
 - `filter.ts`: filter controls to `DetectionFilter`. `route.ts`: hash parsing. `dom.ts`: `h()` etc.
 
 ## Optional page sensor and runtime metrics

@@ -7,7 +7,10 @@
  */
 import type {
   Detection,
+  ExportFile,
+  ImportResult,
   IndicatorSet,
+  TimelineEntry,
   MonitoringSettings,
   MonitoringStatus,
   NormalizedEvent,
@@ -27,6 +30,8 @@ import {
   type EngineSnapshot,
 } from "@adtripwire/detection-engine";
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
+import { stixToIndicatorSet } from "@adtripwire/interop";
+import { exportResearch } from "./research-export.js";
 import {
   addIndicatorPatterns,
   buildInspectionMatchPatterns,
@@ -47,6 +52,8 @@ export interface SensorAdapter {
     register(): void;
     dispose(): void;
     readonly stats: { pending: number; activeFilters: number; skippedForBudget: number };
+    /** Firefox: swap blocking-listener match patterns after an indicator-set change. */
+    updateInspectionPatterns?(patterns: string[]): void;
   };
 }
 
@@ -62,7 +69,8 @@ const log = (level: "info" | "warn" | "error", msg: string) => {
 
 class Background {
   private store = new LocalStore();
-  private readonly matcher: IndicatorMatcher;
+  private matcher: IndicatorMatcher;
+  /** Bundled (+ synthetic in DEV) sets; imported sets live in the store. */
   private readonly sets: IndicatorSet[] = [];
   private engine: DetectionEngine | undefined;
   private capabilities: SensorCapabilities;
@@ -136,6 +144,7 @@ class Background {
 
   private async init(): Promise<void> {
     await this.store.load();
+    this.rebuildMatcher();
     if (__ADTRIPWIRE_DEV__ && !(await browser.storage.local.get("settings")).settings) {
       // DEV builds (never shipped) enable the page sensor so the browser-level test covers it.
       await this.store.updateSettings({ pageSensorEnabled: true });
@@ -187,6 +196,79 @@ class Background {
       "info",
       `ready: ${this.matcher.size} indicators, ruleset ${this.eng.rulesetVersion}, caps=${this.capabilities.capabilities.join(",")}${queued.length ? `, replayed ${queued.length} early events` : ""}`,
     );
+  }
+
+  /** Bundled sets plus enabled imported sets. */
+  private activeSets(): IndicatorSet[] {
+    return [
+      ...this.sets,
+      ...this.store
+        .listImportedSets()
+        .filter((r) => r.enabled)
+        .map((r) => r.set),
+    ];
+  }
+
+  /** Rebuilds the matcher and the sensor's inspection patterns after an indicator-set change. */
+  private rebuildMatcher(): void {
+    const active = this.activeSets();
+    this.matcher = new IndicatorMatcher(active);
+    const patterns = buildInspectionMatchPatterns(active.filter((s) => !s.meta.synthetic));
+    const extra = new Set<string>(patterns);
+    if (__ADTRIPWIRE_DEV__) {
+      for (const set of active)
+        if (set.meta.synthetic) for (const r of set.indicators) addIndicatorPatterns(extra, r);
+    }
+    this.sensor.updateInspectionPatterns?.(Array.from(extra));
+    if (this.engine) {
+      this.engine = DetectionEngine.restore(
+        this.engine.snapshot(),
+        this.engineOptions(this.store.getSettings().monitoring),
+      );
+    }
+  }
+
+  private withNote(d: Detection): Detection & { note?: string } {
+    const n = this.store.getNote(d.detectionId);
+    return n ? { ...d, note: n.note } : d;
+  }
+
+  private timeline(opts: { tabId?: number; since?: number; limit?: number }): TimelineEntry[] {
+    const since = opts.since ?? 0;
+    const entries: TimelineEntry[] = [];
+    for (const d of this.store.listDetections()) {
+      if (d.timestamp < since) continue;
+      if (opts.tabId !== undefined && d.tabId !== opts.tabId) continue;
+      const e: TimelineEntry = {
+        timestamp: d.timestamp,
+        kind: "detection",
+        detectionId: d.detectionId,
+        severity: d.severity,
+        ruleId: d.ruleId,
+        summary: d.summary,
+      };
+      if (d.subjectHostnames[0]) e.hostname = d.subjectHostnames[0];
+      if (d.tabId !== undefined) e.tabId = d.tabId;
+      entries.push(e);
+    }
+    for (const ev of this.store.allEvents()) {
+      if (ev.timestamp < since) continue;
+      if (opts.tabId !== undefined && ev.tabId !== opts.tabId) continue;
+      const e: TimelineEntry = {
+        timestamp: ev.timestamp,
+        kind: "event",
+        eventId: ev.eventId,
+        summary:
+          `${ev.eventType} ${ev.resourceType ?? ""} ${ev.destination.hostname}${ev.destination.pathPattern}`.trim(),
+        hostname: ev.destination.hostname,
+        frameId: ev.frameContext.frameId,
+      };
+      if (ev.tabId !== undefined) e.tabId = ev.tabId;
+      entries.push(e);
+    }
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    const limit = opts.limit ?? 500;
+    return entries.length > limit ? entries.slice(entries.length - limit) : entries;
   }
 
   private pageSensorChain: Promise<void> = Promise.resolve();
@@ -258,6 +340,106 @@ class Background {
         this.engineOptions(this.store.getSettings().monitoring),
       );
     }
+  }
+
+  /** STIX / SIEM / hand-off exports over the selected detections and their events. */
+  private exportResearch(
+    req: Extract<UiRequest, { type: "export_stix" | "export_siem" | "export_handoff" }>,
+  ): ExportFile {
+    let detections = this.store.listDetections();
+    if (req.detectionIds)
+      detections = detections.filter((d) => req.detectionIds!.includes(d.detectionId));
+    const ids = new Set<string>();
+    for (const d of detections) for (const id of d.eventIds) ids.add(id);
+    return exportResearch(req, {
+      detections,
+      events: this.store.getEvents(Array.from(ids)),
+      indicatorSets: this.activeSets().filter((s) => !s.meta.synthetic),
+      notes: this.store.allNotes(),
+      productVersion: __ADTRIPWIRE_VERSION__,
+      rulesetVersion: this.eng.rulesetVersion,
+      browser: this.capabilities,
+      now: new Date(),
+    });
+  }
+
+  /** Imports a user-supplied indicator set (local file contents) after strict validation. */
+  private async importIndicatorSet(
+    format: "adtripwire" | "stix",
+    text: string,
+    enabled: boolean,
+  ): Promise<ImportResult> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { ok: false, errors: ["not valid JSON"], warnings: [] };
+    }
+    const warnings: string[] = [];
+    let candidate: unknown = parsed;
+    if (format === "stix") {
+      const converted = stixToIndicatorSet(parsed, {
+        setId: `stix-import-${Date.now().toString(36)}`,
+        name: "Imported STIX 2.1 bundle",
+        license: "as provided by the bundle",
+      });
+      if (!converted.ok) return { ok: false, errors: converted.errors, warnings };
+      warnings.push(...converted.warnings);
+      candidate = converted.set;
+    }
+    const v = validateIndicatorSet(candidate);
+    if (!v.ok) return { ok: false, errors: v.errors, warnings };
+    if (v.set.meta.synthetic) {
+      return {
+        ok: false,
+        errors: ["synthetic (test) sets cannot be imported into a running extension"],
+        warnings,
+      };
+    }
+    if (this.sets.some((b) => b.meta.id === v.set.meta.id)) {
+      return {
+        ok: false,
+        errors: [`set id ${v.set.meta.id} collides with a bundled set`],
+        warnings,
+      };
+    }
+    // Bundled curation takes precedence: an imported record for a host the bundled set already
+    // classifies (e.g. as surveillance/contextual) is dropped, so a broader upstream feed cannot
+    // silently re-rank common ad-tech exposure as malicious.
+    const bundled = new IndicatorMatcher(this.sets.filter((b) => !b.meta.synthetic));
+    const kept = [];
+    let dropped = 0;
+    for (const rec of v.set.indicators) {
+      const overlapping =
+        rec.indicatorType === "hostname" || rec.indicatorType === "domain"
+          ? bundled.match(rec.indicator).filter((m) => m.indicator.indicator === rec.indicator)
+          : [];
+      if (overlapping.length > 0) {
+        dropped++;
+        continue;
+      }
+      kept.push(rec);
+    }
+    if (dropped > 0) {
+      warnings.push(
+        `${dropped} indicator(s) already covered by the bundled set were skipped; bundled classification takes precedence`,
+      );
+    }
+    if (kept.length === 0) {
+      return {
+        ok: false,
+        errors: ["no indicators left after de-duplication against the bundled set"],
+        warnings,
+      };
+    }
+    const finalSet: IndicatorSet = { ...v.set, indicators: kept };
+    await this.store.addImportedSet({ set: finalSet, enabled, importedAt: Date.now(), format });
+    this.rebuildMatcher();
+    log(
+      "info",
+      `imported indicator set ${finalSet.meta.id} (${kept.length} indicators, enabled=${enabled})`,
+    );
+    return { ok: true, setId: finalSet.meta.id, indicatorCount: kept.length, errors: [], warnings };
   }
 
   /** Entry point for validated page-sensor messages. */
@@ -439,7 +621,12 @@ class Background {
       hostPermissionGranted,
       capabilities: this.capabilities,
       counts,
-      indicatorSets: this.sets.map((x) => x.meta),
+      indicatorSets: [
+        ...this.sets.map((x) => x.meta),
+        ...this.store
+          .listImportedSets()
+          .map((r) => ({ ...r.set.meta, imported: true, enabled: r.enabled })),
+      ],
       rulesetVersion: this.eng.rulesetVersion,
       productVersion: __ADTRIPWIRE_VERSION__,
     };
@@ -480,10 +667,12 @@ class Background {
         if (f.confidences?.length) list = list.filter((d) => f.confidences!.includes(d.confidence));
         if (f.since !== undefined) list = list.filter((d) => d.timestamp >= f.since!);
         list = [...list].sort((a, b) => b.timestamp - a.timestamp);
-        return list.slice(0, f.limit ?? 500);
+        return list.slice(0, f.limit ?? 500).map((d) => this.withNote(d));
       }
-      case "get_detection":
-        return this.store.getDetection(req.detectionId) ?? null;
+      case "get_detection": {
+        const d = this.store.getDetection(req.detectionId);
+        return d ? this.withNote(d) : null;
+      }
       case "get_events":
         return this.store.getEvents(req.eventIds);
       case "get_settings":
@@ -544,6 +733,35 @@ class Background {
       }
       case "list_rules":
         return this.eng.listRules();
+      case "set_detection_note": {
+        const d = this.store.getDetection(req.detectionId);
+        if (!d) throw new Error("unknown detection");
+        await this.store.setNote(req.detectionId, req.note, Date.now());
+        return this.withNote(d);
+      }
+      case "get_timeline": {
+        const o: { tabId?: number; since?: number; limit?: number } = {};
+        if (req.tabId !== undefined) o.tabId = req.tabId;
+        if (req.since !== undefined) o.since = req.since;
+        if (req.limit !== undefined) o.limit = req.limit;
+        return this.timeline(o);
+      }
+      case "import_indicator_set":
+        return this.importIndicatorSet(req.format, req.text, req.enabled);
+      case "remove_indicator_set": {
+        await this.store.removeImportedSet(req.setId);
+        this.rebuildMatcher();
+        return this.status();
+      }
+      case "set_indicator_set_enabled": {
+        await this.store.setImportedSetEnabled(req.setId, req.enabled);
+        this.rebuildMatcher();
+        return this.status();
+      }
+      case "export_stix":
+      case "export_siem":
+      case "export_handoff":
+        return this.exportResearch(req);
     }
   }
 }

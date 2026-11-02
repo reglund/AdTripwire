@@ -120,3 +120,44 @@ describe("isPageSensorSender", () => {
     ).toBe(false);
   });
 });
+
+describe("parseUiRequest Phase 4", () => {
+  it("accepts well-formed research requests", () => {
+    expect(
+      parseUiRequest({ type: "export_stix", includeIndicators: true, detectionIds: ["a"] }),
+    ).toEqual({ type: "export_stix", includeIndicators: true, detectionIds: ["a"] });
+    expect(parseUiRequest({ type: "export_siem" })).toEqual({ type: "export_siem" });
+    expect(parseUiRequest({ type: "export_handoff", profile: "strict" })).toEqual({
+      type: "export_handoff",
+      profile: "strict",
+    });
+    expect(
+      parseUiRequest({ type: "import_indicator_set", format: "stix", text: "{}", enabled: true }),
+    ).toEqual({ type: "import_indicator_set", format: "stix", text: "{}", enabled: true });
+    expect(parseUiRequest({ type: "set_detection_note", detectionId: "d", note: "n" })).toEqual({
+      type: "set_detection_note",
+      detectionId: "d",
+      note: "n",
+    });
+    expect(parseUiRequest({ type: "get_timeline", tabId: 3, since: 1, limit: 10 })).toEqual({
+      type: "get_timeline",
+      tabId: 3,
+      since: 1,
+      limit: 10,
+    });
+  });
+  it("rejects malformed research requests", () => {
+    expect(parseUiRequest({ type: "export_stix" })).toBeNull();
+    expect(
+      parseUiRequest({ type: "import_indicator_set", format: "csv", text: "x", enabled: true }),
+    ).toBeNull();
+    expect(
+      parseUiRequest({ type: "import_indicator_set", format: "stix", text: "", enabled: true }),
+    ).toBeNull();
+    expect(
+      parseUiRequest({ type: "set_detection_note", detectionId: "d", note: "x".repeat(4001) }),
+    ).toBeNull();
+    expect(parseUiRequest({ type: "get_timeline", limit: 0 })).toBeNull();
+    expect(parseUiRequest({ type: "remove_indicator_set", setId: 5 })).toBeNull();
+  });
+});

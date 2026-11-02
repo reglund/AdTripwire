@@ -88,14 +88,21 @@ manual verification of the page-sensor consent UI.
 Gate 3: synthetic suite passes on the Chromium rule subset (met headless); no faked body
 inspection (met: `no_response_body_access` on every event).
 
-## Phase 4 — Security research integration ⬜
+## Phase 4 — Security research integration (in progress, started 2026-11-02)
 
-- STIX 2.1 and SIEM-compatible JSON export of detections and indicators.
-- Import of Zero Breach scan results and IOC feeds (offline files first).
-- Optional Zeek/Suricata companion rule set generated from the indicator data.
-- Investigation workflow: case notes, timeline view, hand-off package for helplines.
+- STIX 2.1 export of detections and indicators ✅ (validated with the OASIS validator);
+  STIX import of indicator bundles ✅ (bundled curation takes precedence).
+- SIEM-compatible JSON ✅ (ECS 8.11 NDJSON for detections and observations).
+- Zeek Intel and Suricata companion rules generated from the indicator set ✅ (`feeds/`,
+  `pnpm feeds:export`; structurally tested, not executed in Suricata/Zeek).
+- Zero Breach results: STIX import path ✅; on-device scan results have no stable public
+  format yet ⬜.
+- Investigation workflow ✅: analyst notes, timeline view, hand-off package.
+- Pending: run the Suricata rules through `suricata -T`, a security review of the import
+  path and exports, manual UI verification of the new views.
 
-Gate 4: an exported bundle round-trips into a STIX validator and a SIEM test harness.
+Gate 4: an exported bundle round-trips into a STIX validator (met) and a SIEM test harness
+(ECS structure tested; live ingestion into Elastic/OpenSearch not yet performed).
 
 ## Phase 5 — Advanced local correlation ⬜
 

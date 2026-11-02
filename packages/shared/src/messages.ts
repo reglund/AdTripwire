@@ -36,7 +36,8 @@ export interface MonitoringStatus {
     inspectionsSkippedForBudget: number;
     since: number;
   };
-  indicatorSets: IndicatorSetMeta[];
+  /** Bundled and user-imported sets; imported ones carry `imported: true`. */
+  indicatorSets: Array<IndicatorSetMeta & { imported?: boolean; enabled?: boolean }>;
   rulesetVersion: string;
   productVersion: string;
 }
@@ -54,7 +55,16 @@ export type UiRequest =
   | { type: "export_evidence"; profile: "default" | "strict"; detectionIds?: string[] }
   | { type: "delete_all_data" }
   | { type: "request_host_permission" }
-  | { type: "list_rules" };
+  | { type: "list_rules" }
+  // Phase 4: research integration
+  | { type: "export_stix"; detectionIds?: string[]; includeIndicators: boolean }
+  | { type: "export_siem"; detectionIds?: string[] }
+  | { type: "import_indicator_set"; format: "adtripwire" | "stix"; text: string; enabled: boolean }
+  | { type: "remove_indicator_set"; setId: string }
+  | { type: "set_indicator_set_enabled"; setId: string; enabled: boolean }
+  | { type: "set_detection_note"; detectionId: string; note: string }
+  | { type: "get_timeline"; tabId?: number; since?: number; limit?: number }
+  | { type: "export_handoff"; detectionIds?: string[]; profile: "default" | "strict" };
 
 export interface DetectionFilter {
   categories?: string[];
@@ -65,6 +75,39 @@ export interface DetectionFilter {
 }
 
 export type UiResponse = { ok: true; data: unknown } | { ok: false; error: string };
+
+/** A detection with its analyst note, as returned by get_detection / list_detections. */
+export type DetectionWithNote = Detection & { note?: string };
+
+/** Timeline entry: detections and their supporting events merged chronologically. */
+export interface TimelineEntry {
+  timestamp: number;
+  kind: "detection" | "event";
+  detectionId?: string;
+  eventId?: string;
+  severity?: Detection["severity"];
+  ruleId?: string;
+  summary: string;
+  hostname?: string;
+  tabId?: number;
+  frameId?: number;
+}
+
+/** Result of a file export request: the UI saves `text` as `filename`. */
+export interface ExportFile {
+  filename: string;
+  mediaType: string;
+  text: string;
+}
+
+/** Result of an import: which set was added and what the validator said. */
+export interface ImportResult {
+  ok: boolean;
+  setId?: string;
+  indicatorCount?: number;
+  errors: string[];
+  warnings: string[];
+}
 
 export type DetectionListItem = Detection;
 export type EventListItem = NormalizedEvent;

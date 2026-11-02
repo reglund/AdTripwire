@@ -11,6 +11,9 @@
       "path": "packages/privacy"
     },
     {
+      "path": "packages/interop"
+    },
+    {
       "path": "packages/detection-engine"
     },
     {

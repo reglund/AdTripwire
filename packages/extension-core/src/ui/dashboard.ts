@@ -5,6 +5,7 @@ import { renderDetections } from "./views/detections.js";
 import { renderIndicators } from "./views/indicators.js";
 import { renderOverview } from "./views/overview.js";
 import { renderRules } from "./views/rules.js";
+import { renderTimeline } from "./views/timeline.js";
 import { renderSettings } from "./views/settings.js";
 import type { ViewContext } from "./views/common.js";
 import { NO_DETECTIONS_NOTICE } from "./format.js";
@@ -18,6 +19,7 @@ const main: HTMLElement = mainEl;
 const TITLES: Record<TabName, string> = {
   overview: "Overview",
   detections: "Detections",
+  timeline: "Timeline",
   indicators: "Indicators",
   rules: "Rules",
   settings: "Settings",
@@ -82,6 +84,8 @@ async function renderRoute(route: Route): Promise<Node> {
       return renderDetections(ctx);
     case "detection":
       return renderDetectionDetail(route.id);
+    case "timeline":
+      return renderTimeline(ctx);
     case "indicators":
       return renderIndicators(ctx);
     case "rules":

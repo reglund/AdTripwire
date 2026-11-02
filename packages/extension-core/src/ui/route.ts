@@ -4,15 +4,17 @@ export type Route =
   | { name: "overview" }
   | { name: "detections" }
   | { name: "detection"; id: string }
+  | { name: "timeline" }
   | { name: "indicators" }
   | { name: "rules" }
   | { name: "settings" };
 
-export type TabName = "overview" | "detections" | "indicators" | "rules" | "settings";
+export type TabName = "overview" | "detections" | "timeline" | "indicators" | "rules" | "settings";
 
 export const TABS: ReadonlyArray<{ name: TabName; label: string }> = [
   { name: "overview", label: "Overview" },
   { name: "detections", label: "Detections" },
+  { name: "timeline", label: "Timeline" },
   { name: "indicators", label: "Indicators" },
   { name: "rules", label: "Rules" },
   { name: "settings", label: "Settings" },
@@ -35,6 +37,8 @@ export function parseHash(hash: string): Route {
       }
       return id.length > 0 ? { name: "detection", id } : { name: "detections" };
     }
+    case "timeline":
+      return { name: "timeline" };
     case "indicators":
       return { name: "indicators" };
     case "rules":

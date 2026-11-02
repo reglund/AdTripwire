@@ -8,6 +8,7 @@ describe("parseHash", () => {
   });
   it("parses tab routes", () => {
     expect(parseHash("#detections")).toEqual({ name: "detections" });
+    expect(parseHash("#timeline")).toEqual({ name: "timeline" });
     expect(parseHash("#indicators")).toEqual({ name: "indicators" });
     expect(parseHash("#rules")).toEqual({ name: "rules" });
     expect(parseHash("#settings")).toEqual({ name: "settings" });

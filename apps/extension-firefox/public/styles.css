@@ -209,6 +209,29 @@ input[type="text"] {
   width: 14rem;
   max-width: 100%;
 }
+input[type="file"] {
+  font: inherit;
+  max-width: 100%;
+}
+textarea {
+  display: block;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  width: 100%;
+  max-width: 40rem;
+  box-sizing: border-box;
+  resize: vertical;
+}
+input[type="radio"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-right: 0.4rem;
+  vertical-align: -0.15em;
+}
 input[type="checkbox"] {
   width: 1.05rem;
   height: 1.05rem;
@@ -682,4 +705,36 @@ details.rule[open] {
 }
 .page-sensor .notice-warn h4 {
   margin-top: 0;
+}
+
+/* Timeline, imports and exports */
+table.timeline tbody.tl-group {
+  border-top: 2px solid var(--border);
+}
+table.timeline tbody.tl-group:first-of-type {
+  border-top: 0;
+}
+table.timeline tr.tl-group-label th {
+  background: var(--bg-subtle);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+label.radio {
+  font-weight: 400;
+}
+.import-result,
+.import-output {
+  margin-top: 0.75rem;
+}
+.imported-controls {
+  border-top: 1px solid var(--border);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
 }

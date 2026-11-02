@@ -87,6 +87,9 @@ importers:
       '@adtripwire/indicators':
         specifier: workspace:*
         version: link:../indicators
+      '@adtripwire/interop':
+        specifier: workspace:*
+        version: link:../interop
       '@adtripwire/privacy':
         specifier: workspace:*
         version: link:../privacy
@@ -99,6 +102,18 @@ importers:
 
   packages/indicators:
     dependencies:
+      '@adtripwire/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/interop:
+    dependencies:
+      '@adtripwire/indicators':
+        specifier: workspace:*
+        version: link:../indicators
+      '@adtripwire/privacy':
+        specifier: workspace:*
+        version: link:../privacy
       '@adtripwire/shared':
         specifier: workspace:*
         version: link:../shared

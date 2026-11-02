@@ -8,6 +8,7 @@ export const workspaceAliases = {
   "@adtripwire/shared": pkg("shared"),
   "@adtripwire/indicators": pkg("indicators"),
   "@adtripwire/privacy": pkg("privacy"),
+  "@adtripwire/interop": pkg("interop"),
   "@adtripwire/detection-engine": pkg("detection-engine"),
   "@adtripwire/sensor-firefox": pkg("sensor-firefox"),
   "@adtripwire/sensor-chromium": pkg("sensor-chromium"),

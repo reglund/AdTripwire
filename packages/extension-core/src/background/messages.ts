@@ -115,6 +115,76 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
       if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;
       return req;
     }
+    case "export_stix": {
+      if (typeof r.includeIndicators !== "boolean") return null;
+      if (r.detectionIds !== undefined && !isStrArr(r.detectionIds)) return null;
+      const req: Extract<UiRequest, { type: "export_stix" }> = {
+        type: "export_stix",
+        includeIndicators: r.includeIndicators,
+      };
+      if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;
+      return req;
+    }
+    case "export_siem": {
+      if (r.detectionIds !== undefined && !isStrArr(r.detectionIds)) return null;
+      const req: Extract<UiRequest, { type: "export_siem" }> = { type: "export_siem" };
+      if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;
+      return req;
+    }
+    case "export_handoff": {
+      if (r.profile !== "default" && r.profile !== "strict") return null;
+      if (r.detectionIds !== undefined && !isStrArr(r.detectionIds)) return null;
+      const req: Extract<UiRequest, { type: "export_handoff" }> = {
+        type: "export_handoff",
+        profile: r.profile,
+      };
+      if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;
+      return req;
+    }
+    case "import_indicator_set": {
+      if (r.format !== "adtripwire" && r.format !== "stix") return null;
+      if (typeof r.text !== "string" || r.text.length === 0 || r.text.length > 20 * 1024 * 1024)
+        return null;
+      if (typeof r.enabled !== "boolean") return null;
+      return { type: "import_indicator_set", format: r.format, text: r.text, enabled: r.enabled };
+    }
+    case "remove_indicator_set":
+      return typeof r.setId === "string" && r.setId.length <= 128
+        ? { type: "remove_indicator_set", setId: r.setId }
+        : null;
+    case "set_indicator_set_enabled":
+      return typeof r.setId === "string" && r.setId.length <= 128 && typeof r.enabled === "boolean"
+        ? { type: "set_indicator_set_enabled", setId: r.setId, enabled: r.enabled }
+        : null;
+    case "set_detection_note":
+      return typeof r.detectionId === "string" &&
+        r.detectionId.length <= 64 &&
+        typeof r.note === "string" &&
+        r.note.length <= 4000
+        ? { type: "set_detection_note", detectionId: r.detectionId, note: r.note }
+        : null;
+    case "get_timeline": {
+      const req: Extract<UiRequest, { type: "get_timeline" }> = { type: "get_timeline" };
+      if (r.tabId !== undefined) {
+        if (typeof r.tabId !== "number" || !Number.isInteger(r.tabId)) return null;
+        req.tabId = r.tabId;
+      }
+      if (r.since !== undefined) {
+        if (typeof r.since !== "number" || !Number.isFinite(r.since)) return null;
+        req.since = r.since;
+      }
+      if (r.limit !== undefined) {
+        if (
+          typeof r.limit !== "number" ||
+          !Number.isInteger(r.limit) ||
+          r.limit < 1 ||
+          r.limit > 5000
+        )
+          return null;
+        req.limit = r.limit;
+      }
+      return req;
+    }
     default:
       return null;
   }

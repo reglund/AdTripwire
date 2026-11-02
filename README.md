@@ -110,6 +110,7 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/indicator-updates.md` – design for signed, optional indicator updates
 - `docs/store-listing.md` – store texts and permission justifications
 - `docs/exposure-session.md` – how to look for real exposure in your own browsing
+- `docs/integration.md` – STIX/SIEM exports, imports, Zeek/Suricata feeds
 - `docs/roadmap.md` – phases and gates
 - `docs/phase-1-report.md` – Phase 1 deliverables and status
 - `docs/phase-3-report.md` – Phase 3 (Chromium) deliverables and status

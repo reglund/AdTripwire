@@ -9,10 +9,23 @@
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["src/**/*.test.ts"],
   "references": [
-    { "path": "../shared" },
-    { "path": "../indicators" },
-    { "path": "../privacy" },
-    { "path": "../detection-engine" },
-    { "path": "../sensor-firefox" }
+    {
+      "path": "../shared"
+    },
+    {
+      "path": "../indicators"
+    },
+    {
+      "path": "../privacy"
+    },
+    {
+      "path": "../detection-engine"
+    },
+    {
+      "path": "../sensor-firefox"
+    },
+    {
+      "path": "../interop"
+    }
   ]
 }

@@ -1,0 +1,264 @@
+{
+  "type": "bundle",
+  "id": "bundle--4fc8bd9d-df64-5596-aa7b-4a59c8d7eace",
+  "objects": [
+    {
+      "type": "identity",
+      "spec_version": "2.1",
+      "id": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "name": "adint-scan IOC set",
+      "identity_class": "system",
+      "description": "Synthetic trimmed copy of the Zero Breach bundle shape; all names are reserved .test names."
+    },
+    {
+      "type": "malware",
+      "spec_version": "2.1",
+      "id": "malware--75526ba0-abba-56bc-af06-770a39688ab3",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "name": "Synthetic family",
+      "is_family": true,
+      "description": "Synthetic.",
+      "external_references": [
+        {
+          "source_name": "Example Lab",
+          "description": "Synthetic report (2026-10-15)",
+          "url": "https://report.example.test/adfection"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000001",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "delivery-one.test",
+      "description": "Synthetic delivery host.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[domain-name:value = 'delivery-one.test']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:delivery", "confidence:primary", "source:example-2026"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Lab",
+          "description": "Synthetic report (2026-10-15)",
+          "url": "https://report.example.test/adfection"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000002",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "c2.candiru-like.test",
+      "description": "Synthetic C2 host.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[domain-name:value = 'c2.candiru-like.test']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:cc", "confidence:primary", "source:example-2026"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Lab",
+          "description": "Synthetic report (2026-10-15)",
+          "url": "https://report.example.test/adfection"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000003",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "old-campaign.test",
+      "description": "Synthetic historical host.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[domain-name:value = 'old-campaign.test']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:historical", "confidence:secondary", "source:example-2021"],
+      "confidence": 50,
+      "external_references": [
+        {
+          "source_name": "Example Intel",
+          "description": "Synthetic appendix (2025-08-05)",
+          "url": "https://intel.example.test/candiru"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000004",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "d0synthetic.cdn-like.test",
+      "description": "Synthetic CDN-style staging host.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[domain-name:value = 'd0synthetic.cdn-like.test']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:delivery", "confidence:primary", "source:example-2026"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Lab",
+          "description": "Synthetic report (2026-10-15)",
+          "url": "https://report.example.test/adfection"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000005",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "192.0.2.10",
+      "description": "Synthetic IP (TEST-NET-1).",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[ipv4-addr:value = '192.0.2.10']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:candiru-ip", "confidence:primary", "source:example-2025"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Intel",
+          "description": "Synthetic appendix (2025-08-05)",
+          "url": "https://intel.example.test/candiru"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000006",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "198.51.100.20",
+      "description": "Synthetic IP (TEST-NET-2).",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[ipv4-addr:value = '198.51.100.20']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:candiru-ip", "confidence:primary", "source:example-2025"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Intel",
+          "description": "Synthetic appendix (2025-08-05)",
+          "url": "https://intel.example.test/candiru"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--00000000-0000-5000-8000-000000000007",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "created_by_ref": "identity--294ec63a-c449-5439-83fb-942185697747",
+      "name": "synthetic-sample",
+      "description": "Synthetic hash.",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[file:hashes.'SHA-256' = '0000000000000000000000000000000000000000000000000000000000000000']",
+      "pattern_type": "stix",
+      "valid_from": "2026-10-18T00:00:00.000Z",
+      "labels": ["tier:sample", "confidence:primary", "source:example-2026"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "Example Lab",
+          "description": "Synthetic report (2026-10-15)",
+          "url": "https://report.example.test/adfection"
+        }
+      ]
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000100",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000001",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000101",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000002",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000102",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000003",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000103",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000004",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000104",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000005",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000105",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000006",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--00000000-0000-5000-8000-000000000106",
+      "created": "2026-10-18T00:00:00.000Z",
+      "modified": "2026-10-18T22:33:48.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--00000000-0000-5000-8000-000000000007",
+      "target_ref": "malware--75526ba0-abba-56bc-af06-770a39688ab3"
+    }
+  ]
+}

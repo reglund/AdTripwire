@@ -1,4 +1,10 @@
-import type { Detection, NormalizedEvent, RetentionSettings, Settings } from "@adtripwire/shared";
+import type {
+  Detection,
+  IndicatorSet,
+  NormalizedEvent,
+  RetentionSettings,
+  Settings,
+} from "@adtripwire/shared";
 import { DEFAULT_SETTINGS } from "@adtripwire/shared";
 
 /**
@@ -10,6 +16,23 @@ const KEY_DETECTIONS = "detections";
 const KEY_EVENTS = "events";
 const KEY_EXPOSURE = "exposure";
 const KEY_METRICS = "metrics";
+const KEY_IMPORTED_SETS = "importedIndicatorSets";
+const KEY_NOTES = "detectionNotes";
+
+export interface ImportedSetRecord {
+  set: IndicatorSet;
+  enabled: boolean;
+  importedAt: number;
+  format: "adtripwire" | "stix";
+}
+
+export interface NoteRecord {
+  note: string;
+  updatedAt: number;
+}
+
+const MAX_IMPORTED_SETS = 20;
+const MAX_NOTE_LENGTH = 4000;
 
 export interface Metrics {
   eventsObserved: number;
@@ -37,11 +60,26 @@ export class LocalStore {
   private detections: Detection[] = [];
   private events = new Map<string, NormalizedEvent>();
   private settings: Settings = DEFAULT_SETTINGS;
+  private importedSets: ImportedSetRecord[] = [];
+  private notes = new Map<string, NoteRecord>();
   private dirty = false;
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
 
   async load(): Promise<void> {
-    const data = await browser.storage.local.get([KEY_SETTINGS, KEY_DETECTIONS, KEY_EVENTS]);
+    const data = await browser.storage.local.get([
+      KEY_SETTINGS,
+      KEY_DETECTIONS,
+      KEY_EVENTS,
+      KEY_IMPORTED_SETS,
+      KEY_NOTES,
+    ]);
+    this.importedSets = Array.isArray(data[KEY_IMPORTED_SETS])
+      ? (data[KEY_IMPORTED_SETS] as ImportedSetRecord[])
+      : [];
+    const notes = data[KEY_NOTES];
+    this.notes = new Map(
+      notes && typeof notes === "object" ? Object.entries(notes as Record<string, NoteRecord>) : [],
+    );
     this.settings = mergeSettings(data[KEY_SETTINGS]);
     this.detections = Array.isArray(data[KEY_DETECTIONS])
       ? (data[KEY_DETECTIONS] as Detection[])
@@ -149,6 +187,15 @@ export class LocalStore {
       for (const e of sorted.slice(0, this.events.size - r.maxEvents))
         this.events.delete(e.eventId);
     }
+    const kept = new Set(this.detections.map((d) => d.detectionId));
+    let notesChanged = false;
+    for (const id of Array.from(this.notes.keys()))
+      if (!kept.has(id)) {
+        this.notes.delete(id);
+        notesChanged = true;
+      }
+    if (notesChanged)
+      void browser.storage.local.set({ [KEY_NOTES]: Object.fromEntries(this.notes) });
     const removed = {
       removedDetections: before - this.detections.length,
       removedEvents: evBefore - this.events.size,
@@ -161,13 +208,61 @@ export class LocalStore {
     this.detections = [];
     this.events.clear();
     const keep = this.settings;
+    const keepSets = this.importedSets;
+    this.notes.clear();
     await browser.storage.local.clear();
-    await browser.storage.local.set({ [KEY_SETTINGS]: keep });
+    await browser.storage.local.set({ [KEY_SETTINGS]: keep, [KEY_IMPORTED_SETS]: keepSets });
     try {
       await browser.storage.session.clear();
     } catch {
       /* storage.session may be unavailable */
     }
+  }
+
+  // ---- imported indicator sets ----
+
+  listImportedSets(): ImportedSetRecord[] {
+    return this.importedSets;
+  }
+
+  async addImportedSet(rec: ImportedSetRecord): Promise<void> {
+    this.importedSets = this.importedSets.filter((r) => r.set.meta.id !== rec.set.meta.id);
+    this.importedSets.push(rec);
+    if (this.importedSets.length > MAX_IMPORTED_SETS) this.importedSets.shift();
+    await browser.storage.local.set({ [KEY_IMPORTED_SETS]: this.importedSets });
+  }
+
+  async removeImportedSet(setId: string): Promise<boolean> {
+    const before = this.importedSets.length;
+    this.importedSets = this.importedSets.filter((r) => r.set.meta.id !== setId);
+    await browser.storage.local.set({ [KEY_IMPORTED_SETS]: this.importedSets });
+    return this.importedSets.length < before;
+  }
+
+  async setImportedSetEnabled(setId: string, enabled: boolean): Promise<boolean> {
+    const rec = this.importedSets.find((r) => r.set.meta.id === setId);
+    if (!rec) return false;
+    rec.enabled = enabled;
+    await browser.storage.local.set({ [KEY_IMPORTED_SETS]: this.importedSets });
+    return true;
+  }
+
+  // ---- analyst notes ----
+
+  getNote(detectionId: string): NoteRecord | undefined {
+    return this.notes.get(detectionId);
+  }
+
+  async setNote(detectionId: string, note: string, now: number): Promise<NoteRecord | undefined> {
+    const trimmed = note.slice(0, MAX_NOTE_LENGTH);
+    if (trimmed.trim().length === 0) this.notes.delete(detectionId);
+    else this.notes.set(detectionId, { note: trimmed, updatedAt: now });
+    await browser.storage.local.set({ [KEY_NOTES]: Object.fromEntries(this.notes) });
+    return this.notes.get(detectionId);
+  }
+
+  allNotes(): ReadonlyMap<string, NoteRecord> {
+    return this.notes;
   }
 
   async getExposureSnapshot(): Promise<unknown> {

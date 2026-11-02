@@ -52,6 +52,10 @@ export class WebRequestSensor {
   private activeFilters = 0;
   private skippedForBudget = 0;
   private registered = false;
+  private filterApi: ((id: string) => StreamFilterLike) | undefined;
+  private inspectListener:
+    ((d: browser.webRequest._OnBeforeRequestDetails) => undefined) | undefined;
+  private headersListener: ((d: browser.webRequest._OnHeadersReceivedDetails) => void) | undefined;
   private sweepTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly opts: SensorOptions) {}
@@ -79,31 +83,60 @@ export class WebRequestSensor {
       all,
     );
 
-    const filterApi = (
+    this.filterApi = (
       browser.webRequest as unknown as { filterResponseData?: (id: string) => StreamFilterLike }
     ).filterResponseData;
-    if (filterApi && this.opts.inspectionMatchPatterns.length > 0) {
-      browser.webRequest.onBeforeRequest.addListener(
-        (d) => this.onInspectCandidate(d as unknown as RequestDetailsLike, filterApi),
-        {
-          urls: this.opts.inspectionMatchPatterns,
-          types: Array.from(INSPECTABLE_TYPES) as browser.webRequest.ResourceType[],
-        },
-        ["blocking"],
-      );
-      // Content-Type is only known at headers time; stash it for the inspector.
-      browser.webRequest.onHeadersReceived.addListener(
-        (d) => this.onHeaders(d as unknown as RequestDetailsLike),
-        { urls: this.opts.inspectionMatchPatterns },
-        ["responseHeaders"],
-      );
-    } else {
+    this.registerInspectionListeners(this.opts.inspectionMatchPatterns);
+    this.sweepTimer = setInterval(() => this.sweep(Date.now()), 15_000);
+  }
+
+  /**
+   * (Re)registers the blocking inspection listener and the headers listener for the given
+   * match patterns. Match patterns are fixed at registration time in WebExtensions, so a
+   * changed indicator set (e.g. a user import) requires removing and re-adding the listeners.
+   */
+  private registerInspectionListeners(patterns: string[]): void {
+    if (this.inspectListener) {
+      browser.webRequest.onBeforeRequest.removeListener(this.inspectListener);
+      this.inspectListener = undefined;
+    }
+    if (this.headersListener) {
+      browser.webRequest.onHeadersReceived.removeListener(this.headersListener);
+      this.headersListener = undefined;
+    }
+    const filterApi = this.filterApi;
+    if (!filterApi || patterns.length === 0) {
       this.opts.onLog?.(
         "info",
         "response inspection not registered (API unavailable or no patterns)",
       );
+      return;
     }
-    this.sweepTimer = setInterval(() => this.sweep(Date.now()), 15_000);
+    this.inspectListener = (d) =>
+      this.onInspectCandidate(d as unknown as RequestDetailsLike, filterApi);
+    browser.webRequest.onBeforeRequest.addListener(
+      this.inspectListener,
+      { urls: patterns, types: Array.from(INSPECTABLE_TYPES) as browser.webRequest.ResourceType[] },
+      ["blocking"],
+    );
+    // Content-Type is only known at headers time; stash it for the inspector.
+    this.headersListener = (d) => this.onHeaders(d as unknown as RequestDetailsLike);
+    browser.webRequest.onHeadersReceived.addListener(this.headersListener, { urls: patterns }, [
+      "responseHeaders",
+    ]);
+  }
+
+  /** Swap inspection match patterns after an indicator-set change. */
+  updateInspectionPatterns(patterns: string[]): void {
+    if (!this.registered) {
+      this.opts.inspectionMatchPatterns.splice(
+        0,
+        this.opts.inspectionMatchPatterns.length,
+        ...patterns,
+      );
+      return;
+    }
+    this.registerInspectionListeners(patterns);
   }
 
   /** Diagnostics for the dashboard and tests. */

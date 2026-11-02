@@ -146,3 +146,51 @@ describe("LocalStore", () => {
     ).toBe(DEFAULT_SETTINGS.monitoring.responseInspectionMaxBytes);
   });
 });
+
+describe("LocalStore Phase 4: imported sets and notes", () => {
+  const set = (id: string) => ({
+    meta: {
+      id,
+      name: id,
+      version: "1",
+      asOf: "2026-11-02",
+      license: "CC0",
+      synthetic: false,
+      sources: [],
+    },
+    indicators: [],
+  });
+  it("adds, toggles, removes imported sets and keeps them across deleteAll", async () => {
+    installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    await s.addImportedSet({ set: set("a"), enabled: true, importedAt: 1, format: "adtripwire" });
+    await s.addImportedSet({ set: set("b"), enabled: false, importedAt: 2, format: "stix" });
+    expect(s.listImportedSets().map((r) => r.set.meta.id)).toEqual(["a", "b"]);
+    expect(await s.setImportedSetEnabled("b", true)).toBe(true);
+    expect(await s.setImportedSetEnabled("zzz", true)).toBe(false);
+    await s.deleteAll();
+    const s2 = new LocalStore();
+    await s2.load();
+    expect(s2.listImportedSets().length).toBe(2);
+    expect(await s2.removeImportedSet("a")).toBe(true);
+    expect(s2.listImportedSets().map((r) => r.set.meta.id)).toEqual(["b"]);
+  });
+  it("stores notes, trims them, drops empty ones and prunes with retention", async () => {
+    installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    s.addDetection(det("d1", 5_000_000_000_000, ["e1"]), [ev("e1", 5_000_000_000_000)]);
+    await s.setNote("d1", "x".repeat(5000), 10);
+    expect(s.getNote("d1")?.note.length).toBe(4000);
+    await s.setNote("d1", "   ", 11);
+    expect(s.getNote("d1")).toBeUndefined();
+    await s.setNote("d1", "keep", 12);
+    s.applyRetention(5_000_000_000_000 + 30 * 86_400_000, {
+      detectionRetentionDays: 7,
+      maxDetections: 50,
+      maxEvents: 500,
+    });
+    expect(s.getNote("d1")).toBeUndefined();
+  });
+});

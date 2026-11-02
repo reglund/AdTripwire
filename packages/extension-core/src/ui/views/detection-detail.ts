@@ -1,13 +1,5 @@
-import type { Detection, NormalizedEvent } from "@adtripwire/shared";
-import {
-  downloadText,
-  errorMessage,
-  errorState,
-  externalLink,
-  h,
-  severityBadge,
-  type Child,
-} from "../dom.js";
+import type { Detection, DetectionWithNote, NormalizedEvent } from "@adtripwire/shared";
+import { errorMessage, errorState, externalLink, h, severityBadge, type Child } from "../dom.js";
 import {
   categoryLabel,
   confidenceLabel,
@@ -21,8 +13,10 @@ import {
   sensorLabel,
   severityLabel,
 } from "../format.js";
+import { clampNote, NOTE_MAX_LENGTH } from "../exports.js";
 import { rpc } from "../rpc.js";
-import { bulletList, card, kv, profileSelect, tableWrap, timeEl, uid } from "./common.js";
+import { bulletList, card, kv, tableWrap, timeEl, uid } from "./common.js";
+import { exportGroup } from "./export-actions.js";
 
 const shortId = (id: string): string => id.slice(0, 8);
 
@@ -195,45 +189,71 @@ async function eventSection(d: Detection): Promise<{ node: HTMLElement; availabl
   return { node: card("Event sequence", body), available };
 }
 
-function exportControls(d: Detection): HTMLElement {
-  const profile = profileSelect();
-  const statusId = uid("export-status");
-  const status = h("p", { id: statusId, class: "muted", role: "status" });
-  const button = h(
+function noteSection(d: DetectionWithNote): HTMLElement {
+  const id = uid("note");
+  const textarea = h("textarea", {
+    id,
+    rows: 6,
+    maxlength: NOTE_MAX_LENGTH,
+    "aria-describedby": `${id}-help ${id}-count`,
+  });
+  textarea.value = clampNote(d.note ?? "");
+  const count = h("span", { id: `${id}-count`, class: "muted small" });
+  const updateCount = (): void => {
+    count.textContent = `${textarea.value.length} / ${NOTE_MAX_LENGTH} characters`;
+  };
+  updateCount();
+  textarea.addEventListener("input", updateCount);
+  const status = h("p", { class: "muted", role: "status" });
+  if (d.note !== undefined && d.note !== "")
+    status.textContent = "A previously saved note is shown above.";
+  const save = h(
     "button",
     {
       type: "button",
       class: "btn",
       onclick: () => {
-        button.disabled = true;
-        status.textContent = "Preparing export…";
+        save.disabled = true;
+        status.textContent = "Saving…";
         void (async () => {
           try {
-            const p = profile.value();
-            const data = await rpc<unknown>({
-              type: "export_evidence",
-              profile: p,
-              detectionIds: [d.detectionId],
+            await rpc<DetectionWithNote>({
+              type: "set_detection_note",
+              detectionId: d.detectionId,
+              note: clampNote(textarea.value),
             });
-            const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-            const date = new Date().toISOString().slice(0, 10);
-            downloadText(`adtripwire-detection-${shortId(d.detectionId)}-${p}-${date}.json`, text);
-            status.textContent = "Export downloaded.";
+            status.textContent = `Saved at ${formatTimestamp(Date.now())}.`;
           } catch (err) {
-            status.textContent = `Export failed: ${errorMessage(err)}`;
+            status.textContent = `Saving failed: ${errorMessage(err)}`;
           } finally {
-            button.disabled = false;
+            save.disabled = false;
           }
         })();
       },
     },
-    "Export this detection (JSON)",
+    "Save note",
   );
-  return h("div", { class: "export-controls" }, profile.el, button, status);
+  return card(
+    "Analyst notes",
+    h(
+      "div",
+      { class: "field" },
+      h("label", { for: id }, "Your notes on this detection"),
+      textarea,
+      h(
+        "p",
+        { id: `${id}-help`, class: "muted small" },
+        "Plain text, stored locally in this browser profile and included in hand-off packages. Do not paste passwords or other secrets.",
+      ),
+      count,
+    ),
+    h("div", { class: "button-row" }, save),
+    status,
+  );
 }
 
 export async function renderDetectionDetail(id: string): Promise<Node> {
-  const d = await rpc<Detection | null>({ type: "get_detection", detectionId: id });
+  const d = await rpc<DetectionWithNote | null>({ type: "get_detection", detectionId: id });
   const back = h("p", null, h("a", { href: "#detections" }, "← All detections"));
   if (!d) {
     return h(
@@ -295,7 +315,15 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
       h("strong", null, "Confidence rationale: "),
       d.confidenceRationale,
     ),
-    exportControls(d),
+    card(
+      "Export",
+      exportGroup({
+        detectionIds: [d.detectionId],
+        evidenceFilename: (p) =>
+          `adtripwire-detection-${shortId(d.detectionId)}-${p}-${new Date().toISOString().slice(0, 10)}.json`,
+      }),
+    ),
+    noteSection(d),
     card(
       "What was observed",
       h("p", null, d.summary),

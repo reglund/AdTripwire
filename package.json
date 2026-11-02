@@ -26,7 +26,8 @@
     "e2e:firefox": "node scripts/e2e-firefox.mjs",
     "eval:benign": "node scripts/benign-eval.mjs",
     "e2e:chromium": "node scripts/e2e-chromium.mjs",
-    "eval:benign:chromium": "node scripts/benign-eval.mjs --chromium"
+    "eval:benign:chromium": "node scripts/benign-eval.mjs --chromium",
+    "feeds:export": "node scripts/export-feeds.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

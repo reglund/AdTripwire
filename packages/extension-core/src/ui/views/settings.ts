@@ -1,8 +1,9 @@
 import type { MonitoringStatus, Settings, UiRequest } from "@adtripwire/shared";
-import { downloadText, errorMessage, h } from "../dom.js";
+import { errorMessage, h } from "../dom.js";
 import { minutesToMs, msToMinutes, parseBoundedInt } from "../format.js";
 import { requestHostPermission, rpc } from "../rpc.js";
-import { card, profileSelect, uid, type View } from "./common.js";
+import { card, uid, type View } from "./common.js";
+import { exportGroup } from "./export-actions.js";
 
 const LIMITS = {
   maxBytes: { min: 1024, max: 16 * 1024 * 1024 },
@@ -52,37 +53,10 @@ function numberField(label: string, help: string, value: number, unit: string) {
 }
 
 function exportAll(): HTMLElement {
-  const profile = profileSelect();
-  const status = h("p", { class: "muted", role: "status" });
-  const button = h(
-    "button",
-    {
-      type: "button",
-      class: "btn",
-      onclick: () => {
-        button.disabled = true;
-        status.textContent = "Preparing export…";
-        void (async () => {
-          try {
-            const p = profile.value();
-            const data = await rpc<unknown>({ type: "export_evidence", profile: p });
-            const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-            downloadText(
-              `adtripwire-evidence-${p}-${new Date().toISOString().slice(0, 10)}.json`,
-              text,
-            );
-            status.textContent = "Export downloaded.";
-          } catch (err) {
-            status.textContent = `Export failed: ${errorMessage(err)}`;
-          } finally {
-            button.disabled = false;
-          }
-        })();
-      },
-    },
-    "Export all evidence (JSON)",
-  );
-  return h("div", { class: "export-controls" }, profile.el, button, status);
+  return exportGroup({
+    evidenceFilename: (p) =>
+      `adtripwire-evidence-${p}-${new Date().toISOString().slice(0, 10)}.json`,
+  });
 }
 
 function deleteControls(): HTMLElement {
@@ -422,7 +396,7 @@ export const renderSettings: View = async (ctx) => {
       h(
         "p",
         null,
-        "Export detections and their supporting sanitized events as JSON for analysis or sharing with an incident-response contact.",
+        "Export all detections and their supporting sanitized events for analysis or sharing with an incident-response contact: evidence JSON, a STIX 2.1 bundle, SIEM NDJSON (ECS) or a hand-off package.",
       ),
       exportAll(),
     ),
