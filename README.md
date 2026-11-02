@@ -93,6 +93,8 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/privacy.md` – what is stored, what never is, permissions
 - `docs/limitations.md` – known gaps
 - `docs/testing.md` – automated and manual verification
+- `docs/roadmap.md` – phases and gates
+- `docs/phase-1-report.md` – Phase 1 deliverables and status
 
 ## Indicators and attribution
 
