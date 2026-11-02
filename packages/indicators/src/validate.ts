@@ -6,7 +6,8 @@ import type {
   IndicatorSetMeta,
   IndicatorType,
 } from "@adtripwire/shared";
-import { isIpAddress, normalizeHostname } from "./hostname.js";
+import { isIpAddress, normalizeHostname, hostnameMatchesDomain } from "./hostname.js";
+import { publicSuffix } from "./psl.js";
 
 /**
  * Names that are shared hosting / CDN / cloud platforms. An indicator may never BE one of these
@@ -27,6 +28,34 @@ export const BROAD_DOMAIN_DENYLIST: readonly string[] = [
   "vercel.app",
   "web.app",
   "firebaseapp.com",
+  "s3.amazonaws.com",
+  "elb.amazonaws.com",
+  "compute.amazonaws.com",
+  "blogspot.com",
+  "appspot.com",
+  "pages.dev",
+  "workers.dev",
+  "azurewebsites.net",
+  "googleusercontent.com",
+  "gitlab.io",
+  "wixsite.com",
+  "wordpress.com",
+  "weebly.com",
+  "squarespace.com",
+  "myshopify.com",
+  "cloudapp.net",
+  "trafficmanager.net",
+  "akamaized.net",
+  "fastlylb.net",
+  "ngrok.io",
+  "ngrok.app",
+  "repl.co",
+  "glitch.me",
+  "surge.sh",
+  "000webhostapp.com",
+  "duckdns.org",
+  "no-ip.org",
+  "dyndns.org",
 ];
 
 export type ValidationResult = { ok: true; set: IndicatorSet } | { ok: false; errors: string[] };
@@ -60,6 +89,12 @@ function validateMeta(raw: unknown, errors: string[]): IndicatorSetMeta | null {
   };
   for (const k of ["id", "name", "version", "license"] as const) {
     if (!isNonEmptyString(raw[k])) err(`${k}: required non-empty string`);
+  }
+  if (typeof raw["id"] === "string" && !/^[A-Za-z0-9._-]{1,128}$/.test(raw["id"]))
+    err("id: must match ^[A-Za-z0-9._-]{1,128}$");
+  for (const k of ["name", "version", "license", "description"] as const) {
+    if (typeof raw[k] === "string" && (raw[k] as string).length > 500)
+      err(`${k}: longer than 500 characters`);
   }
   if (!isIsoDate(raw["asOf"])) err("asOf: must be a valid YYYY-MM-DD date");
   if (typeof raw["synthetic"] !== "boolean") err("synthetic: must be a boolean");
@@ -143,6 +178,11 @@ function validateRecord(raw: unknown, index: number, errors: string[]): Indicato
   for (const k of ["notes", "role"] as const) {
     if (raw[k] !== undefined && typeof raw[k] !== "string")
       err(`${k}: must be a string when present`);
+    else if (typeof raw[k] === "string" && (raw[k] as string).length > (k === "notes" ? 1000 : 200))
+      err(`${k}: too long`);
+  }
+  for (const k of ["source", "sourceUrl", "campaign", "id"] as const) {
+    if (typeof raw[k] === "string" && (raw[k] as string).length > 500) err(`${k}: too long`);
   }
 
   // Indicator value.
@@ -165,6 +205,15 @@ function validateRecord(raw: unknown, index: number, errors: string[]): Indicato
         err(`indicator: "${host}" must contain at least one dot (bare TLD / single label)`);
       } else if (BROAD_DOMAIN_DENYLIST.includes(host)) {
         err(`indicator: "${host}" is too broad (shared hosting / CDN / cloud platform)`);
+      } else if ((type === "domain" || type === "hostname_path") && publicSuffix(host) === host) {
+        err(`indicator: "${host}" is a public suffix and cannot be a ${String(type)} indicator`);
+      } else if (
+        type === "domain" &&
+        BROAD_DOMAIN_DENYLIST.some((d) => hostnameMatchesDomain(host, d))
+      ) {
+        err(
+          `indicator: "${host}" is a tenant of a shared platform; use indicatorType "hostname" for an exact match`,
+        );
       }
     }
   }
@@ -176,6 +225,12 @@ function validateRecord(raw: unknown, index: number, errors: string[]): Indicato
   } else if (typeOk && (type === "hostname_path" || type === "url_path")) {
     if (typeof pp !== "string" || !pp.startsWith("/")) {
       err(`pathPattern: required and must start with "/" for ${String(type)}`);
+    } else {
+      // A path indicator must name a real path: at least one segment of 4+ characters and
+      // not just "/" or a one-letter directory, otherwise it would match (nearly) everything.
+      const segs = pp.split("/").filter((x) => x.length > 0);
+      if (segs.length === 0 || !segs.some((x) => x.length >= 4) || pp.length > 200)
+        err(`pathPattern: "${pp}" is too broad or too long for ${String(type)}`);
     }
   }
 
@@ -209,6 +264,8 @@ export function validateIndicatorSet(input: unknown): ValidationResult {
   const meta = validateMeta(input["meta"], errors);
   const records: IndicatorRecord[] = [];
   const rawList = input["indicators"];
+  if (Array.isArray(rawList) && rawList.length > 10_000)
+    errors.push("indicators: more than 10000 records in one set");
   if (!Array.isArray(rawList)) {
     errors.push("indicators: must be an array");
   } else {

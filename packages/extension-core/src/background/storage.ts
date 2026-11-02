@@ -6,6 +6,7 @@ import type {
   Settings,
 } from "@adtripwire/shared";
 import { DEFAULT_SETTINGS } from "@adtripwire/shared";
+import { validateIndicatorSet } from "@adtripwire/indicators";
 
 /**
  * Local persistence (browser.storage.local). Only detections and the events they
@@ -73,9 +74,14 @@ export class LocalStore {
       KEY_IMPORTED_SETS,
       KEY_NOTES,
     ]);
-    this.importedSets = Array.isArray(data[KEY_IMPORTED_SETS])
-      ? (data[KEY_IMPORTED_SETS] as ImportedSetRecord[])
-      : [];
+    // Stored imports are re-validated on load so a stale or corrupted record can never
+    // re-enter the matcher.
+    this.importedSets = (
+      Array.isArray(data[KEY_IMPORTED_SETS]) ? (data[KEY_IMPORTED_SETS] as ImportedSetRecord[]) : []
+    ).flatMap((r) => {
+      const v = validateIndicatorSet(r?.set);
+      return v.ok && typeof r.enabled === "boolean" ? [{ ...r, set: v.set }] : [];
+    });
     const notes = data[KEY_NOTES];
     this.notes = new Map(
       notes && typeof notes === "object" ? Object.entries(notes as Record<string, NoteRecord>) : [],
@@ -225,11 +231,15 @@ export class LocalStore {
     return this.importedSets;
   }
 
-  async addImportedSet(rec: ImportedSetRecord): Promise<void> {
+  /** Adds or replaces an imported set; returns the id of an evicted oldest set, if any. */
+  async addImportedSet(rec: ImportedSetRecord): Promise<string | undefined> {
     this.importedSets = this.importedSets.filter((r) => r.set.meta.id !== rec.set.meta.id);
     this.importedSets.push(rec);
-    if (this.importedSets.length > MAX_IMPORTED_SETS) this.importedSets.shift();
+    let evicted: string | undefined;
+    if (this.importedSets.length > MAX_IMPORTED_SETS)
+      evicted = this.importedSets.shift()?.set.meta.id;
     await browser.storage.local.set({ [KEY_IMPORTED_SETS]: this.importedSets });
+    return evicted;
   }
 
   async removeImportedSet(setId: string): Promise<boolean> {

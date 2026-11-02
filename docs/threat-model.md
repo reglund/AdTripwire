@@ -80,3 +80,21 @@ themselves public suffixes. Documented, not fixed: hidden-ness is judged at inse
 page signals can be forged by a hostile frame (bounded to that frame's lineage and capped
 below high priority without a documented NOAS host); the code view can be steered by
 crafted regex literals.
+
+### Phase 4 review (2026-11-02)
+
+Read-only Opus review of the import path and the new request parsing (exports and feeds were
+not reached and remain covered by the interop package's own tests). Findings fixed the same
+day: a host-independent `url_path` indicator of `/` would have matched every request (path
+indicators now need a real path segment and `url_path` records are not accepted from imports
+at all); public suffixes such as `co.uk` and shared-platform tenants passed as `domain`
+records (now rejected via the bundled Public Suffix List and an extended platform denylist;
+tenants must be exact `hostname` records, and the STIX importer maps them accordingly);
+bundled precedence only caught identical strings (now also parents and children of bundled
+indicators); unbounded set ids made imported sets impossible to remove (ids limited to
+`[A-Za-z0-9._-]{1,128}`, string lengths capped); no cap on imported indicators (10 000 per
+set, 5 000 total, 20 sets, eviction reported); stored imports are re-validated on load; the
+Firefox inspection-pattern re-registration rolls back to the previous pattern set on failure.
+Residual: imported classifications are still trusted within those limits, so an analyst can
+import `domain` records for legitimate popular sites; the dashboard shows imported sets
+separately and they can be disabled or removed at any time.

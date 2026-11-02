@@ -182,3 +182,102 @@ describe("validateIndicatorSet", () => {
     ).toContain("published");
   });
 });
+
+describe("validator hardening (Phase 4 review)", () => {
+  const base = {
+    id: "x-1",
+    source: "t",
+    sourceUrl: "https://example.test/",
+    campaign: "t",
+    classification: "malicious",
+    confidence: "high",
+    firstReported: "2026-01-01",
+    lastReviewed: "2026-01-01",
+    enabled: true,
+  };
+  const setWith = (rec: Record<string, unknown>, metaId = "s") => ({
+    meta: {
+      id: metaId,
+      name: "s",
+      version: "1",
+      asOf: "2026-01-01",
+      license: "CC0",
+      synthetic: false,
+      sources: [],
+    },
+    indicators: [{ ...base, ...rec }],
+  });
+  const fails = (rec: Record<string, unknown>, metaId?: string) => {
+    const r = validateIndicatorSet(setWith(rec, metaId));
+    return r.ok ? [] : r.errors;
+  };
+  it("rejects host-independent or near-empty path patterns", () => {
+    expect(
+      fails({ indicator: "/", indicatorType: "url_path", pathPattern: "/" }).join(" "),
+    ).toMatch(/too broad/);
+    expect(
+      fails({ indicator: "/js", indicatorType: "url_path", pathPattern: "/js" }).join(" "),
+    ).toMatch(/too broad/);
+    expect(
+      fails({
+        indicator: "h.synthetic.test",
+        indicatorType: "hostname_path",
+        pathPattern: "/a/",
+      }).join(" "),
+    ).toMatch(/too broad/);
+    expect(
+      fails({
+        indicator: "h.synthetic.test",
+        indicatorType: "hostname_path",
+        pathPattern: "/getAd",
+      }),
+    ).toEqual([]);
+  });
+  it("rejects public suffixes and platform tenants as domain indicators", () => {
+    expect(fails({ indicator: "co.uk", indicatorType: "domain" }).join(" ")).toMatch(
+      /public suffix/,
+    );
+    expect(fails({ indicator: "com.au", indicatorType: "domain" }).join(" ")).toMatch(
+      /public suffix/,
+    );
+    expect(fails({ indicator: "elb.amazonaws.com", indicatorType: "domain" }).join(" ")).toMatch(
+      /too broad|tenant/,
+    );
+    expect(
+      fails({ indicator: "my-bucket.s3.amazonaws.com", indicatorType: "domain" }).join(" "),
+    ).toMatch(/tenant/);
+    expect(fails({ indicator: "my-bucket.s3.amazonaws.com", indicatorType: "hostname" })).toEqual(
+      [],
+    );
+    expect(fails({ indicator: "blogspot.com", indicatorType: "domain" }).join(" ")).toMatch(
+      /too broad/,
+    );
+  });
+  it("caps meta.id format and string lengths", () => {
+    expect(
+      fails({ indicator: "h.synthetic.test", indicatorType: "hostname" }, "x".repeat(129)).join(
+        " ",
+      ),
+    ).toMatch(/meta\.id/);
+    expect(
+      fails(
+        { indicator: "h.synthetic.test", indicatorType: "hostname" },
+        "bad id with spaces",
+      ).join(" "),
+    ).toMatch(/meta\.id/);
+    expect(
+      fails({
+        indicator: "h.synthetic.test",
+        indicatorType: "hostname",
+        notes: "n".repeat(1001),
+      }).join(" "),
+    ).toMatch(/notes/);
+  });
+  it("still accepts the bundled set", () => {
+    expect(
+      validateIndicatorSet(
+        JSON.parse(readFileSync("packages/indicators/data/adfection-2026.json", "utf8")),
+      ).ok,
+    ).toBe(true);
+  });
+});

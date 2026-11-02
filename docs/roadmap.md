@@ -88,7 +88,7 @@ manual verification of the page-sensor consent UI.
 Gate 3: synthetic suite passes on the Chromium rule subset (met headless); no faked body
 inspection (met: `no_response_body_access` on every event).
 
-## Phase 4 — Security research integration (in progress, started 2026-11-02)
+## Phase 4 — Security research integration (delivered 2026-11-02, awaiting approval)
 
 - STIX 2.1 export of detections and indicators ✅ (validated with the OASIS validator);
   STIX import of indicator bundles ✅ (bundled curation takes precedence).
@@ -98,8 +98,9 @@ inspection (met: `no_response_body_access` on every event).
 - Zero Breach results: STIX import path ✅; on-device scan results have no stable public
   format yet ⬜.
 - Investigation workflow ✅: analyst notes, timeline view, hand-off package.
-- Pending: run the Suricata rules through `suricata -T`, a security review of the import
-  path and exports, manual UI verification of the new views.
+- Security review of the import path ✅ (findings fixed; see threat model). Pending: run
+  the Suricata rules through `suricata -T` (container run was blocked in this environment),
+  review of exports/feeds beyond the package tests, manual UI verification of the new views.
 
 Gate 4: an exported bundle round-trips into a STIX validator (met) and a SIEM test harness
 (ECS structure tested; live ingestion into Elastic/OpenSearch not yet performed).

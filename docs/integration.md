@@ -28,11 +28,16 @@ redaction pseudonymises non-subject hostnames. `url.*` ECS fields never carry qu
 - Formats: AdTripwire indicator-set JSON, or a STIX 2.1 bundle (indicators with
   `domain-name:value` equality patterns; IPs, hashes and other patterns are skipped with a
   warning).
-- Validation: identical to the bundled set (no IPs as domains, no shared-hosting apexes, no
-  reserved test names, date sanity). Rejected records become warnings; the import fails only
-  if nothing survives.
-- **Bundled curation takes precedence**: imported records for hosts the bundled set already
-  classifies are dropped with a warning. This matters for Zero Breach's STIX export, which
+- Validation: identical to the bundled set, hardened for untrusted files: no IPs as domains,
+  no public suffixes (`co.uk`) or shared-platform tenants as `domain` records (use exact
+  `hostname`), no host-independent `url_path` records, path indicators must name a real path,
+  no reserved test names, date sanity, bounded string lengths, set ids limited to
+  `[A-Za-z0-9._-]{1,128}`, at most 10 000 records per set and 5 000 imported indicators in
+  total across at most 20 sets. Rejected records become warnings; the import fails only if
+  nothing survives. Stored imports are re-validated on every load.
+- **Bundled curation takes precedence**: imported records that name a bundled host, that
+  are a `domain` covering a bundled host (parent), or that fall under a bundled `domain`
+  (child) are dropped with a warning. This matters for Zero Breach's STIX export, which
   labels every indicator `malicious-activity`, including hosts AdTripwire classifies as
   surveillance or contextual. Imports therefore add coverage (e.g. the 2021–2025 Candiru
   sets) without re-ranking common ad-tech exposure.

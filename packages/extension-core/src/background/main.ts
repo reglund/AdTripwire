@@ -33,6 +33,11 @@ import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import { stixToIndicatorSet } from "@adtripwire/interop";
 import { exportResearch } from "./research-export.js";
 import {
+  MAX_IMPORTED_INDICATORS_TOTAL,
+  applyBundledPrecedence,
+  summariseDrops,
+} from "./import-policy.js";
+import {
   addIndicatorPatterns,
   buildInspectionMatchPatterns,
   isNoasPath,
@@ -403,28 +408,10 @@ class Background {
         warnings,
       };
     }
-    // Bundled curation takes precedence: an imported record for a host the bundled set already
-    // classifies (e.g. as surveillance/contextual) is dropped, so a broader upstream feed cannot
-    // silently re-rank common ad-tech exposure as malicious.
-    const bundled = new IndicatorMatcher(this.sets.filter((b) => !b.meta.synthetic));
-    const kept = [];
-    let dropped = 0;
-    for (const rec of v.set.indicators) {
-      const overlapping =
-        rec.indicatorType === "hostname" || rec.indicatorType === "domain"
-          ? bundled.match(rec.indicator).filter((m) => m.indicator.indicator === rec.indicator)
-          : [];
-      if (overlapping.length > 0) {
-        dropped++;
-        continue;
-      }
-      kept.push(rec);
-    }
-    if (dropped > 0) {
-      warnings.push(
-        `${dropped} indicator(s) already covered by the bundled set were skipped; bundled classification takes precedence`,
-      );
-    }
+    // Bundled curation takes precedence (exact, parent and child overlaps; no url_path).
+    const policy = applyBundledPrecedence(v.set, this.sets);
+    warnings.push(...summariseDrops(policy.dropped));
+    const kept = policy.kept;
     if (kept.length === 0) {
       return {
         ok: false,
@@ -432,8 +419,28 @@ class Background {
         warnings,
       };
     }
+    const alreadyImported = this.store
+      .listImportedSets()
+      .filter((r) => r.set.meta.id !== v.set.meta.id)
+      .reduce((n, r) => n + r.set.indicators.length, 0);
+    if (alreadyImported + kept.length > MAX_IMPORTED_INDICATORS_TOTAL) {
+      return {
+        ok: false,
+        errors: [
+          `import would exceed the ${MAX_IMPORTED_INDICATORS_TOTAL}-indicator limit for imported sets (${alreadyImported} already imported); remove a set first`,
+        ],
+        warnings,
+      };
+    }
     const finalSet: IndicatorSet = { ...v.set, indicators: kept };
-    await this.store.addImportedSet({ set: finalSet, enabled, importedAt: Date.now(), format });
+    const evicted = await this.store.addImportedSet({
+      set: finalSet,
+      enabled,
+      importedAt: Date.now(),
+      format,
+    });
+    if (evicted)
+      warnings.push(`oldest imported set ${evicted} was removed to stay within the limit`);
     this.rebuildMatcher();
     log(
       "info",

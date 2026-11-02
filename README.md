@@ -114,6 +114,7 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/roadmap.md` – phases and gates
 - `docs/phase-1-report.md` – Phase 1 deliverables and status
 - `docs/phase-3-report.md` – Phase 3 (Chromium) deliverables and status
+- `docs/phase-4-report.md` – Phase 4 (research integration) deliverables and status
 
 ## Indicators and attribution
 

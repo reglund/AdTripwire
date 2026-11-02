@@ -87,6 +87,7 @@ export class WebRequestSensor {
       browser.webRequest as unknown as { filterResponseData?: (id: string) => StreamFilterLike }
     ).filterResponseData;
     this.registerInspectionListeners(this.opts.inspectionMatchPatterns);
+    this.activePatterns = [...this.opts.inspectionMatchPatterns];
     this.sweepTimer = setInterval(() => this.sweep(Date.now()), 15_000);
   }
 
@@ -126,7 +127,9 @@ export class WebRequestSensor {
     ]);
   }
 
-  /** Swap inspection match patterns after an indicator-set change. */
+  private activePatterns: string[] = [];
+
+  /** Swap inspection match patterns after an indicator-set change (rolls back on failure). */
   updateInspectionPatterns(patterns: string[]): void {
     if (!this.registered) {
       this.opts.inspectionMatchPatterns.splice(
@@ -136,7 +139,21 @@ export class WebRequestSensor {
       );
       return;
     }
-    this.registerInspectionListeners(patterns);
+    const previous = this.activePatterns;
+    try {
+      this.registerInspectionListeners(patterns);
+      this.activePatterns = patterns;
+    } catch (e) {
+      this.opts.onLog?.(
+        "error",
+        `inspection pattern update failed, restoring previous set: ${String(e)}`,
+      );
+      try {
+        this.registerInspectionListeners(previous);
+      } catch (e2) {
+        this.opts.onLog?.("error", `restoring inspection patterns failed: ${String(e2)}`);
+      }
+    }
   }
 
   /** Diagnostics for the dashboard and tests. */

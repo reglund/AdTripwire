@@ -19,7 +19,11 @@ import type {
   IndicatorSet,
   IndicatorSetMeta,
 } from "@adtripwire/shared";
-import { validateIndicatorSet } from "@adtripwire/indicators";
+import {
+  BROAD_DOMAIN_DENYLIST,
+  hostnameMatchesDomain,
+  validateIndicatorSet,
+} from "@adtripwire/indicators";
 
 export interface StixImportOptions {
   setId: string;
@@ -214,7 +218,13 @@ export function stixToIndicatorSet(bundleJson: unknown, opts: StixImportOptions)
       const rec: IndicatorRecord = {
         id: values.length === 1 ? id : `${id}#${i + 1}`,
         indicator: value.toLowerCase(),
-        indicatorType: labels.includes("adtripwire:type:hostname") ? "hostname" : "domain",
+        // Tenants of shared platforms (e.g. d0abc.cloudfront.net) are imported as exact hostnames:
+        // a `domain` record there would be rejected as too broad by the validator.
+        indicatorType:
+          labels.includes("adtripwire:type:hostname") ||
+          BROAD_DOMAIN_DENYLIST.some((d) => hostnameMatchesDomain(value.toLowerCase(), d))
+            ? "hostname"
+            : "domain",
         source: identity?.name ?? str(ref?.["source_name"], 200) ?? "STIX import",
         sourceUrl: httpUrl(ref?.["url"]) ?? `urn:stix:${id}`,
         campaign: labelValue(labels, "campaign:") ?? opts.setId,
