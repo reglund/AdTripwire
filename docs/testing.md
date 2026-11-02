@@ -122,6 +122,17 @@ repeated-exposure rule carry over between daily runs. Firefox is driven over Web
 with `-remote-allow-system-access` (needed to evaluate inside the extension page); Chromium
 via CDP with `--load-extension`.
 
+### Lesson: evaluate with consent
+
+The original benign-browsing evaluations ran headless without accepting consent dialogs, so
+few programmatic auctions ran and cookie-sync redirect chains were rare. The first
+consent-enabled exposure run (2026-11-02) showed 30-60 such chains per ad-heavy page, each a
+separate `ad_delivery.redirect_chain` "suspicious" detection (93 % of detections in a sample).
+The rule was retuned (per-tab aggregation, informational unless a hop reaches documented
+infrastructure; the same two-page sample went from 74 to 7 detections), and false-positive
+evaluations now use `scripts/exposure-run.mjs` with consent, e.g.
+`node scripts/exposure-run.mjs --browser=firefox --sites=tests/fixtures/benign-sites.txt`.
+
 ## Local-model assistance (Phase 5)
 
 ```bash
