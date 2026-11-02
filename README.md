@@ -99,6 +99,7 @@ pnpm e2e:chromium        # headless Chrome/Chromium run (reduced capability expe
 pnpm e2e:firefox:assist  # same, with the optional --assist build and a mock local model runtime
 pnpm eval:assist         # evaluate local models on synthetic scenarios (see docs/local-assist.md)
 pnpm release:check       # reproducible release zips, source archive, SBOM, SHA256SUMS (docs/release.md)
+pnpm exposure:build && pnpm exposure:firefox   # interactive real-traffic exposure run (docs/testing.md)
 pnpm indicators:sign     # keygen | sign | verify signed indicator bundles (docs/indicator-updates.md)
 pnpm docs:rules          # regenerate the rule catalogue in docs/detection-methodology.md
 ```

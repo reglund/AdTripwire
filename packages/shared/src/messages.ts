@@ -40,6 +40,8 @@ export interface MonitoringStatus {
     /** Mean milliseconds per engine ingest. */
     ingestMsMean: number;
     inspectionsSkippedForBudget: number;
+    /** Distinct registrable domains contacted by third-party requests (count only). */
+    thirdPartyDomains: number;
     since: number;
   };
   /**

@@ -33,7 +33,10 @@
     "e2e:chromium:assist": "node scripts/e2e-chromium.mjs --assist",
     "indicators:sign": "esbuild scripts/sign-indicators.mjs --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/sign-indicators.mjs --log-level=warning --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts && node node_modules/.cache/adtripwire/sign-indicators.mjs",
     "release:package": "node scripts/release-package.mjs",
-    "release:check": "node scripts/release-package.mjs --check"
+    "release:check": "node scripts/release-package.mjs --check",
+    "exposure:build": "node apps/extension-firefox/build.mjs --eval --out=$HOME/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=$HOME/snap/chromium/common/adtripwire-eval-dist",
+    "exposure:firefox": "node scripts/exposure-run.mjs --browser=firefox",
+    "exposure:chromium": "node scripts/exposure-run.mjs --browser=chromium"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -42,6 +45,7 @@
     "esbuild": "~0.25.12",
     "eslint": "^10.14.0",
     "prettier": "^3.9.10",
+    "puppeteer-core": "^25.16.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^3.2.7",

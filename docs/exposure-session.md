@@ -29,6 +29,15 @@ record whether the browser contacts infrastructure documented in the AdFection r
 5. Optional: a second run on a phone-like viewport (Responsive Design Mode, mobile UA)
    because the campaign targeted mobile identifiers heavily.
 
+## Automated variant
+
+`pnpm exposure:build && pnpm exposure:firefox` (or `exposure:chromium`, `--mobile`) performs
+this session automatically with a persistent profile: consent accepted, scrolling, one
+article per site, 75 s dwell, report with auction evidence per site. Run it daily for at
+least three days to let the repeated-exposure rule fire. It cannot stand in for your own
+profile (logins, history, your consent choices), so keep the manual session below as the
+reference.
+
 ## Session
 
 - Visit the sites in `tests/fixtures/exposure-sites.txt` (or your own daily sites).

@@ -193,7 +193,10 @@ for (const { batch, line } of parsed) {
   } else if (/^ready: \d+ indicators, ruleset \d+r-[0-9a-f]+, caps=[a-z_,]+/.test(line)) {
     ready++;
   } else if (
-    (m = /^stats: observed=(\d+) ingested=(\d+) inspections=(\d+) detections=(\d+)$/.exec(line))
+    (m =
+      /^stats: observed=(\d+) ingested=(\d+) inspections=(\d+) detections=(\d+)(?: thirdPartyDomains=\d+)?$/.exec(
+        line,
+      ))
   ) {
     statsLines.push({
       batch,

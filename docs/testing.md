@@ -102,6 +102,26 @@ snap or Chrome for Testing (`CHROME_BIN=...`). Snap Chromium needs the profile u
 Steps 5–7 exercise the UI and were **not** covered by the automated script in Phase 1;
 they remain a manual check. Console lines are prefixed `[AdTripwire]`.
 
+## Interactive exposure runs (real ad traffic)
+
+```bash
+pnpm exposure:build                 # evaluation builds (production indicators, dashboard opens on install)
+pnpm exposure:firefox -- --seconds=75           # or exposure:chromium; add --mobile, --limit=N, --headed
+node scripts/exposure-run.mjs --browser=firefox --sites=tests/fixtures/exposure-sites.txt --json=run.json
+```
+
+`scripts/exposure-run.mjs` drives a real browser through puppeteer-core (dev dependency):
+it accepts consent dialogs (known CMP selectors plus button-text heuristics in every frame),
+scrolls, opens one article per site and dwells, so programmatic auctions actually run. It
+reads results through the extension's own UI protocol from the dashboard tab (not console
+parsing), records per site the requests observed, the distinct third-party registrable
+domains contacted (auction evidence) and new detections, and writes
+`docs/evaluations/<date>-exposure-interactive-<browser>[-mobile].md`. Profiles persist in
+`~/snap/<browser>/common/adtripwire-exposure-profile*` so cookies, consent and the
+repeated-exposure rule carry over between daily runs. Firefox is driven over WebDriver BiDi
+with `-remote-allow-system-access` (needed to evaluate inside the extension page); Chromium
+via CDP with `--load-extension`.
+
 ## Local-model assistance (Phase 5)
 
 ```bash

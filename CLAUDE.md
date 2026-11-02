@@ -30,6 +30,7 @@ node scripts/import-zero-breach.mjs      # regenerate packages/indicators/data/a
 node apps/extension-firefox/build.mjs --assist   # optional local-model build (loopback-only connect-src)
 pnpm e2e:firefox:assist | e2e:chromium:assist    # e2e with mock Ollama runtime on 127.0.0.1:8787
 pnpm eval:assist -- --endpoint URL --models a,b  # evaluate local models on synthetic scenarios
+pnpm exposure:build && pnpm exposure:firefox     # puppeteer-driven real-traffic run (consent, scroll, article)
 ```
 
 Note: `tsc -p <pkg> --noEmit` fails with TS6305 until referenced packages are built; use

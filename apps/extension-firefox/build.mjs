@@ -14,10 +14,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dist = join(here, "dist");
+const outArg = process.argv.find((a) => a.startsWith("--out="));
+const dist = outArg ? outArg.slice("--out=".length) : join(here, "dist");
 const dev = process.argv.includes("--dev");
 const watch = process.argv.includes("--watch");
 const assist = process.argv.includes("--assist");
+// --eval: production indicators, but the dashboard opens on install so an automated evaluation
+// run (scripts/exposure-run.mjs) can query the extension through its own UI protocol.
+const evalMode = process.argv.includes("--eval");
 const pkg = JSON.parse(readFileSync(join(here, "package.json"), "utf8"));
 
 rmSync(dist, { recursive: true, force: true });
@@ -26,6 +30,7 @@ mkdirSync(dist, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"));
 manifest.version = pkg.version;
 if (dev) manifest.name = "AdTripwire (dev build with synthetic test indicators)";
+if (evalMode) manifest.name = `${manifest.name} (evaluation build)`;
 if (assist) {
   manifest.name = `${manifest.name} (local assist build)`;
   const csp = manifest.content_security_policy.extension_pages;
@@ -53,6 +58,7 @@ const common = {
     __ADTRIPWIRE_VERSION__: JSON.stringify(pkg.version),
     __ADTRIPWIRE_DEV__: JSON.stringify(dev),
     __ADTRIPWIRE_ASSIST__: JSON.stringify(assist),
+    __ADTRIPWIRE_EVAL__: JSON.stringify(evalMode),
   },
   outdir: dist,
   entryPoints: {
@@ -110,6 +116,6 @@ if (watch) {
     process.exit(1);
   }
   console.log(
-    `built ${dev ? "DEV" : "production"}${assist ? " +assist" : ""} bundle v${pkg.version} → ${dist}`,
+    `built ${dev ? "DEV" : "production"}${assist ? " +assist" : ""}${evalMode ? " +eval" : ""} bundle v${pkg.version} → ${dist}`,
   );
 }

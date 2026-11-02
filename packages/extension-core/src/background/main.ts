@@ -42,6 +42,7 @@ import { exportResearch } from "./research-export.js";
 import {
   buildAssistContext,
   clusterDetections,
+  clusterDomain,
   renderPrompt,
   suggestActions,
   summarizeTimeline,
@@ -93,6 +94,9 @@ class Background {
   private readonly sets: IndicatorSet[] = [];
   private engine: DetectionEngine | undefined;
   private capabilities: SensorCapabilities;
+  /** Registrable domains seen in third-party requests; a bounded set, counted for evaluation runs. */
+  private thirdPartyDomains = new Set<string>();
+  private static readonly THIRD_PARTY_DOMAINS_MAX = 20_000;
   private readonly sensor: ReturnType<SensorAdapter["createSensor"]>;
   private exposure = new MemoryExposureStore();
   private metrics: Metrics = { ...EMPTY_METRICS };
@@ -214,7 +218,7 @@ class Background {
       const m = this.metrics;
       log(
         "info",
-        `stats: observed=${m.eventsObserved} ingested=${m.eventsIngested} inspections=${m.inspections} detections=${this.store.listDetections().length}`,
+        `stats: observed=${m.eventsObserved} ingested=${m.eventsIngested} inspections=${m.inspections} detections=${this.store.listDetections().length} thirdPartyDomains=${this.thirdPartyDomains.size}`,
       );
     }, 60_000);
     this.isReady = true;
@@ -730,6 +734,12 @@ class Background {
     }
     const engine = this.engine;
     const t0 = performance.now();
+    if (
+      ev.frameContext.thirdParty === true &&
+      this.thirdPartyDomains.size < Background.THIRD_PARTY_DOMAINS_MAX
+    ) {
+      this.thirdPartyDomains.add(clusterDomain(ev.destination.hostname));
+    }
     try {
       const { detections, updated } = engine.ingest(ev);
       this.metrics.eventsIngested++;
@@ -860,6 +870,7 @@ class Background {
       passThroughMsMean: m.inspections ? m.passThroughMsTotal / m.inspections : 0,
       analysisMsMean: m.inspections ? m.analysisMsTotal / m.inspections : 0,
       ingestMsMean: m.eventsIngested ? m.ingestMsTotal / m.eventsIngested : 0,
+      thirdPartyDomains: this.thirdPartyDomains.size,
       inspectionsSkippedForBudget: stats.skippedForBudget,
       since: m.startedAt,
     };
@@ -1048,8 +1059,9 @@ export function startBackground(adapter: SensorAdapter): void {
   browser.runtime.onInstalled.addListener((details) => {
     if (details.reason === "install")
       log("info", "installed; monitoring starts once host permission is present");
-    if (__ADTRIPWIRE_DEV__) {
-      // DEV builds open the dashboard so the browser-level test can confirm the UI renders.
+    if (__ADTRIPWIRE_DEV__ || __ADTRIPWIRE_EVAL__) {
+      // DEV and evaluation builds open the dashboard so an automated run can confirm the UI
+      // renders and query status through the UI protocol.
       setTimeout(() => {
         browser.tabs
           .create({ url: browser.runtime.getURL("dashboard.html#detections"), active: false })
