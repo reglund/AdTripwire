@@ -92,7 +92,12 @@ if (watch) {
   const bad = [];
   for (const name of ["background.js", "popup.js", "dashboard.js", "page-sensor.js"]) {
     const code = readFileSync(join(dist, name), "utf8");
-    const unquoted = code.replace(/["'`][^"'`]*["'`]/g, "");
+    // Strip string literals (escape-aware, so an apostrophe inside a double-quoted string
+    // cannot shift the match and expose string content as code).
+    const unquoted = code.replace(
+      /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g,
+      '""',
+    );
     if (/\beval\s*\(/.test(unquoted)) bad.push(`${name}: eval(`);
     if (/\bnew\s+Function\s*\(/.test(unquoted)) bad.push(`${name}: new Function(`);
     if (!dev && /synthetic-adfection\.test/.test(code))

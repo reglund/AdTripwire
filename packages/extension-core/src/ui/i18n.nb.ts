@@ -5,7 +5,7 @@
  */
 export const NB: Record<string, string> = {
   "Indicator set may be out of date. ": "Indikatorsettet kan være utdatert. ",
-  "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the project's releases for a signed indicator update and import it under Indicators.":
+  "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the AdTripwire releases for a signed indicator update and import it under Indicators.":
     "Det kuraterte settet er {days} dager gammelt (per {date}). Dokumentert infrastruktur roteres, så nyere verter kan mangle. Se prosjektets utgivelser etter en signert indikatoroppdatering og importer den under Indikatorer.",
   // Dashboard chrome
   Overview: "Oversikt",

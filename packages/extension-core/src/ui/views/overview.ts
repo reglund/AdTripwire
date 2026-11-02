@@ -37,7 +37,7 @@ function staleIndicatorNotice(status: MonitoringStatus): HTMLElement | null {
     { class: "notice-warn", role: "status" },
     h("strong", null, t("Indicator set may be out of date. ")),
     t(
-      "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the project's releases for a signed indicator update and import it under Indicators.",
+      "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the AdTripwire releases for a signed indicator update and import it under Indicators.",
       { days: x.days, date: x.s.asOf },
     ),
   );
