@@ -9,12 +9,13 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
 # indicator set (pull the repository to pick up merged indicator refreshes).
 ExecStartPre=/bin/sh -c 'node scripts/refresh-indicators.mjs --check || true'
 ExecStartPre=/bin/sh -c 'node apps/extension-firefox/build.mjs --eval --out=%h/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=%h/snap/chromium/common/adtripwire-eval-dist'
-# Three variants, one after another (each ~60-90 min). A failing variant does not stop the
+# Four variants, one after another (each ~60-90 min). A failing variant does not stop the
 # others. Reports and JSON stay outside the repository; the trend report is rebuilt last.
 ExecStart=/bin/sh -c 'd=$(date +%%F); c=%h/.cache/adtripwire-exposure; mkdir -p $$c/reports; \
   node scripts/exposure-run.mjs --browser=firefox --seconds=60 --json=$$c/$$d-firefox.json --out=$$c/reports/$$d-firefox.md; \
   node scripts/exposure-run.mjs --browser=chromium --seconds=60 --json=$$c/$$d-chromium.json --out=$$c/reports/$$d-chromium.md; \
   node scripts/exposure-run.mjs --browser=chromium --device="iPhone 15" --seconds=60 --json=$$c/$$d-chromium-iphone-15.json --out=$$c/reports/$$d-chromium-iphone-15.md; \
+  node scripts/exposure-run.mjs --browser=chromium --device="Pixel 5" --seconds=60 --json=$$c/$$d-chromium-pixel-5.json --out=$$c/reports/$$d-chromium-pixel-5.md; \
   node scripts/exposure-trend.mjs --dir=$$c'
-TimeoutStartSec=6h
+TimeoutStartSec=8h
 Nice=10
