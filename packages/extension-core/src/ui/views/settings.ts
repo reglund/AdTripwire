@@ -4,6 +4,7 @@ import { minutesToMs, msToMinutes, parseBoundedInt } from "../format.js";
 import { requestHostPermission, rpc } from "../rpc.js";
 import { card, uid, type View } from "./common.js";
 import { exportGroup } from "./export-actions.js";
+import { assistSettingsCard } from "../assist/settings-card.js";
 
 const LIMITS = {
   maxBytes: { min: 1024, max: 16 * 1024 * 1024 },
@@ -400,13 +401,16 @@ export const renderSettings: View = async (ctx) => {
       ),
       exportAll(),
     ),
+    assistSettingsCard(settings, ctx),
     card("Delete data", deleteControls()),
     card(
       "Privacy summary",
       h(
         "p",
         null,
-        "Everything stays on this device. AdTripwire sends no telemetry and makes no network requests of its own.",
+        __ADTRIPWIRE_ASSIST__
+          ? "Everything stays on this device. AdTripwire sends no telemetry. This build can contact a local model runtime on 127.0.0.1 only, and only when local model assistance is enabled and you press the button."
+          : "Everything stays on this device. AdTripwire sends no telemetry and makes no network requests of its own.",
       ),
       h(
         "div",

@@ -6,6 +6,7 @@ import { renderIndicators } from "./views/indicators.js";
 import { renderOverview } from "./views/overview.js";
 import { renderRules } from "./views/rules.js";
 import { renderTimeline } from "./views/timeline.js";
+import { renderClusterDetail, renderCorrelation } from "./views/correlation.js";
 import { renderSettings } from "./views/settings.js";
 import type { ViewContext } from "./views/common.js";
 import { NO_DETECTIONS_NOTICE } from "./format.js";
@@ -20,6 +21,7 @@ const TITLES: Record<TabName, string> = {
   overview: "Overview",
   detections: "Detections",
   timeline: "Timeline",
+  correlation: "Related activity",
   indicators: "Indicators",
   rules: "Rules",
   settings: "Settings",
@@ -86,6 +88,18 @@ async function renderRoute(route: Route): Promise<Node> {
       return renderDetectionDetail(route.id);
     case "timeline":
       return renderTimeline(ctx);
+    case "correlation":
+      return renderCorrelation(ctx);
+    case "cluster":
+      return renderClusterDetail(route.id);
+    case "assist_selftest": {
+      // DEV builds with --assist only; anything else shows the overview.
+      if (__ADTRIPWIRE_DEV__ && __ADTRIPWIRE_ASSIST__) {
+        const { runAssistSelfTest } = await import("./assist/selftest.js");
+        return runAssistSelfTest();
+      }
+      return renderOverview(ctx);
+    }
     case "indicators":
       return renderIndicators(ctx);
     case "rules":
@@ -100,7 +114,13 @@ async function show(): Promise<void> {
   const tab = routeTab(route);
   const token = ++renderToken;
   markActive(tab);
-  document.title = `AdTripwire – ${route.name === "detection" ? "Detection detail" : TITLES[tab]}`;
+  const title =
+    route.name === "detection"
+      ? "Detection detail"
+      : route.name === "cluster"
+        ? "Related activity detail"
+        : TITLES[tab];
+  document.title = `AdTripwire – ${title}`;
   main.setAttribute("aria-busy", "true");
   clear(main);
   main.appendChild(loadingState());

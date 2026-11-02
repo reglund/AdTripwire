@@ -27,6 +27,9 @@ pnpm ext:lint | ext:run | ext:package   # web-ext on dist
 pnpm --filter @adtripwire/extension-firefox exec node build.mjs --dev   # bundles synthetic .test indicators
 node scripts/fixture-server.mjs 8787     # local synthetic scenarios (see docs/testing.md)
 node scripts/import-zero-breach.mjs      # regenerate packages/indicators/data/adfection-2026.json
+node apps/extension-firefox/build.mjs --assist   # optional local-model build (loopback-only connect-src)
+pnpm e2e:firefox:assist | e2e:chromium:assist    # e2e with mock Ollama runtime on 127.0.0.1:8787
+pnpm eval:assist -- --endpoint URL --models a,b  # evaluate local models on synthetic scenarios
 ```
 
 Note: `tsc -p <pkg> --noEmit` fails with TS6305 until referenced packages are built; use
@@ -55,6 +58,13 @@ and thin entry files.
 - `packages/sensor-firefox` — `WebRequestSensor`: non-blocking observers on
   `<all_urls>`, ONE blocking listener scoped to indicator hosts + `/getAd` paths that
   attaches a pass-through filter (`write` first, cap, `disconnect`, analysis deferred).
+- `packages/correlation` — Phase 5. Deterministic clustering/timeline/actions on stored
+  detections, plus the assist layer: `buildAssistContext` is the ONLY path data may take to
+  a model (allowlist, never notes), `screenAssistOutput` removes verdict sentences and masks
+  unknown hostnames, `OllamaProvider` refuses non-loopback URLs. Model output is never
+  stored or exported. Assist UI/network code exists only when `__ADTRIPWIRE_ASSIST__` is
+  true (build flag `--assist`); keep assist-only calls inside `if (__ADTRIPWIRE_ASSIST__)`
+  so the default build tree-shakes them (the build guard checks).
 - UI (`packages/extension-core/src/ui`) is vanilla DOM via `h()`; no innerHTML with data.
   Host permission is requested from the page click handler (user gesture), not via the
   background.

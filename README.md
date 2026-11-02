@@ -32,6 +32,8 @@ requests of its own.
 | Automated unit, synthetic integration and performance tests                        | implemented                             |
 | Browser-level end-to-end verification                                              | manual procedure, see `docs/testing.md` |
 | Chromium support, indicator updates, SIEM/STIX export                              | planned (Phases 3–4)                    |
+| Related-activity grouping, timeline narrative, suggested actions (Phase 5)         | implemented                             |
+| Optional local-model explanations, separate `--assist` build, loopback only        | implemented, see `docs/local-assist.md` |
 
 ## Install (development build)
 
@@ -91,6 +93,8 @@ pnpm indicators:validate # dataset checks
 pnpm ext:lint            # web-ext lint on the built extension
 pnpm e2e:firefox         # headless Firefox run against local synthetic fixtures
 pnpm e2e:chromium        # headless Chrome/Chromium run (reduced capability expectations)
+pnpm e2e:firefox:assist  # same, with the optional --assist build and a mock local model runtime
+pnpm eval:assist         # evaluate local models on synthetic scenarios (see docs/local-assist.md)
 pnpm docs:rules          # regenerate the rule catalogue in docs/detection-methodology.md
 ```
 
@@ -111,10 +115,12 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/store-listing.md` – store texts and permission justifications
 - `docs/exposure-session.md` – how to look for real exposure in your own browsing
 - `docs/integration.md` – STIX/SIEM exports, imports, Zeek/Suricata feeds
+- `docs/local-assist.md` – related-activity grouping and the optional local-model build
 - `docs/roadmap.md` – phases and gates
 - `docs/phase-1-report.md` – Phase 1 deliverables and status
 - `docs/phase-3-report.md` – Phase 3 (Chromium) deliverables and status
 - `docs/phase-4-report.md` – Phase 4 (research integration) deliverables and status
+- `docs/phase-5-report.md` – Phase 5 (local correlation and assistance) deliverables and status
 
 ## Indicators and attribution
 

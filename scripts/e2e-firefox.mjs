@@ -40,7 +40,20 @@ const EXPECTED = [
 const FORBIDDEN = [/infected/i, /spied/i, /is safe/i, /are safe/i];
 
 console.log("building dev bundle…");
-execFileSync("node", ["apps/extension-firefox/build.mjs", "--dev"], { stdio: "inherit" });
+const withAssist = process.argv.includes("--assist");
+execFileSync(
+  "node",
+  ["apps/extension-firefox/build.mjs", "--dev", ...(withAssist ? ["--assist"] : [])],
+  {
+    stdio: "inherit",
+  },
+);
+if (withAssist) {
+  EXPECTED.push(
+    "[AdTripwire] assist selftest probe ok models=mock-model",
+    "[AdTripwire] assist selftest flags=asserted_compromise,unknown_hostname removed=1 masked=1",
+  );
+}
 
 const fixture = spawn("node", ["scripts/fixture-server.mjs", String(PORT)], {
   stdio: ["ignore", "pipe", "pipe"],

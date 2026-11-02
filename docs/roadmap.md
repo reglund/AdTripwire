@@ -105,14 +105,28 @@ inspection (met: `no_response_body_access` on every event).
 Gate 4: an exported bundle round-trips into a STIX validator (met) and a SIEM test harness
 (ECS structure tested; live ingestion into Elastic/OpenSearch not yet performed).
 
-## Phase 5 — Advanced local correlation ⬜
+## Phase 5 — Advanced local correlation 🔶 (delivered 2026-11-02, awaiting approval)
 
-- Optional local model (e.g. via a local runtime) that explains detections, clusters
-  related events and summarises timelines, strictly on top of deterministic evidence.
-- Hard guardrails: the model never changes severity, never declares compromise, and its
-  output is labelled as interpretation.
+- Deterministic correlation ✅: `@adtripwire/correlation` groups detections by shared
+  requests, indicators, hostnames, registrable domains and same-tab proximity (union-find,
+  linear), with a templated summary, timeline narrative and suggested investigative actions.
+  New dashboard tab "Related activity" and group detail pages; detection pages link to their
+  group.
+- Optional local-model assistance ✅ (separate `--assist` build): loopback-only CSP and
+  provider (Ollama-compatible `/api/chat`), explicit opt-in with preview of the exact text,
+  allowlisted context (never notes), sentence-level verdict screen (EN/NB) with hedge
+  detection, unknown-hostname masking, flags, labelling; answers never stored or exported.
+  Default build keeps `connect-src 'none'` and the build guard rejects any loopback path.
+- Verification ✅: 616 unit/integration tests incl. red-team guardrail cases; Firefox e2e 13/13
+  and Chromium e2e 11/11 with the `--assist` build against a mock runtime (CSP, CORS, fetch,
+  screening in the real browser); `eval:assist` against five real local models, report in
+  `docs/evaluations/assist-eval.md`. Report: `docs/phase-5-report.md`.
+- Security review of the Phase 5 diff (Opus); see the threat model's Phase 5 record.
 
-Gate 5: red-team review of guardrails; explanations evaluated against the rule evidence.
+Gate 5: red-team review of guardrails (done, findings fixed) and explanations evaluated
+against rule evidence (done on synthetic scenarios with several local models; see the
+evaluation report for the residual: screening is pattern-based and the label plus
+side-by-side evidence carry the guarantee).
 
 ## Cross-cutting
 

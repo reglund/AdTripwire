@@ -1,4 +1,10 @@
-import type { Detection, DetectionWithNote, NormalizedEvent } from "@adtripwire/shared";
+import type {
+  Detection,
+  DetectionCluster,
+  DetectionWithNote,
+  NormalizedEvent,
+  Settings,
+} from "@adtripwire/shared";
 import { errorMessage, errorState, externalLink, h, severityBadge, type Child } from "../dom.js";
 import {
   categoryLabel,
@@ -17,6 +23,8 @@ import { clampNote, NOTE_MAX_LENGTH } from "../exports.js";
 import { rpc } from "../rpc.js";
 import { bulletList, card, kv, tableWrap, timeEl, uid } from "./common.js";
 import { exportGroup } from "./export-actions.js";
+import { clusterHash } from "../route.js";
+import { assistPanel } from "../assist/panel.js";
 
 const shortId = (id: string): string => id.slice(0, 8);
 
@@ -268,6 +276,27 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
   }
 
   const { node: sequence, available } = await eventSection(d);
+  const [clusters, settings] = await Promise.all([
+    rpc<DetectionCluster[]>({ type: "get_clusters" }).catch(() => [] as DetectionCluster[]),
+    rpc<Settings>({ type: "get_settings" }),
+  ]);
+  const cluster = clusters.find((c) => c.detectionIds.includes(d.detectionId));
+  const related = card(
+    "Related activity",
+    cluster && cluster.detectionIds.length > 1
+      ? h(
+          "p",
+          null,
+          `This detection belongs to a group of ${cluster.detectionIds.length} related detections. `,
+          h("a", { href: clusterHash(cluster.clusterId) }, "View the group"),
+          h("span", { class: "muted" }, ` (${cluster.summary})`),
+        )
+      : h(
+          "p",
+          { class: "muted" },
+          "No other stored detection shares a request, indicator, hostname, domain or tab window with this one.",
+        ),
+  );
 
   const evidence =
     d.evidence.length === 0
@@ -368,5 +397,7 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
       h("h4", null, "What the sensor could not see"),
       bulletList(d.missingVisibility, "None listed."),
     ),
+    related,
+    assistPanel({ detectionId: d.detectionId }, settings),
   );
 }

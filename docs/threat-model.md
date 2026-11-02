@@ -46,6 +46,20 @@ never shipped as a static content script.
 | Capability          | Adds `page_signals`; rules requiring it are "not evaluable" while the sensor is off                                                                                                                                                                                                                                                               |
 | Residual risk       | A hostile frame can emit fake structural signals about itself; at most this yields detections scoped to that frame, which the correlation rules treat as corroboration, not as a chain on their own. Isolated-world scripts cannot see page-world monkey-patching, so signals are limited to DOM structure and message events.                    |
 
+## Local-model assistance (Phase 5, optional build)
+
+Threats introduced by letting a model read evidence, and how the design answers them:
+
+| Threat                                                      | Answer                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model declares the device infected or safe                  | Sentence-level screen removes verdict claims (EN/NB), shows the removal, labels the rest as interpretation; detection severity and evidence are displayed from the deterministic record and cannot be changed by the model.                                     |
+| Prompt injection through attacker-chosen hostnames or paths | Context is allowlisted and re-sanitized (hostname grammar, reduced path charset); evidence is fenced as data; the system prompt forbids following it; instruction echoes are flagged; an injection scenario is part of the evaluation.                          |
+| Model invents infrastructure or victims                     | Hostname tokens absent from the evidence are masked; the evidence list beside the answer is the reference.                                                                                                                                                      |
+| Data leaves the device                                      | Only `--assist` builds can connect, and only to `http://127.0.0.1:*` (CSP + provider check; `localhost` is deliberately not allowed); default build has `connect-src 'none'` and the build guard rejects any loopback code path. Notes never enter the context. |
+| Another local process impersonates the runtime              | It would receive sanitized hostnames, path patterns and rule text only. The port is user-chosen; the probe shows which models answer.                                                                                                                           |
+| Model output persisted or exported as evidence              | Never stored; not part of evidence, STIX, SIEM or hand-off exports. A person may copy text into a note deliberately, which is their authored content.                                                                                                           |
+| Resource exhaustion by a slow or verbose runtime            | 90 s timeout, 256 KB response cap, 600-token `num_predict`, 3 000-character display cap.                                                                                                                                                                        |
+
 ## Explicit non-goals in Phase 1
 
 - Blocking or altering traffic.
@@ -98,3 +112,32 @@ Firefox inspection-pattern re-registration rolls back to the previous pattern se
 Residual: imported classifications are still trusted within those limits, so an analyst can
 import `domain` records for legitimate popular sites; the dashboard shows imported sets
 separately and they can be disabled or removed at any time.
+
+### Phase 5 review (2026-11-02)
+
+Read-only Opus review of the Phase 5 diff (correlation package, assist layer, background
+handlers, build flag; the evaluation script, mocks and docs were not reached). It confirmed
+with real builds that the default bundles contain no `fetch` call and keep
+`connect-src 'none'`, and that in `--assist` builds only the dashboard bundle can connect.
+Findings fixed the same day: the hedge detector accepted any negation followed within three
+words by a verb ("it is not hard to show that your device is compromised" passed) and now
+accepts only fixed hedge phrases sitting directly before the claim, with hedged claims
+flagged; claim patterns missed markdown emphasis, contractions, two-word adverbs, device
+nouns, active voice, named spyware, zero-width characters and line-wrapped claims (output is
+now normalised before screening and the patterns widened); IP literals, `//host`,
+`ftp://host` and look-alike dots escaped hostname masking (now masked; `.md` no longer
+treated as a file extension); the provider followed redirects (now `redirect: "error"`,
+`credentials: "omit"`, `cache: "no-store"`, `referrerPolicy: "no-referrer"`, and redirected
+responses are rejected); `localhost` was allowed by the CSP and provider (now 127.0.0.1
+only); enum-like context fields were not re-sanitised and rule text could close the evidence
+fence (fixed); stored assist settings were merged without validation (fixed); the build guard
+now rejects `fetch`/`XMLHttpRequest`/`WebSocket`/`/api/` outside the assist dashboard; the
+sensor now drops requests issued by extension pages so a model call can never become an
+observed event (unit-tested; see also the `--assist` e2e). Clustering by shared hostname,
+domain or indicator is now bounded to a 24 h proximity window (shared events still link
+regardless) to limit chaining through common ad-platform domains. The real-model evaluation then
+showed the opposite failure: all six sentences the first screen removed were legitimate
+caveats, so the hedge detector was extended to the caveat forms models actually use while the
+reviewer's fake-hedge attacks remain blocked (both encoded as tests). Residual: screening is
+pattern-based and can be phrased around; the label, the side-by-side deterministic evidence
+and the never-stored rule carry the guarantee.

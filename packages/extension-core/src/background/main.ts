@@ -6,7 +6,10 @@
  * redirects or modifies any request. No network calls are made by the extension itself.
  */
 import type {
+  AssistPackage,
+  ClusterDetail,
   Detection,
+  DetectionCluster,
   ExportFile,
   ImportResult,
   IndicatorSet,
@@ -32,6 +35,13 @@ import {
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import { stixToIndicatorSet } from "@adtripwire/interop";
 import { exportResearch } from "./research-export.js";
+import {
+  buildAssistContext,
+  clusterDetections,
+  renderPrompt,
+  suggestActions,
+  summarizeTimeline,
+} from "@adtripwire/correlation";
 import {
   MAX_IMPORTED_INDICATORS_TOTAL,
   applyBundledPrecedence,
@@ -276,6 +286,68 @@ class Background {
     return entries.length > limit ? entries.slice(entries.length - limit) : entries;
   }
 
+  // ── Phase 5: deterministic correlation ─────────────────────────────────────────────────
+
+  private clusters(): DetectionCluster[] {
+    return clusterDetections(this.store.listDetections(), {
+      windowMs: this.store.getSettings().monitoring.correlationWindowMs,
+      maxDetections: this.store.getSettings().retention.maxDetections,
+    });
+  }
+
+  private clusterDetail(clusterId: string): ClusterDetail | null {
+    const cluster = this.clusters().find((c) => c.clusterId === clusterId);
+    if (!cluster) return null;
+    const detections = cluster.detectionIds
+      .map((id) => this.store.getDetection(id))
+      .filter((d): d is Detection => d !== undefined);
+    const events = this.store.getEvents(detections.flatMap((d) => d.eventIds));
+    return {
+      cluster,
+      detections: detections.map((d) => this.withNote(d)),
+      timeline: summarizeTimeline(detections, events),
+      actions: suggestActions(cluster, detections, this.capabilities),
+    };
+  }
+
+  /**
+   * Builds the complete package a local model would receive. Analyst notes are never part
+   * of it; the UI shows the exact text before anything is sent.
+   */
+  private assistPackage(req: Extract<UiRequest, { type: "get_assist_package" }>): AssistPackage {
+    const language = req.language ?? this.store.getSettings().assist.language;
+    let detections: Detection[];
+    let cluster: DetectionCluster | undefined;
+    if (req.clusterId !== undefined) {
+      cluster = this.clusters().find((c) => c.clusterId === req.clusterId);
+      if (!cluster) throw new Error("unknown cluster");
+      detections = cluster.detectionIds
+        .map((id) => this.store.getDetection(id))
+        .filter((d): d is Detection => d !== undefined);
+    } else {
+      const d =
+        req.detectionId !== undefined ? this.store.getDetection(req.detectionId) : undefined;
+      if (!d) throw new Error("unknown detection");
+      detections = [d];
+      cluster = clusterDetections([d], { windowMs: 0 })[0];
+    }
+    if (!cluster) throw new Error("no cluster");
+    const events = this.store.getEvents(detections.flatMap((d) => d.eventIds));
+    const timeline = summarizeTimeline(detections, events);
+    const actions = suggestActions(cluster, detections, this.capabilities);
+    const input = {
+      language,
+      productVersion: __ADTRIPWIRE_VERSION__,
+      capabilities: this.capabilities,
+      detections,
+      events,
+      timeline,
+      actions,
+      ...(req.clusterId !== undefined ? { cluster } : {}),
+    };
+    return renderPrompt(buildAssistContext(input));
+  }
+
   private pageSensorChain: Promise<void> = Promise.resolve();
 
   /**
@@ -514,6 +586,9 @@ class Background {
    * is never observed (that would be a browsing history).
    */
   private shouldObserve(ev: NormalizedEvent): boolean {
+    // Requests issued by extension pages (including this extension's own loopback model
+    // calls in --assist builds) are not web-page traffic and must never become evidence.
+    if (isExtensionOriginated(ev)) return false;
     this.metrics.eventsObserved++;
     if (ev.eventType === "page_signal") return true;
     if (ev.resourceType === "main_frame") return false;
@@ -769,8 +844,25 @@ class Background {
       case "export_siem":
       case "export_handoff":
         return this.exportResearch(req);
+      case "get_clusters":
+        return this.clusters();
+      case "get_cluster":
+        return this.clusterDetail(req.clusterId);
+      case "get_assist_package":
+        return this.assistPackage(req);
+      case "update_assist_settings":
+        return this.store.updateAssistSettings(req.patch);
     }
   }
+}
+
+/** True when the request was issued by an extension page rather than a web page. */
+export function isExtensionOriginated(ev: NormalizedEvent): boolean {
+  const ext = /^(?:moz|chrome)-extension:/i;
+  if (ev.initiatorOrigin && ext.test(ev.initiatorOrigin)) return true;
+  const doc = ev.frameContext.documentHostname ?? "";
+  const top = ev.frameContext.topHostname ?? "";
+  return ext.test(doc) || ext.test(top);
 }
 
 export function startBackground(adapter: SensorAdapter): void {
@@ -812,6 +904,14 @@ export function startBackground(adapter: SensorAdapter): void {
         browser.tabs
           .create({ url: browser.runtime.getURL("dashboard.html#detections"), active: false })
           .catch((e) => log("warn", `could not open dashboard: ${String(e)}`));
+        if (__ADTRIPWIRE_ASSIST__) {
+          browser.tabs
+            .create({
+              url: browser.runtime.getURL("dashboard.html#assist-selftest"),
+              active: false,
+            })
+            .catch((e) => log("warn", `could not open assist self-test: ${String(e)}`));
+        }
       }, 15_000);
     }
   });

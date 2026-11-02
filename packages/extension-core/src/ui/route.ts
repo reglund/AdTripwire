@@ -5,16 +5,21 @@ export type Route =
   | { name: "detections" }
   | { name: "detection"; id: string }
   | { name: "timeline" }
+  | { name: "correlation" }
+  | { name: "cluster"; id: string }
+  | { name: "assist_selftest" }
   | { name: "indicators" }
   | { name: "rules" }
   | { name: "settings" };
 
-export type TabName = "overview" | "detections" | "timeline" | "indicators" | "rules" | "settings";
+export type TabName =
+  "overview" | "detections" | "timeline" | "correlation" | "indicators" | "rules" | "settings";
 
 export const TABS: ReadonlyArray<{ name: TabName; label: string }> = [
   { name: "overview", label: "Overview" },
   { name: "detections", label: "Detections" },
   { name: "timeline", label: "Timeline" },
+  { name: "correlation", label: "Related activity" },
   { name: "indicators", label: "Indicators" },
   { name: "rules", label: "Rules" },
   { name: "settings", label: "Settings" },
@@ -39,6 +44,14 @@ export function parseHash(hash: string): Route {
     }
     case "timeline":
       return { name: "timeline" };
+    case "correlation":
+      return { name: "correlation" };
+    case "cluster": {
+      const id = rest.join("/");
+      return /^c-[0-9a-f]{8}$/.test(id) ? { name: "cluster", id } : { name: "correlation" };
+    }
+    case "assist-selftest":
+      return { name: "assist_selftest" };
     case "indicators":
       return { name: "indicators" };
     case "rules":
@@ -51,7 +64,20 @@ export function parseHash(hash: string): Route {
 }
 
 export function routeTab(route: Route): TabName {
-  return route.name === "detection" ? "detections" : route.name;
+  switch (route.name) {
+    case "detection":
+      return "detections";
+    case "cluster":
+      return "correlation";
+    case "assist_selftest":
+      return "settings";
+    default:
+      return route.name;
+  }
+}
+
+export function clusterHash(id: string): string {
+  return `#cluster/${id}`;
 }
 
 export function detectionHash(id: string): string {

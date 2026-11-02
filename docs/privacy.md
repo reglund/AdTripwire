@@ -6,7 +6,11 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
 
 - **Local only.** No telemetry, analytics, accounts, remote indicator fetches or any
   outbound request initiated by the extension. The extension-page CSP sets
-  `connect-src 'none'`.
+  `connect-src 'none'`. The separate `--assist` build variant (see
+  `docs/local-assist.md`) relaxes this to loopback only (`http://127.0.0.1:*`) so a local model runtime on the same computer can be asked to
+  explain evidence; even then nothing is sent unless assistance is enabled in settings and
+  the person presses the button, and the exact text can be previewed first. Analyst notes
+  are never part of that text, and model answers are never stored or exported.
 - **Sanitized at the edge.** Every URL is reduced to scheme, hostname, a path pattern
   with token-like segments replaced by `{id}`/`{seg}`, and query parameter **names**.
   Query values, fragments and credentials are dropped before anything leaves the sensor.
@@ -35,7 +39,7 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
 
 | Key                       | Content                                                                |
 | ------------------------- | ---------------------------------------------------------------------- |
-| `settings`                | Monitoring and retention settings                                      |
+| `settings`                | Monitoring, retention and (assist builds) local-assistance settings    |
 | `detections`              | Detection records (summary, rule, evidence text, event ids, hostnames) |
 | `events`                  | Sanitized events referenced by detections                              |
 | `exposure`                | Per-hostname distinct-day counters for surveillance-classified hosts   |

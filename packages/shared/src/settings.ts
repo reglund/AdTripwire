@@ -24,9 +24,23 @@ export interface MonitoringSettings {
   pageSensorEnabled: boolean;
 }
 
+/**
+ * Optional local-model assistance (Phase 5). Only present in builds made with `--assist`;
+ * the default build has no network capability at all. The endpoint is always loopback.
+ */
+export interface AssistSettings {
+  enabled: boolean;
+  /** TCP port of an Ollama-compatible runtime on 127.0.0.1. */
+  port: number;
+  /** Model name as listed by the runtime; empty means "not chosen yet". */
+  model: string;
+  language: "en" | "nb";
+}
+
 export interface Settings {
   monitoring: MonitoringSettings;
   retention: RetentionSettings;
+  assist: AssistSettings;
   /** Settings schema version for migrations. */
   schemaVersion: 1;
 }
@@ -44,6 +58,12 @@ export const DEFAULT_SETTINGS: Settings = {
     detectionRetentionDays: 7,
     maxDetections: 2000,
     maxEvents: 20000,
+  },
+  assist: {
+    enabled: false,
+    port: 11434,
+    model: "",
+    language: "en",
   },
   schemaVersion: 1,
 };

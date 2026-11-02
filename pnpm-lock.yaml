@@ -67,6 +67,15 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
 
+  packages/correlation:
+    dependencies:
+      '@adtripwire/indicators':
+        specifier: workspace:*
+        version: link:../indicators
+      '@adtripwire/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/detection-engine:
     dependencies:
       '@adtripwire/indicators':
@@ -81,6 +90,9 @@ importers:
 
   packages/extension-core:
     dependencies:
+      '@adtripwire/correlation':
+        specifier: workspace:*
+        version: link:../correlation
       '@adtripwire/detection-engine':
         specifier: workspace:*
         version: link:../detection-engine

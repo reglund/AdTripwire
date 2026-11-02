@@ -161,3 +161,61 @@ describe("parseUiRequest Phase 4", () => {
     expect(parseUiRequest({ type: "remove_indicator_set", setId: 5 })).toBeNull();
   });
 });
+
+describe("parseUiRequest Phase 5", () => {
+  it("accepts cluster requests only with well-formed ids", () => {
+    expect(parseUiRequest({ type: "get_clusters" })).toEqual({ type: "get_clusters" });
+    expect(parseUiRequest({ type: "get_cluster", clusterId: "c-0123abcd" })).toEqual({
+      type: "get_cluster",
+      clusterId: "c-0123abcd",
+    });
+    expect(parseUiRequest({ type: "get_cluster", clusterId: "c-xyz" })).toBeNull();
+    expect(parseUiRequest({ type: "get_cluster", clusterId: "<img>" })).toBeNull();
+  });
+
+  it("requires exactly one target for assist packages and validates language", () => {
+    expect(parseUiRequest({ type: "get_assist_package", detectionId: "d1" })).toEqual({
+      type: "get_assist_package",
+      detectionId: "d1",
+    });
+    expect(
+      parseUiRequest({ type: "get_assist_package", clusterId: "c-0123abcd", language: "nb" }),
+    ).toEqual({ type: "get_assist_package", clusterId: "c-0123abcd", language: "nb" });
+    expect(parseUiRequest({ type: "get_assist_package" })).toBeNull();
+    expect(
+      parseUiRequest({ type: "get_assist_package", detectionId: "d1", clusterId: "c-0123abcd" }),
+    ).toBeNull();
+    expect(
+      parseUiRequest({ type: "get_assist_package", detectionId: "d1", language: "fr" }),
+    ).toBeNull();
+    expect(parseUiRequest({ type: "get_assist_package", detectionId: "x".repeat(65) })).toBeNull();
+  });
+
+  it("validates assist settings patches strictly", () => {
+    expect(
+      parseUiRequest({
+        type: "update_assist_settings",
+        patch: { enabled: true, port: 11434, model: "qwen3:8b", language: "en" },
+      }),
+    ).toEqual({
+      type: "update_assist_settings",
+      patch: { enabled: true, port: 11434, model: "qwen3:8b", language: "en" },
+    });
+    expect(parseUiRequest({ type: "update_assist_settings", patch: { port: 0 } })).toBeNull();
+    expect(parseUiRequest({ type: "update_assist_settings", patch: { port: 70000 } })).toBeNull();
+    expect(
+      parseUiRequest({ type: "update_assist_settings", patch: { model: "bad model" } }),
+    ).toBeNull();
+    expect(
+      parseUiRequest({ type: "update_assist_settings", patch: { model: "-leading" } }),
+    ).toBeNull();
+    expect(
+      parseUiRequest({ type: "update_assist_settings", patch: { language: "de" } }),
+    ).toBeNull();
+    expect(parseUiRequest({ type: "update_assist_settings", patch: { other: 1 } })).toBeNull();
+    expect(parseUiRequest({ type: "update_assist_settings", patch: { model: "" } })).toEqual({
+      type: "update_assist_settings",
+      patch: { model: "" },
+    });
+  });
+});

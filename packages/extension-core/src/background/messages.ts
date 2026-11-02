@@ -1,4 +1,4 @@
-import type { UiRequest, UiResponse } from "@adtripwire/shared";
+import type { Settings, UiRequest, UiResponse } from "@adtripwire/shared";
 
 /**
  * Strict validation of messages reaching the privileged background. Only the
@@ -184,6 +184,55 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
         req.limit = r.limit;
       }
       return req;
+    }
+    case "get_clusters":
+      return { type: "get_clusters" };
+    case "get_cluster":
+      return typeof r.clusterId === "string" && /^c-[0-9a-f]{8}$/.test(r.clusterId)
+        ? { type: "get_cluster", clusterId: r.clusterId }
+        : null;
+    case "get_assist_package": {
+      const req: Extract<UiRequest, { type: "get_assist_package" }> = {
+        type: "get_assist_package",
+      };
+      if (r.detectionId !== undefined) {
+        if (typeof r.detectionId !== "string" || r.detectionId.length > 64) return null;
+        req.detectionId = r.detectionId;
+      }
+      if (r.clusterId !== undefined) {
+        if (typeof r.clusterId !== "string" || !/^c-[0-9a-f]{8}$/.test(r.clusterId)) return null;
+        req.clusterId = r.clusterId;
+      }
+      if ((req.detectionId === undefined) === (req.clusterId === undefined)) return null;
+      if (r.language !== undefined) {
+        if (r.language !== "en" && r.language !== "nb") return null;
+        req.language = r.language;
+      }
+      return req;
+    }
+    case "update_assist_settings": {
+      if (!r.patch || typeof r.patch !== "object") return null;
+      const patch: Partial<Settings["assist"]> = {};
+      for (const [k, v] of Object.entries(r.patch as Record<string, unknown>)) {
+        if (k === "enabled" && typeof v === "boolean") patch.enabled = v;
+        else if (
+          k === "port" &&
+          typeof v === "number" &&
+          Number.isInteger(v) &&
+          v >= 1 &&
+          v <= 65535
+        )
+          patch.port = v;
+        else if (
+          k === "model" &&
+          typeof v === "string" &&
+          /^(?:[A-Za-z0-9][A-Za-z0-9._:/-]{0,127})?$/.test(v)
+        )
+          patch.model = v;
+        else if (k === "language" && (v === "en" || v === "nb")) patch.language = v;
+        else return null;
+      }
+      return { type: "update_assist_settings", patch };
     }
     default:
       return null;

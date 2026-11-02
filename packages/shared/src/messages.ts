@@ -8,6 +8,12 @@ import type { NormalizedEvent } from "./events.js";
 import type { Settings } from "./settings.js";
 import type { SensorCapabilities } from "./capabilities.js";
 import type { IndicatorSetMeta } from "./indicators.js";
+import type {
+  AssistLanguage,
+  DetectionCluster,
+  SuggestedActions,
+  TimelineSummary,
+} from "./correlation.js";
 
 export interface MonitoringStatus {
   monitoring: boolean;
@@ -64,7 +70,17 @@ export type UiRequest =
   | { type: "set_indicator_set_enabled"; setId: string; enabled: boolean }
   | { type: "set_detection_note"; detectionId: string; note: string }
   | { type: "get_timeline"; tabId?: number; since?: number; limit?: number }
-  | { type: "export_handoff"; detectionIds?: string[]; profile: "default" | "strict" };
+  | { type: "export_handoff"; detectionIds?: string[]; profile: "default" | "strict" }
+  // Phase 5: deterministic correlation and optional local-model assistance
+  | { type: "get_clusters" }
+  | { type: "get_cluster"; clusterId: string }
+  | {
+      type: "get_assist_package";
+      detectionId?: string;
+      clusterId?: string;
+      language?: AssistLanguage;
+    }
+  | { type: "update_assist_settings"; patch: Partial<Settings["assist"]> };
 
 export interface DetectionFilter {
   categories?: string[];
@@ -107,6 +123,14 @@ export interface ImportResult {
   indicatorCount?: number;
   errors: string[];
   warnings: string[];
+}
+
+/** A cluster with everything the cluster view needs. */
+export interface ClusterDetail {
+  cluster: DetectionCluster;
+  detections: DetectionWithNote[];
+  timeline: TimelineSummary;
+  actions: SuggestedActions;
 }
 
 export type DetectionListItem = Detection;

@@ -7,3 +7,4 @@ export * from "./settings.js";
 export * from "./export.js";
 export * from "./messages.js";
 export * from "./ids.js";
+export * from "./correlation.js";

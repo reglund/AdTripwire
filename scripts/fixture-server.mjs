@@ -52,6 +52,12 @@ const routes = {
       true,
     ),
   "/benign": () => page("Benign ad", adFrame("mode=benign"), true),
+  // Diagnostic: a web page that fetches the mock runtime on loopback and logs the outcome.
+  "/fetchtest": () =>
+    page(
+      "Loopback fetch test",
+      `<script>fetch("http://127.0.0.1:${port}/api/tags").then(r=>r.json()).then(j=>console.log("[FetchTest] ok "+JSON.stringify(j))).catch(e=>console.log("[FetchTest] fail "+e.name+" "+e.message));</script>`,
+    ),
   "/exposure": () => page("NOAS exposure (empty response)", adFrame("mode=exposure"), true),
   "/selected": () => page("NOAS selected (JS returned)", adFrame("mode=selected"), true),
   "/ioc": () =>
@@ -97,7 +103,58 @@ var s=document.createElement("script");s.id="getAdScript";s.src="http://${H.vali
 };
 
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Mock of an Ollama-compatible runtime for the --assist self-test. The canned answer
+// deliberately contains a compromise claim and an unknown hostname so the browser-level test
+// can assert that the guardrails remove and mask them. CORS mirrors Ollama's defaults for
+// extension origins.
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+  // Chromium Private Network Access: a page may need this on the preflight to reach loopback.
+  "access-control-allow-private-network": "true",
+};
+const MOCK_ANSWER =
+  "What was observed\nA script request reached noas.synthetic-adfection.test from an ad frame. Your device is infected. Traffic also went to evil.attacker.example.\n\nSensible next steps\nExport a hand-off package.";
+function mockRuntime(req, res, url) {
+  if (url.pathname.startsWith("/api/")) console.log(`mock runtime: ${req.method} ${url.pathname}`);
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS).end();
+    return true;
+  }
+  if (url.pathname === "/api/tags" && req.method === "GET") {
+    res
+      .writeHead(200, { ...CORS, "content-type": "application/json" })
+      .end(JSON.stringify({ models: [{ name: "mock-model" }] }));
+    return true;
+  }
+  if (url.pathname === "/api/chat" && req.method === "POST") {
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      let model = "?";
+      try {
+        model = JSON.parse(body).model;
+      } catch {
+        /* ignore */
+      }
+      console.log(`mock runtime: chat request for model ${model}, ${body.length} bytes`);
+      res.writeHead(200, { ...CORS, "content-type": "application/json" }).end(
+        JSON.stringify({
+          model,
+          message: { role: "assistant", content: MOCK_ANSWER },
+          done: true,
+        }),
+      );
+    });
+    return true;
+  }
+  return false;
+}
+
 createServer((req, res) => {
+  if (process.env.FIXTURE_LOG) console.log(`fixture: ${req.method} ${req.headers.host}${req.url}`);
   let url;
   try {
     url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -105,6 +162,7 @@ createServer((req, res) => {
     res.writeHead(400).end("bad request");
     return;
   }
+  if (mockRuntime(req, res, url)) return;
   const handler = routes[url.pathname];
   if (!handler) {
     res.writeHead(404).end("not found");

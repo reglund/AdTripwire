@@ -17,6 +17,9 @@
       "path": "packages/detection-engine"
     },
     {
+      "path": "packages/correlation"
+    },
+    {
       "path": "packages/sensor-firefox"
     },
     {

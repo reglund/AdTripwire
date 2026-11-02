@@ -130,6 +130,19 @@ export class LocalStore {
     return next;
   }
 
+  /** Assist settings are validated by the message parser; this only clamps and persists. */
+  async updateAssistSettings(patch: Partial<Settings["assist"]>): Promise<Settings> {
+    const assist = { ...this.settings.assist };
+    if (patch.enabled !== undefined) assist.enabled = patch.enabled;
+    if (patch.port !== undefined) assist.port = clamp(patch.port, 1, 65535);
+    if (patch.model !== undefined) assist.model = patch.model.slice(0, 128);
+    if (patch.language !== undefined) assist.language = patch.language;
+    const next: Settings = { ...this.settings, assist };
+    this.settings = next;
+    await browser.storage.local.set({ [KEY_SETTINGS]: next });
+    return next;
+  }
+
   listDetections(): Detection[] {
     return this.detections;
   }
@@ -321,5 +334,23 @@ export function mergeSettings(raw: unknown): Settings {
     schemaVersion: 1,
     monitoring: { ...DEFAULT_SETTINGS.monitoring, ...(r.monitoring ?? {}) },
     retention: { ...DEFAULT_SETTINGS.retention, ...(r.retention ?? {}) },
+    assist: mergeAssist(r.assist),
+  };
+}
+
+function mergeAssist(raw: unknown): Settings["assist"] {
+  const d = DEFAULT_SETTINGS.assist;
+  const a = (raw ?? {}) as Partial<Record<keyof Settings["assist"], unknown>>;
+  return {
+    enabled: typeof a.enabled === "boolean" ? a.enabled : d.enabled,
+    port:
+      typeof a.port === "number" && Number.isInteger(a.port) && a.port >= 1 && a.port <= 65535
+        ? a.port
+        : d.port,
+    model:
+      typeof a.model === "string" && /^(?:[A-Za-z0-9][A-Za-z0-9._:/-]{0,127})?$/.test(a.model)
+        ? a.model
+        : d.model,
+    language: a.language === "nb" ? "nb" : "en",
   };
 }

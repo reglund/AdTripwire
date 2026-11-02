@@ -102,6 +102,22 @@ snap or Chrome for Testing (`CHROME_BIN=...`). Snap Chromium needs the profile u
 Steps 5–7 exercise the UI and were **not** covered by the automated script in Phase 1;
 they remain a manual check. Console lines are prefixed `[AdTripwire]`.
 
+## Local-model assistance (Phase 5)
+
+```bash
+pnpm e2e:firefox:assist     # DEV --assist bundle; fixture server mocks an Ollama runtime on 127.0.0.1 (8787 Firefox / 8788 Chromium)
+pnpm e2e:chromium:assist
+pnpm eval:assist -- --endpoint http://127.0.0.1:11434 --models qwen3:8b --languages en,nb
+```
+
+The `--assist` end-to-end runs add two console expectations from the dashboard's DEV-only
+self-test page: a successful probe of the mock runtime and the guardrail flags
+`asserted_compromise,unknown_hostname` with one sentence removed and one hostname masked.
+This proves the CSP, CORS, fetch, JSON handling and screening together in the real browser.
+`eval:assist` runs synthetic scenarios through the real pipeline against actual models and
+writes `docs/evaluations/assist-eval.md` (`--rescreen <json>` re-applies screening to saved
+answers). See `docs/local-assist.md`.
+
 ## Detection quality
 
 Two separate evaluations are maintained and must not be conflated:

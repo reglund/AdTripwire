@@ -57,7 +57,20 @@ if (!chromeBin) {
 }
 
 console.log("building dev bundle (chromium)…");
-execFileSync("node", ["apps/extension-chromium/build.mjs", "--dev"], { stdio: "inherit" });
+const withAssist = process.argv.includes("--assist");
+execFileSync(
+  "node",
+  ["apps/extension-chromium/build.mjs", "--dev", ...(withAssist ? ["--assist"] : [])],
+  {
+    stdio: "inherit",
+  },
+);
+if (withAssist) {
+  EXPECTED.push(
+    "[AdTripwire] assist selftest probe ok models=mock-model",
+    "[AdTripwire] assist selftest flags=asserted_compromise,unknown_hostname removed=1 masked=1",
+  );
+}
 const dist = resolve("apps/extension-chromium/dist");
 
 const fixture = spawn("node", ["scripts/fixture-server.mjs", String(PORT)], {
@@ -85,7 +98,10 @@ const args = [
   `--load-extension=${dist}`,
   // Fail closed: only the six reserved names resolve (to the local fixture); everything else
   // is NXDOMAIN, so the run can make no outbound requests.
-  `--host-resolver-rules=${[...DOMAINS.map((d) => `MAP ${d} 127.0.0.1`), "MAP * ~NOTFOUND", "EXCLUDE localhost"].join(", ")}`,
+  // Fail-closed DNS: only the fixture hosts resolve. "MAP *" also catches IP literals in
+  // Chromium's mapped resolver, so loopback is excluded explicitly (the assist self-test
+  // and the fixture server live there).
+  `--host-resolver-rules=${[...DOMAINS.map((d) => `MAP ${d} 127.0.0.1`), "MAP * ~NOTFOUND", "EXCLUDE localhost", "EXCLUDE 127.0.0.1"].join(", ")}`,
   "--enable-logging=stderr",
   "--v=0",
   "--no-first-run",

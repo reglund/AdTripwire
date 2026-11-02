@@ -4,6 +4,9 @@
  *   node build.mjs            production build
  *   node build.mjs --dev      includes the synthetic indicator set (reserved .test names) for local testing
  *   node build.mjs --watch    rebuild on change
+ *   node build.mjs --assist   optional local-model assistance: adds a loopback-only connect-src
+ *                             (http://127.0.0.1 only) and the assist UI; the default
+ *                             build keeps connect-src 'none' and contains no network code path.
  */
 import { build, context } from "esbuild";
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
@@ -14,6 +17,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const dist = join(here, "dist");
 const dev = process.argv.includes("--dev");
 const watch = process.argv.includes("--watch");
+const assist = process.argv.includes("--assist");
 const pkg = JSON.parse(readFileSync(join(here, "package.json"), "utf8"));
 
 rmSync(dist, { recursive: true, force: true });
@@ -22,6 +26,16 @@ mkdirSync(dist, { recursive: true });
 const manifest = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"));
 manifest.version = pkg.version;
 if (dev) manifest.name = "AdTripwire (dev build with synthetic test indicators)";
+if (assist) {
+  manifest.name = `${manifest.name} (local assist build)`;
+  const csp = manifest.content_security_policy.extension_pages;
+  if (!csp.includes("connect-src 'none'"))
+    throw new Error("manifest CSP must start from connect-src 'none'");
+  manifest.content_security_policy.extension_pages = csp.replace(
+    "connect-src 'none'",
+    "connect-src http://127.0.0.1:*",
+  );
+}
 writeFileSync(join(dist, "manifest.json"), JSON.stringify(manifest, null, 2));
 
 if (existsSync(join(here, "public"))) cpSync(join(here, "public"), dist, { recursive: true });
@@ -41,6 +55,7 @@ const common = {
   define: {
     __ADTRIPWIRE_VERSION__: JSON.stringify(pkg.version),
     __ADTRIPWIRE_DEV__: JSON.stringify(dev),
+    __ADTRIPWIRE_ASSIST__: JSON.stringify(assist),
   },
   outdir: dist,
   entryPoints: {
@@ -76,10 +91,28 @@ if (watch) {
     if (/\bnew\s+Function\s*\(/.test(unquoted)) bad.push(`${name}: new Function(`);
     if (!dev && /synthetic-adfection\.test/.test(code))
       bad.push(`${name}: synthetic indicators in production bundle`);
+    // Without --assist no bundle may carry any network client code at all; with it, only
+    // the dashboard may.
+    const net =
+      /\bfetch\s*\(|\bXMLHttpRequest\b|\bnew\s+WebSocket\s*\(|\/api\/(?:chat|tags)|127\.0\.0\.1:/;
+    if ((!assist || name !== "dashboard.js") && net.test(unquoted))
+      bad.push(
+        `${name}: network client code present (${assist ? "outside the dashboard" : "non-assist build"})`,
+      );
+    if (!dev && /assist selftest/.test(code))
+      bad.push(`${name}: self-test code in production bundle`);
   }
+  const builtManifest = JSON.parse(readFileSync(join(dist, "manifest.json"), "utf8"));
+  const builtCsp = builtManifest.content_security_policy.extension_pages;
+  if (!assist && !builtCsp.includes("connect-src 'none'"))
+    bad.push("manifest: connect-src must be 'none' without --assist");
+  if (assist && !/connect-src http:\/\/127\.0\.0\.1:\*;/.test(builtCsp))
+    bad.push("manifest: assist build must restrict connect-src to loopback");
   if (bad.length) {
     console.error("Build guard failed:", bad.join(", "));
     process.exit(1);
   }
-  console.log(`built ${dev ? "DEV" : "production"} bundle v${pkg.version} → ${dist}`);
+  console.log(
+    `built ${dev ? "DEV" : "production"}${assist ? " +assist" : ""} bundle v${pkg.version} → ${dist}`,
+  );
 }

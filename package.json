@@ -27,7 +27,10 @@
     "eval:benign": "node scripts/benign-eval.mjs",
     "e2e:chromium": "node scripts/e2e-chromium.mjs",
     "eval:benign:chromium": "node scripts/benign-eval.mjs --chromium",
-    "feeds:export": "node scripts/export-feeds.mjs"
+    "feeds:export": "node scripts/export-feeds.mjs",
+    "eval:assist": "esbuild scripts/assist-eval.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/assist-eval.mjs --log-level=warning --alias:@adtripwire/detection-engine=./packages/detection-engine/src/index.ts --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts --alias:@adtripwire/privacy=./packages/privacy/src/index.ts --alias:@adtripwire/correlation=./packages/correlation/src/index.ts --alias:@adtripwire/sensor-firefox=./packages/sensor-firefox/src/index.ts && node node_modules/.cache/adtripwire/assist-eval.mjs",
+    "e2e:firefox:assist": "node scripts/e2e-firefox.mjs --assist",
+    "e2e:chromium:assist": "node scripts/e2e-chromium.mjs --assist"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -21,19 +21,32 @@ traffic, and it makes no network requests of its own.
 
 ## Packages
 
-| Package                        | Responsibility                                                                                                      | Browser APIs                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `@adtripwire/shared`           | Type contracts: events, detections, indicators, rules, capabilities, settings, export, UI messages.                 | none                                                                |
-| `@adtripwire/indicators`       | Hostname normalization, boundary-safe domain matching, indicator validation, bundled curated set.                   | none                                                                |
-| `@adtripwire/privacy`          | URL sanitization (names, not values), identifier-parameter classification, redaction profiles, evidence export.     | none                                                                |
-| `@adtripwire/detection-engine` | Rule registry, JavaScript marker analyser, bounded correlation window, dedup, exposure counters, capability gating. | none                                                                |
-| `@adtripwire/sensor-firefox`   | webRequest observers, scoped blocking listener that attaches a pass-through `StreamFilter`, capability detection.   | `webRequest.*`, `filterResponseData`, `runtime.getBrowserInfo`      |
-| `apps/extension-firefox`       | MV3 event page wiring sensor → engine → storage; strictly validated UI messaging; popup and dashboard.              | `storage.local`, `storage.session`, `alarms`, `permissions`, `tabs` |
+| Package                        | Responsibility                                                                                                                                                              | Browser APIs                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `@adtripwire/shared`           | Type contracts: events, detections, indicators, rules, capabilities, settings, export, UI messages.                                                                         | none                                                                |
+| `@adtripwire/indicators`       | Hostname normalization, boundary-safe domain matching, indicator validation, bundled curated set.                                                                           | none                                                                |
+| `@adtripwire/privacy`          | URL sanitization (names, not values), identifier-parameter classification, redaction profiles, evidence export.                                                             | none                                                                |
+| `@adtripwire/detection-engine` | Rule registry, JavaScript marker analyser, bounded correlation window, dedup, exposure counters, capability gating.                                                         | none                                                                |
+| `@adtripwire/correlation`      | Phase 5: deterministic clustering of detections, timeline narrative, suggested actions; assist context allowlist, prompt, output guardrails, loopback-only Ollama provider. | none (the provider is given `fetch` explicitly)                     |
+| `@adtripwire/sensor-firefox`   | webRequest observers, scoped blocking listener that attaches a pass-through `StreamFilter`, capability detection.                                                           | `webRequest.*`, `filterResponseData`, `runtime.getBrowserInfo`      |
+| `apps/extension-firefox`       | MV3 event page wiring sensor → engine → storage; strictly validated UI messaging; popup and dashboard.                                                                      | `storage.local`, `storage.session`, `alarms`, `permissions`, `tabs` |
 
 The engine and the indicator/privacy packages have no browser dependency and run
 under Node in tests. A future Chromium sensor implements the same `NormalizedEvent`
 contract and declares a smaller capability set; rules requiring missing capabilities
 are reported as "not evaluable" rather than silently skipped.
+
+### Correlation and optional local-model assistance (Phase 5)
+
+`@adtripwire/correlation` is pure and runs under Node. The background answers
+`get_clusters` / `get_cluster` by clustering stored detections (union-find over shared
+events, indicators, hostnames, registrable domains and same-tab proximity) and deriving a
+timeline narrative and suggested actions from the result. `get_assist_package` builds the
+only data a local model may see (`buildAssistContext`) and renders the prompt; the UI shows
+that text, sends it to an Ollama-compatible runtime on 127.0.0.1 through `OllamaProvider`
+(only in builds made with `--assist`), screens the answer with `screenAssistOutput` and
+displays it labelled as interpretation. Model output is never stored, exported or fed back
+into the engine. See `docs/local-assist.md`.
 
 ## Data flow in the Firefox extension
 

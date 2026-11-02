@@ -194,3 +194,39 @@ describe("LocalStore Phase 4: imported sets and notes", () => {
     expect(s.getNote("d1")).toBeUndefined();
   });
 });
+
+describe("LocalStore Phase 5: assist settings", () => {
+  beforeEach(() => {
+    installBrowserMock();
+  });
+
+  it("fills assist defaults for stored settings from earlier versions", () => {
+    const s = mergeSettings({ monitoring: { enabled: false } });
+    expect(s.assist).toEqual(DEFAULT_SETTINGS.assist);
+    expect(s.assist.enabled).toBe(false);
+    const bad = mergeSettings({
+      assist: { enabled: "yes", port: 99999, model: "x y", language: "fr" },
+    });
+    expect(bad.assist).toEqual(DEFAULT_SETTINGS.assist);
+  });
+
+  it("updates and clamps assist settings and persists them", async () => {
+    const store = new LocalStore();
+    await store.load();
+    const next = await store.updateAssistSettings({
+      enabled: true,
+      port: 99999,
+      model: "m".repeat(200),
+      language: "nb",
+    });
+    expect(next.assist.enabled).toBe(true);
+    expect(next.assist.port).toBe(65535);
+    expect(next.assist.model).toHaveLength(128);
+    expect(next.assist.language).toBe("nb");
+    const again = new LocalStore();
+    await again.load();
+    expect(again.getSettings().assist).toEqual(next.assist);
+    // Monitoring/retention untouched.
+    expect(again.getSettings().monitoring).toEqual(DEFAULT_SETTINGS.monitoring);
+  });
+});

@@ -738,3 +738,53 @@ label.radio {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
 }
+
+/* Phase 5: related activity and local-model assistance */
+.badge.priority-now {
+  background: var(--sev-elevated, #b45309);
+  color: #fff;
+}
+.badge.priority-soon {
+  background: var(--sev-suspicious, #92400e);
+  color: #fff;
+}
+.badge.priority-optional {
+  background: var(--muted, #6b7280);
+  color: #fff;
+}
+.actions li {
+  margin-bottom: 0.6rem;
+}
+.assist-output {
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+.assist-label {
+  font-weight: 600;
+  margin-top: 0;
+}
+.assist-flags {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+.assist-flags li {
+  margin: 0.25rem 0;
+}
+.assist-text {
+  white-space: pre-wrap;
+}
+.prompt-preview {
+  margin-top: 0.75rem;
+}
+.prompt-text {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+}

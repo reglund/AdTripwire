@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectionHash, parseHash, routeTab } from "./route.js";
+import { clusterHash, detectionHash, parseHash, routeTab } from "./route.js";
 
 describe("parseHash", () => {
   it("defaults to overview", () => {
@@ -23,5 +23,13 @@ describe("parseHash", () => {
   });
   it("highlights the detections tab for a detail route", () => {
     expect(routeTab({ name: "detection", id: "x" })).toBe("detections");
+  });
+  it("parses correlation routes and validates cluster ids", () => {
+    expect(parseHash("#correlation")).toEqual({ name: "correlation" });
+    expect(parseHash(clusterHash("c-0123abcd"))).toEqual({ name: "cluster", id: "c-0123abcd" });
+    expect(parseHash("#cluster/<script>")).toEqual({ name: "correlation" });
+    expect(routeTab({ name: "cluster", id: "c-0123abcd" })).toBe("correlation");
+    expect(parseHash("#assist-selftest")).toEqual({ name: "assist_selftest" });
+    expect(routeTab({ name: "assist_selftest" })).toBe("settings");
   });
 });

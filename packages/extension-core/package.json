@@ -22,6 +22,7 @@
     "@adtripwire/privacy": "workspace:*",
     "@adtripwire/detection-engine": "workspace:*",
     "@adtripwire/sensor-firefox": "workspace:*",
-    "@adtripwire/interop": "workspace:*"
+    "@adtripwire/interop": "workspace:*",
+    "@adtripwire/correlation": "workspace:*"
   }
 }
