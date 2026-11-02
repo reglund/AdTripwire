@@ -37,6 +37,9 @@ requests of its own.
 
 ## Install (development build)
 
+Packaged builds: https://github.com/reglund/AdTripwire/releases (v0.2.0; checksums in
+`SHA256SUMS`, reproducible from the tagged commit with `pnpm release:check`).
+
 Prerequisites on Ubuntu 24.04: Node.js 20+, pnpm 10 (`corepack enable`), Firefox 128+.
 
 ```bash

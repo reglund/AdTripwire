@@ -5,6 +5,8 @@ semantic versioning for the extension packages.
 
 ## [0.2.0] — 2026-11-02
 
+Released: https://github.com/reglund/AdTripwire/releases/tag/v0.2.0
+
 First release candidate after Phases 1–6 of the roadmap.
 
 ### Added

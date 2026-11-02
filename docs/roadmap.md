@@ -128,7 +128,7 @@ against rule evidence (done on synthetic scenarios with several local models; se
 evaluation report for the residual: screening is pattern-based and the label plus
 side-by-side evidence carry the guarantee).
 
-## Phase 6 — Release readiness 🔶 (delivered 2026-11-02, awaiting approval)
+## Phase 6 — Release readiness ✅ (delivered and released 2026-11-02)
 
 `prompt.md` defines Phases 1–5 only. Phase 6 is the remaining roadmap, approved to start on
 2026-11-02: the cross-cutting items below plus what Phases 4–5 carried forward.
@@ -160,8 +160,9 @@ Milestone 6.4 Community and carried-forward checks
 - Rule proposal template, indicator review process, issue templates.
 - Suricata `-T` / Zeek check if a tool is available; otherwise documented as unverified.
 
-Gate 6: a tagged build reproduces byte-for-byte from a clean checkout (met locally via
-`pnpm release:check`; CI run pending a pushed tag); a signed bundle verifies in both browsers
+Gate 6: a tagged build reproduces byte-for-byte from a clean checkout (met: `v0.2.0` built in
+GitHub Actions matches the local `SHA256SUMS` for every artifact, and the release is published
+at https://github.com/reglund/AdTripwire/releases/tag/v0.2.0); a signed bundle verifies in both browsers
 (met via the DEV self-test; the import UI itself was not click-tested); keyboard-only
 walkthrough reviewed from markup, not performed by a person. Report: `docs/phase-6-report.md`.
 
