@@ -26,7 +26,7 @@ approved to start on 2026-11-02.
 | Unit + integration tests                          | 644 passed (incl. 15 signed-bundle unit tests, 3 published-feed tests, 10 i18n tests) |
 | Typecheck, eslint, prettier, indicator validation | clean                                                                                 |
 | `pnpm release:check`                              | second build byte-identical for all four extension zips, source archive and SBOM      |
-| Firefox e2e (DEV)                                 | 12 of 12, including the in-browser Ed25519 verification of the published bundle    |
+| Firefox e2e (DEV)                                 | 12 of 12, including the in-browser Ed25519 verification of the published bundle       |
 | Chromium e2e (DEV)                                | 10 of 10, including the in-browser Ed25519 verification of the published bundle       |
 | Production builds                                 | Firefox `web-ext lint` 0/0/0; Chromium manifest check OK                              |
 
