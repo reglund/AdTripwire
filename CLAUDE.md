@@ -36,8 +36,10 @@ Note: `tsc -p <pkg> --noEmit` fails with TS6305 until referenced packages are bu
 
 Data flow: `sensor-firefox` (webRequest + StreamFilter) → `NormalizedEvent` →
 `detection-engine` (rules A–F, bounded correlation window, dedup) → `Detection` →
-`apps/extension-firefox/src/background` (storage.local for detections + referenced
-events, storage.session for the window snapshot) → UI via validated `UiRequest` messages.
+`packages/extension-core/src/background` (shared between browsers via a `SensorAdapter`;
+storage.local for detections + referenced events, storage.session for the window snapshot)
+→ UI via validated `UiRequest` messages. `apps/extension-*` hold only manifest, build script
+and thin entry files.
 
 - `packages/shared` holds all type contracts. Change them first; everything else codes
   against them. `exactOptionalPropertyTypes` is on: omit optional props, never assign
@@ -53,7 +55,7 @@ events, storage.session for the window snapshot) → UI via validated `UiRequest
 - `packages/sensor-firefox` — `WebRequestSensor`: non-blocking observers on
   `<all_urls>`, ONE blocking listener scoped to indicator hosts + `/getAd` paths that
   attaches a pass-through filter (`write` first, cap, `disconnect`, analysis deferred).
-- UI (`apps/extension-firefox/src/ui`) is vanilla DOM via `h()`; no innerHTML with data.
+- UI (`packages/extension-core/src/ui`) is vanilla DOM via `h()`; no innerHTML with data.
   Host permission is requested from the page click handler (user gesture), not via the
   background.
 

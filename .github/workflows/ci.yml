@@ -28,10 +28,16 @@ jobs:
       - run: pnpm build
       - run: pnpm ext:lint
       - run: pnpm ext:package
+      - run: pnpm --filter @adtripwire/extension-chromium run ext:lint
+      - run: pnpm --filter @adtripwire/extension-chromium run ext:package
       - uses: actions/upload-artifact@v4
         with:
           name: adtripwire-firefox
           path: apps/extension-firefox/web-ext-artifacts/*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adtripwire-chromium
+          path: apps/extension-chromium/web-ext-artifacts/*.zip
 
   dependency-audit:
     runs-on: ubuntu-24.04

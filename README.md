@@ -52,6 +52,19 @@ signing: `pnpm ext:package` (output in `apps/extension-firefox/web-ext-artifacts
 The extension asks for access to all sites because ads appear everywhere; you can revoke
 and re-grant it at any time. Nothing is observed until it is granted.
 
+### Chromium / Chrome (Phase 3, reduced visibility)
+
+```bash
+pnpm --filter @adtripwire/extension-chromium run build   # → apps/extension-chromium/dist
+```
+
+Open `chrome://extensions`, enable Developer mode, **Load unpacked**, select
+`apps/extension-chromium/dist`. Chromium MV3 cannot inspect response bodies and does not
+expose frame ancestry, third-party status or tracking classification directly, so the
+JavaScript-technique rules and the response branch of the NOAS rules are reported as
+**not evaluable** in the dashboard; frame ancestry is reconstructed from `webNavigation`.
+See `docs/browser-capabilities.md`.
+
 ## Using it
 
 - **Toolbar popup**: monitoring state, counts of known-IOC observations, suspicious
@@ -77,6 +90,7 @@ pnpm test:perf           # performance bounds
 pnpm indicators:validate # dataset checks
 pnpm ext:lint            # web-ext lint on the built extension
 pnpm e2e:firefox         # headless Firefox run against local synthetic fixtures
+pnpm e2e:chromium        # headless Chrome/Chromium run (reduced capability expectations)
 pnpm docs:rules          # regenerate the rule catalogue in docs/detection-methodology.md
 ```
 

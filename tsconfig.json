@@ -1,11 +1,32 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/shared" },
-    { "path": "packages/indicators" },
-    { "path": "packages/privacy" },
-    { "path": "packages/detection-engine" },
-    { "path": "packages/sensor-firefox" },
-    { "path": "apps/extension-firefox" }
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/indicators"
+    },
+    {
+      "path": "packages/privacy"
+    },
+    {
+      "path": "packages/detection-engine"
+    },
+    {
+      "path": "packages/sensor-firefox"
+    },
+    {
+      "path": "packages/sensor-chromium"
+    },
+    {
+      "path": "packages/extension-core"
+    },
+    {
+      "path": "apps/extension-firefox"
+    },
+    {
+      "path": "apps/extension-chromium"
+    }
   ]
 }

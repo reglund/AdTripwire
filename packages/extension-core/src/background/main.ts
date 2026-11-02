@@ -28,17 +28,27 @@ import {
 } from "@adtripwire/detection-engine";
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import {
-  WebRequestSensor,
   addIndicatorPatterns,
   buildInspectionMatchPatterns,
-  detectCapabilities,
   isNoasPath,
+  type SensorOptions,
 } from "@adtripwire/sensor-firefox";
 import { LocalStore, EMPTY_METRICS, type Metrics } from "./storage.js";
 import { fail, isPageSensorSender, isTrustedSender, ok, parseUiRequest } from "./messages.js";
 import { buildPageSignalEvent, pageSignalAllowed } from "./page-signals.js";
 import { hostnameOf } from "@adtripwire/privacy";
 import syntheticSet from "../../../../tests/fixtures/indicators/synthetic.json";
+
+/** Browser-specific pieces the shared background needs. */
+export interface SensorAdapter {
+  browserName: "firefox" | "chromium";
+  detectCapabilities(): Promise<SensorCapabilities>;
+  createSensor(opts: SensorOptions): {
+    register(): void;
+    dispose(): void;
+    readonly stats: { pending: number; activeFilters: number; skippedForBudget: number };
+  };
+}
 
 const SESSION_KEY_ENGINE = "engineSnapshot";
 const PAGE_SENSOR_ID = "adtripwire-page-sensor";
@@ -55,12 +65,8 @@ class Background {
   private readonly matcher: IndicatorMatcher;
   private readonly sets: IndicatorSet[] = [];
   private engine: DetectionEngine | undefined;
-  private capabilities: SensorCapabilities = {
-    browser: "firefox",
-    capabilities: [],
-    notes: ["capabilities not yet detected"],
-  };
-  private readonly sensor: WebRequestSensor;
+  private capabilities: SensorCapabilities;
+  private readonly sensor: ReturnType<SensorAdapter["createSensor"]>;
   private exposure = new MemoryExposureStore();
   private metrics: Metrics = { ...EMPTY_METRICS };
   private snapshotTimer: ReturnType<typeof setTimeout> | undefined;
@@ -71,7 +77,12 @@ class Background {
   private readonly preReady: NormalizedEvent[] = [];
   private static readonly PRE_READY_MAX = 500;
 
-  constructor() {
+  constructor(private readonly adapter: SensorAdapter) {
+    this.capabilities = {
+      browser: adapter.browserName,
+      capabilities: [],
+      notes: ["capabilities not yet detected"],
+    };
     // Everything needed to register listeners is synchronous: indicator sets are bundled.
     this.sets = [...BUNDLED_INDICATOR_SETS];
     if (__ADTRIPWIRE_DEV__) {
@@ -93,8 +104,8 @@ class Background {
 
     // Event pages: listeners must be registered synchronously at top level so Firefox can
     // wake the page for them. Callbacks consult current state lazily.
-    this.sensor = new WebRequestSensor({
-      browserName: "firefox",
+    this.sensor = this.adapter.createSensor({
+      browserName: this.adapter.browserName,
       inspectionMatchPatterns: patterns,
       shouldObserve: (ev) => this.shouldObserve(ev),
       shouldInspect: (ev) =>
@@ -130,7 +141,7 @@ class Background {
       await this.store.updateSettings({ pageSensorEnabled: true });
     }
     this.metrics = await this.store.getMetrics();
-    this.capabilities = await detectCapabilities();
+    this.capabilities = await this.adapter.detectCapabilities();
     await this.applyPageSensorSetting();
 
     let exposure = new MemoryExposureStore();
@@ -537,33 +548,44 @@ class Background {
   }
 }
 
-const bg = new Background();
-const baseUrl = browser.runtime.getURL("");
+export function startBackground(adapter: SensorAdapter): void {
+  const bg = new Background(adapter);
+  const baseUrl = browser.runtime.getURL("");
 
-browser.runtime.onMessage.addListener((raw: unknown, sender) => {
-  // Optional page sensor: fire-and-forget signals from our own content script in sub-frames.
-  if (raw && typeof raw === "object" && (raw as { type?: unknown }).type === "page_signal") {
-    if (isPageSensorSender(sender)) bg.handlePageSignal(raw, sender);
-    return undefined;
-  }
-  if (!isTrustedSender(sender, baseUrl)) return Promise.resolve(fail("untrusted sender"));
-  const req = parseUiRequest(raw);
-  if (!req) return Promise.resolve(fail("invalid request"));
-  return bg
-    .handle(req)
-    .then(ok)
-    .catch((e: unknown) => fail(e instanceof Error ? e.message : "internal error"));
-});
+  // sendResponse + `return true` works on both Firefox and Chromium (Chromium does not
+  // accept a returned Promise from onMessage listeners).
+  browser.runtime.onMessage.addListener(
+    (raw: unknown, sender, sendResponse: (r: unknown) => void): true | undefined => {
+      if (raw && typeof raw === "object" && (raw as { type?: unknown }).type === "page_signal") {
+        if (isPageSensorSender(sender)) bg.handlePageSignal(raw, sender);
+        return undefined;
+      }
+      if (!isTrustedSender(sender, baseUrl)) {
+        sendResponse(fail("untrusted sender"));
+        return undefined;
+      }
+      const req = parseUiRequest(raw);
+      if (!req) {
+        sendResponse(fail("invalid request"));
+        return undefined;
+      }
+      bg.handle(req)
+        .then((data) => sendResponse(ok(data)))
+        .catch((e: unknown) => sendResponse(fail(e instanceof Error ? e.message : "internal error")));
+      return true;
+    },
+  );
 
-browser.runtime.onInstalled.addListener((details) => {
-  if (details.reason === "install")
-    log("info", "installed; monitoring starts once host permission is present");
-  if (__ADTRIPWIRE_DEV__) {
-    // DEV builds open the dashboard so the browser-level test can confirm the UI renders.
-    setTimeout(() => {
-      browser.tabs
-        .create({ url: browser.runtime.getURL("dashboard.html#detections"), active: false })
-        .catch((e) => log("warn", `could not open dashboard: ${String(e)}`));
-    }, 15_000);
-  }
-});
+  browser.runtime.onInstalled.addListener((details) => {
+    if (details.reason === "install")
+      log("info", "installed; monitoring starts once host permission is present");
+    if (__ADTRIPWIRE_DEV__) {
+      // DEV builds open the dashboard so the browser-level test can confirm the UI renders.
+      setTimeout(() => {
+        browser.tabs
+          .create({ url: browser.runtime.getURL("dashboard.html#detections"), active: false })
+          .catch((e) => log("warn", `could not open dashboard: ${String(e)}`));
+      }, 15_000);
+    }
+  });
+}

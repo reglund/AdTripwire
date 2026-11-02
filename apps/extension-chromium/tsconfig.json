@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist-types",
+    "types": ["firefox-webext-browser", "chrome"],
+    "composite": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/shared"
+    },
+    {
+      "path": "../../packages/extension-core"
+    },
+    {
+      "path": "../../packages/sensor-chromium"
+    }
+  ]
+}

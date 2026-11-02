@@ -10,10 +10,8 @@
     "ext:package": "web-ext build -s dist --overwrite-dest"
   },
   "dependencies": {
-    "@adtripwire/shared": "workspace:*",
-    "@adtripwire/indicators": "workspace:*",
-    "@adtripwire/privacy": "workspace:*",
-    "@adtripwire/detection-engine": "workspace:*",
-    "@adtripwire/sensor-firefox": "workspace:*"
+    "@adtripwire/extension-core": "workspace:*",
+    "@adtripwire/sensor-firefox": "workspace:*",
+    "@adtripwire/shared": "workspace:*"
   }
 }

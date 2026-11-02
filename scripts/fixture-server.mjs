@@ -39,13 +39,26 @@ const adFrame = (inner) =>
   `<iframe title="ad" width="300" height="250" src="http://${H.ads}/creative?${inner}"></iframe>`;
 
 const routes = {
-  "/benign": () => page("Benign ad", adFrame("mode=benign")),
-  "/exposure": () => page("NOAS exposure (empty response)", adFrame("mode=exposure")),
-  "/selected": () => page("NOAS selected (JS returned)", adFrame("mode=selected")),
+  // Headless Chrome accepts a single start URL: this page embeds every scenario as an iframe.
+  "/all": () =>
+    page(
+      "All scenarios",
+      ["/benign", "/exposure", "/selected", "/ioc"]
+        .map(
+          (p) =>
+            `<h2>${p}</h2><iframe title="scenario ${p}" width="600" height="320" src="http://${H.publisher}${p}"></iframe>`,
+        )
+        .join(""),
+      true,
+    ),
+  "/benign": () => page("Benign ad", adFrame("mode=benign"), true),
+  "/exposure": () => page("NOAS exposure (empty response)", adFrame("mode=exposure"), true),
+  "/selected": () => page("NOAS selected (JS returned)", adFrame("mode=selected"), true),
   "/ioc": () =>
     page(
       "Known IOC beacon",
       `<img src="http://${H.c2}/pixel.gif?x=1" width="1" height="1" alt="">`,
+      true,
     ),
   "/creative": (q) => {
     const mode = q.get("mode") ?? "benign";

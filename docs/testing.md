@@ -55,6 +55,23 @@ response to elevated once the body was inspected, nested frame to indicator (ele
 malicious contact (elevated), and `correlation.adfection_chain` (high priority). The
 benign scenario produced no detections.
 
+### Chromium (Phase 3)
+
+```bash
+pnpm e2e:chromium           # headless Google Chrome / Chromium, ~60 s
+```
+
+`scripts/e2e-chromium.mjs` builds a dev bundle of `apps/extension-chromium`, launches Chrome
+with `--load-extension` and `--host-resolver-rules` mapping the reserved `.test` names to
+localhost, captures console output via `--enable-logging=stderr`, and asserts the reduced
+Chromium expectations: indicator contacts and the NOAS request rule fire, the page sensor
+registers and reports, and **no** `js.*` detection or `response_body_inspection` capability
+appears, because Chromium MV3 cannot inspect response bodies. Headless Chrome accepts a
+single start URL, so the run opens the fixture page `/all`, which embeds the four scenarios
+as iframes. Branded Google Chrome ignores `--load-extension` (since 137): use the Chromium
+snap or Chrome for Testing (`CHROME_BIN=...`). Snap Chromium needs the profile under
+`~/snap/chromium/common/`, which the script handles.
+
 ### Manual
 
 1. Build a dev bundle (includes the synthetic indicator set):

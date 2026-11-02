@@ -40,7 +40,7 @@ operational, IOC + boundary matching, response inspection byte-for-byte, synthet
 suspicious event → visible detection, benign → no high priority, restart persistence,
 deletion, redacted export, tests pass, README/limitations/privacy documented.
 
-## Phase 2 — Enhanced behavioural detection (in progress, started 2026-11-02)
+## Phase 2 — Enhanced behavioural detection (closed 2026-11-02 with approval; open items carried forward)
 
 1. **Benign-browsing false-positive study** 🔶 — `pnpm eval:benign` automates a headless
    run over `tests/fixtures/benign-sites.txt`; results under `docs/evaluations/` (zero
@@ -66,16 +66,25 @@ Gate 2: documented false-positive rate on the benign protocol with zero high-pri
 false positives (met for the headless run; interactive run pending), frame-lineage
 correlation tested (met), page sensor reviewed (met, two reviews; see threat model).
 
-## Phase 3 — Chrome/Chromium support ⬜
+Carried forward from Phase 2 (not blocking): interactive benign session, signed indicator
+bundle implementation (`docs/indicator-updates.md`), Firefox-profiler performance pass,
+manual verification of the page-sensor consent UI.
 
-- `packages/sensor-chromium`: MV3 service worker, observational `webRequest` only,
-  capability declaration without `response_body_inspection`, `frame_ancestry`,
-  `third_party_flag`, `url_classification`.
-- Shared UI and engine; dashboard explains which rules are not evaluable.
-- Store listing requirements, permissions explanation, documented capability gaps.
+## Phase 3 — Chrome/Chromium support (in progress, started 2026-11-02)
 
-Gate 3: same synthetic suite passes on the Chromium subset of rules; no faked body
-inspection.
+- `packages/sensor-chromium` ✅ — MV3 observational `webRequest`, frame tree from
+  `webNavigation`, incognito handling via a tab cache, no inspection; 53 tests.
+- Shared core ✅ — background, UI and page sensor moved to `packages/extension-core` behind a
+  `SensorAdapter`; apps are manifest + build + entry files.
+- `apps/extension-chromium` ✅ — service-worker manifest, `chrome`→`browser` shim, raster
+  icons, manifest validator, CI package. Verified headless on Chromium 156
+  (`pnpm e2e:chromium`): indicator and NOAS rules, page sensor, dashboard, no `js.*` rules.
+- Dashboard explains non-evaluable rules on Chromium ✅ (engine capability gating).
+- Pending: store-listing text and permission explanations, a Chromium benign-browsing run,
+  a review of the Chromium sensor by a second model, real Chrome (branded) manual check.
+
+Gate 3: synthetic suite passes on the Chromium rule subset (met headless); no faked body
+inspection (met: `no_response_body_access` on every event).
 
 ## Phase 4 — Security research integration ⬜
 

@@ -15,6 +15,20 @@ engine reports rules with unmet capabilities as **not evaluable**.
 | Background model                                      | event page (`background.scripts`), no service worker                                                                            | service worker                                    | MDN background key                       |
 | Host permissions at install                           | granted at install from Firefox 127 (MV3); revocable by user at any time                                                        | prompt / optional                                 | Extension Workshop MV3 guide             |
 
+## Chromium build (Phase 3, verified 2026-11-02 on Chromium 156 snap, headless)
+
+`apps/extension-chromium` binds the shared core to `@adtripwire/sensor-chromium`: observational
+`webRequest` only, frame ancestry reconstructed from `webNavigation` (declared as
+`frame_ancestry`, may lag), third-party status inferred by comparing registrable domains of
+the issuing document and the top frame, `no_response_body_access` on every event. Declared
+capabilities: `request_metadata, redirect_chain, response_headers, response_size,
+frame_ancestry` (+ `page_signals` when the opt-in sensor is on). The headless run confirmed
+indicator contacts, the NOAS request rule, nested-frame and NOAS-then-frame correlation, the
+page sensor, the dashboard, and an AdFection chain completed through a page-signal step 2
+with a documented NOAS host; no `js.*` rule and no `response_body_inspection` appeared.
+Note: branded Google Chrome ignores `--load-extension` since Chrome 137, so automated runs
+use Chromium or Chrome for Testing.
+
 ## Consequences for AdTripwire
 
 - Category B (selective JS response) and D (JavaScript techniques) are Firefox-only

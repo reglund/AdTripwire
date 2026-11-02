@@ -41,9 +41,9 @@ const common = {
   },
   outdir: dist,
   entryPoints: {
-    background: join(here, "src/background/main.ts"),
-    popup: join(here, "src/ui/popup.ts"),
-    dashboard: join(here, "src/ui/dashboard.ts"),
+    background: join(here, "src/background.ts"),
+    popup: join(here, "src/popup.ts"),
+    dashboard: join(here, "src/dashboard.ts"),
   },
 };
 
@@ -51,7 +51,7 @@ const common = {
 const pageSensor = {
   ...common,
   format: "iife",
-  entryPoints: { "page-sensor": join(here, "src/page-sensor/page-sensor.ts") },
+  entryPoints: { "page-sensor": join(here, "src/page-sensor.ts") },
 };
 
 if (watch) {
