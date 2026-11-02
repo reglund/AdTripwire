@@ -226,6 +226,17 @@ export function formatHostnames(hostnames: readonly string[], max = 3): string {
   });
 }
 
+/** Days a curated indicator set may age before the UI suggests looking for a signed update. */
+export const INDICATOR_STALE_DAYS = 45;
+
+/** Whole days between an indicator set's `asOf` date (YYYY-MM-DD) and `now`; null if unparseable. */
+export function indicatorAgeDays(asOf: string, now: number = Date.now()): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return null;
+  const t = Date.parse(`${asOf}T00:00:00Z`);
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
 export function msToMinutes(ms: number): number {
   return Math.round(ms / MINUTE);
 }

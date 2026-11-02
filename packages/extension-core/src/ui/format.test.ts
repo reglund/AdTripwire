@@ -221,3 +221,14 @@ describe("page sensor and metrics helpers", () => {
     expect(rows).toHaveLength(8);
   });
 });
+
+describe("indicatorAgeDays", () => {
+  it("counts whole days since asOf and rejects bad dates", async () => {
+    const { indicatorAgeDays } = await import("./format.js");
+    const now = Date.parse("2026-12-20T12:00:00Z");
+    expect(indicatorAgeDays("2026-10-18", now)).toBe(63);
+    expect(indicatorAgeDays("2026-12-20", now)).toBe(0);
+    expect(indicatorAgeDays("2027-01-01", now)).toBe(0);
+    expect(indicatorAgeDays("not-a-date", now)).toBeNull();
+  });
+});

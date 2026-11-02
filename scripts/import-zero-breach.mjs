@@ -4,6 +4,16 @@
  * AdTripwire's normalized indicator format.
  *
  * Usage: node scripts/import-zero-breach.mjs [input.tsv] [output.json]
+ *          [--withdrawals=<stix.json>] [--strict]
+ *
+ *  --withdrawals  Zero Breach's withdrawals bundle: any revoked indicator whose value matches a
+ *                 row is dropped (counted as "withdrawn").
+ *  --strict       exit 3 when rows were skipped for an unknown source or tier, so an automated
+ *                 refresh stops for human review instead of silently ignoring new data.
+ *
+ * Versioning: when the generated indicators are identical to the existing output, its
+ * version and asOf are kept (byte-stable output). When they differ, version becomes today's
+ * date (YYYY.MM.DD, monotonic for signed bundles) and asOf the upstream file's "# as-of:".
  *
  * Curation policy (see docs/detection-methodology.md):
  *  - Import only current-campaign PRIMARY indicators (Citizen Lab 2026, Confiant 2026)
@@ -12,10 +22,27 @@
  *    file hashes, the vulnerable-driver hash, and 2021-2022 historical sets.
  *  - Re-classify every row into AdTripwire's three classes explicitly below.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const input = process.argv[2] ?? "packages/indicators/upstream/zero-breach/adfection_iocs.txt";
-const output = process.argv[3] ?? "packages/indicators/data/adfection-2026.json";
+const positional = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const opt = (k) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
+const input = positional[0] ?? "packages/indicators/upstream/zero-breach/adfection_iocs.txt";
+const output = positional[1] ?? "packages/indicators/data/adfection-2026.json";
+const withdrawalsPath = opt("withdrawals");
+const strict = process.argv.includes("--strict");
+const rawInput = readFileSync(input, "utf8");
+const upstreamAsOf = /^#\s*as-of:\s*(\d{4}-\d{2}-\d{2})/m.exec(rawInput)?.[1];
+if (!upstreamAsOf) throw new Error(`${input}: no "# as-of: YYYY-MM-DD" header`);
+
+// Revoked indicator values from the withdrawals bundle (domain-name / url / hostname patterns).
+const withdrawn = new Set();
+if (withdrawalsPath) {
+  const bundle = JSON.parse(readFileSync(withdrawalsPath, "utf8"));
+  for (const o of bundle.objects ?? []) {
+    if (o.type !== "indicator" || o.revoked !== true || typeof o.pattern !== "string") continue;
+    for (const m of o.pattern.matchAll(/value\s*=\s*'([^']+)'/g)) withdrawn.add(m[1].toLowerCase());
+  }
+}
 
 const SOURCES = {
   "citizenlab-adfection-2026": {
@@ -83,7 +110,7 @@ const PROFILING = new Set(["sincereaccertain.com"]);
 const isIp = (s) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
 const isHash = (s) => /^[0-9a-f]{64}$/i.test(s);
 
-const rows = readFileSync(input, "utf8")
+const rows = rawInput
   .split("\n")
   .map((l) => l.trim())
   .filter((l) => l && !l.startsWith("#"))
@@ -91,10 +118,22 @@ const rows = readFileSync(input, "utf8")
   .filter((c) => c.length === 4);
 
 const out = [];
-const skipped = { ip: 0, hash: 0, historicalSecondary: 0, vulnDriver: 0, other: 0 };
+const skipped = {
+  ip: 0,
+  hash: 0,
+  historicalSecondary: 0,
+  vulnDriver: 0,
+  withdrawn: 0,
+  other: 0,
+};
+const unknownRows = [];
 
 for (const [indicator, tier, confidence, source] of rows) {
   const value = indicator.toLowerCase();
+  if (withdrawn.has(value)) {
+    skipped.withdrawn++;
+    continue;
+  }
   if (isIp(value)) {
     skipped.ip++;
     continue;
@@ -114,6 +153,7 @@ for (const [indicator, tier, confidence, source] of rows) {
   const src = SOURCES[source];
   if (!src) {
     skipped.other++;
+    unknownRows.push(`${value}\t${tier}\t${confidence}\t${source} (unknown source)`);
     continue;
   }
 
@@ -196,6 +236,7 @@ for (const [indicator, tier, confidence, source] of rows) {
     }
   } else {
     skipped.other++;
+    unknownRows.push(`${value}\t${tier}\t${confidence}\t${source} (unknown tier)`);
     continue;
   }
 
@@ -283,12 +324,20 @@ dedup.forEach((r, i) => {
 });
 const ordered = dedup.map(({ id, ...rest }) => ({ id, ...rest }));
 
+// Keep version/asOf when nothing changed; otherwise bump to today and the upstream as-of.
+const previous = existsSync(output) ? JSON.parse(readFileSync(output, "utf8")) : null;
+const unchanged =
+  previous !== null && JSON.stringify(previous.indicators) === JSON.stringify(ordered);
+const today = new Date().toISOString().slice(0, 10);
+const version = unchanged ? previous.meta.version : today.replace(/-/g, ".");
+const asOf = unchanged ? previous.meta.asOf : upstreamAsOf;
+
 const set = {
   meta: {
     id: "adfection-2026",
     name: "AdFection / Discover-Tech / Candiru infrastructure",
-    version: "2026.11.02",
-    asOf: "2026-10-18",
+    version,
+    asOf,
     license: "CC0-1.0 (indicator data via Zero Breach; facts from the cited reports)",
     synthetic: false,
     description:
@@ -297,7 +346,7 @@ const set = {
       {
         name: "Zero Breach (interplains/zero-breach) curated IOC list, CC0 1.0",
         url: "https://github.com/interplains/zero-breach",
-        published: "2026-10-18",
+        published: upstreamAsOf,
       },
     ]),
   },
@@ -306,4 +355,15 @@ const set = {
 writeFileSync(output, JSON.stringify(set, null, 2) + "\n");
 const byClass = {};
 for (const r of ordered) byClass[r.classification] = (byClass[r.classification] ?? 0) + 1;
-console.log(`wrote ${ordered.length} indicators to ${output}`, byClass, "skipped:", skipped);
+console.log(
+  `wrote ${ordered.length} indicators to ${output} (version ${version}, asOf ${asOf}, ${unchanged ? "unchanged" : "CHANGED"})`,
+  byClass,
+  "skipped:",
+  skipped,
+);
+if (unknownRows.length) {
+  console.error(
+    `rows skipped for an unknown source or tier (need a curation decision):\n${unknownRows.join("\n")}`,
+  );
+  if (strict) process.exit(3);
+}

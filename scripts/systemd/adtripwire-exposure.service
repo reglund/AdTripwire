@@ -5,5 +5,9 @@ Description=AdTripwire daily interactive exposure run (Firefox and Chromium, per
 Type=oneshot
 WorkingDirectory=%h/git/AdTripwire
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
+# Rebuild the evaluation bundles from the checked-out tree so the run always uses the current
+# indicator set (pull the repository to pick up merged indicator refreshes).
+ExecStartPre=/bin/sh -c 'node scripts/refresh-indicators.mjs --check || true'
+ExecStartPre=/bin/sh -c 'node apps/extension-firefox/build.mjs --eval --out=%h/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=%h/snap/chromium/common/adtripwire-eval-dist'
 ExecStart=/bin/sh -c 'node scripts/exposure-run.mjs --browser=firefox --seconds=75 --json=%h/.cache/adtripwire-exposure/firefox-$(date +%%F).json && node scripts/exposure-run.mjs --browser=chromium --seconds=75 --json=%h/.cache/adtripwire-exposure/chromium-$(date +%%F).json'
 Nice=10

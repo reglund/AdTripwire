@@ -30,6 +30,28 @@ done.
   `feeds/adtripwire-indicators-<version>.signed.json` is the published artifact;
   `tests/integration/signed-feed.test.ts` checks it against the pinned key on every CI run.
 
+## Keeping the curated set current
+
+- **Upstream check:** `node scripts/refresh-indicators.mjs` downloads the Zero Breach list,
+  verifies it against the published SHA-256, applies Zero Breach's withdrawals bundle, and
+  regenerates the curated set and the feeds when anything changed (`--check` only compares).
+  New rows with an unknown source or tier stop the import (exit 3) until a curation decision
+  is added to `scripts/import-zero-breach.mjs`; nothing new enters the set silently.
+- **Versioning:** unchanged content keeps its version; changed content gets today's date as
+  version (monotonic, so a signed bundle of it is accepted as an update) and the upstream
+  `as-of` as `asOf`.
+- **Automation:** the `Indicator refresh` workflow runs every Monday and opens a pull request
+  with the change list and a review checklist (or an issue when curation is needed). Merging
+  and signing stay manual. After merging: `pnpm indicators:sign sign …` publishes a signed
+  bundle so existing installs can update from a file.
+- **In the extension:** the overview shows a notice when the curated set is older than 45
+  days, pointing to signed updates. The extension itself never fetches indicators.
+- **Daily exposure runs** rebuild their evaluation bundles from the checked-out tree before
+  every run and log whether upstream has moved on.
+- **Blind spot:** only 2 of the ~305 Candiru validator domains are public (upstream
+  `VALIDATOR-GAP.md`); a validator hit would indicate targeting, and the set is nearly blind
+  to that layer. Refreshing cannot fix this; new publications can.
+
 ## Original design (fetching variant, not implemented)
 
 The remainder of this document is the Phase 2 design for an opt-in network update check.

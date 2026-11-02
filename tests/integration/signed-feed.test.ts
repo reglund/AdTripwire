@@ -1,33 +1,49 @@
 /**
- * The published signed bundle in feeds/ must verify against the key pinned in the extension,
- * carry the same content as the built-in set, and be rejected as a replay of the built-in
- * version (a real update will carry a newer version).
+ * The newest published signed bundle in feeds/ must verify against the key pinned in the
+ * extension. When its version equals the built-in set's, the content must be identical; when
+ * the built-in set is newer (an automated indicator refresh merged, bundle not yet signed),
+ * the bundle must still be older, never newer, than what ships.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BUNDLED_INDICATOR_SETS,
   canonicalJson,
-  diffIndicatorSets,
+  compareVersions,
   verifySignedBundle,
 } from "@adtripwire/indicators";
 
-const path = new URL("../../feeds/adtripwire-indicators-2026.11.02.signed.json", import.meta.url);
-const bundle = JSON.parse(readFileSync(path, "utf8")) as { meta: { version: string } };
+const feedsDir = new URL("../../feeds/", import.meta.url);
+const newest = readdirSync(feedsDir)
+  .filter((f) => /^adtripwire-indicators-[\d.]+\.signed\.json$/.test(f))
+  .sort((a, b) =>
+    compareVersions(
+      a.replace(/^adtripwire-indicators-|\.signed\.json$/g, ""),
+      b.replace(/^adtripwire-indicators-|\.signed\.json$/g, ""),
+    ),
+  )
+  .pop();
+const path = new URL(newest ?? "missing", feedsDir);
+const text = readFileSync(path, "utf8");
+const bundle = JSON.parse(text) as { meta: { version: string } };
 const builtIn = BUNDLED_INDICATOR_SETS[0]!;
 
 describe("published signed indicator bundle", () => {
-  it("verifies against the pinned project key", async () => {
-    const r = await verifySignedBundle(bundle, { expectedSetId: builtIn.meta.id });
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(r.key.keyId).toBe("adtripwire-2026a");
-      expect(canonicalJson(r.bundle.payload)).toBe(canonicalJson(builtIn));
-      expect(diffIndicatorSets(builtIn, r.bundle.payload).added).toEqual([]);
-    }
+  it("exists", () => {
+    expect(newest).toBeDefined();
   });
 
-  it("is rejected as a replay when the built-in set has the same version", async () => {
+  it("verifies against the pinned project key and matches or trails the built-in set", async () => {
+    const r = await verifySignedBundle(bundle, { expectedSetId: builtIn.meta.id });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.key.keyId).toBe("adtripwire-2026a");
+    const cmp = compareVersions(r.bundle.meta.version, builtIn.meta.version);
+    expect(cmp).toBeLessThanOrEqual(0);
+    if (cmp === 0) expect(canonicalJson(r.bundle.payload)).toBe(canonicalJson(builtIn));
+  });
+
+  it("is rejected as a replay when it is not newer than the built-in set", async () => {
     const r = await verifySignedBundle(bundle, {
       expectedSetId: builtIn.meta.id,
       activeVersion: builtIn.meta.version,
@@ -37,8 +53,9 @@ describe("published signed indicator bundle", () => {
   });
 
   it("is rejected after a single-byte change", async () => {
-    const text = readFileSync(path, "utf8").replace('"enabled": true', '"enabled": false');
-    const r = await verifySignedBundle(JSON.parse(text));
+    const r = await verifySignedBundle(
+      JSON.parse(text.replace('"enabled": true', '"enabled": false')),
+    );
     expect(r.ok).toBe(false);
   });
 });

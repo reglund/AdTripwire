@@ -26,7 +26,8 @@ pnpm build                     # packages, then esbuild → apps/extension-firef
 pnpm ext:lint | ext:run | ext:package   # web-ext on dist
 pnpm --filter @adtripwire/extension-firefox exec node build.mjs --dev   # bundles synthetic .test indicators
 node scripts/fixture-server.mjs 8787     # local synthetic scenarios (see docs/testing.md)
-node scripts/import-zero-breach.mjs      # regenerate packages/indicators/data/adfection-2026.json
+node scripts/refresh-indicators.mjs      # fetch upstream Zero Breach list, verify, regenerate set + feeds (--check: compare only)
+node scripts/import-zero-breach.mjs      # regenerate packages/indicators/data/adfection-2026.json from the vendored list
 node apps/extension-firefox/build.mjs --assist   # optional local-model build (loopback-only connect-src)
 pnpm e2e:firefox:assist | e2e:chromium:assist    # e2e with mock Ollama runtime on 127.0.0.1:8787
 pnpm eval:assist -- --endpoint URL --models a,b  # evaluate local models on synthetic scenarios

@@ -1,0 +1,62 @@
+name: Indicator refresh
+
+# Weekly check of the upstream Zero Breach AdFection list. When it changed, the curated set,
+# feeds and vendored upstream files are regenerated, the full test suite runs, and a pull
+# request is opened for human review. Nothing is merged or signed automatically.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Refresh from upstream
+        id: refresh
+        run: |
+          set +e
+          node scripts/refresh-indicators.mjs --summary=refresh-summary.md
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" != 0 ] && [ "$code" != 10 ] && [ "$code" != 3 ]; then exit "$code"; fi
+      - name: Test the regenerated set
+        if: steps.refresh.outputs.code == '10'
+        run: |
+          pnpm indicators:validate
+          pnpm typecheck
+          pnpm test
+      - name: Open pull request
+        if: steps.refresh.outputs.code == '10'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="indicators/refresh-$(date -u +%Y%m%d)"
+          git config user.name "adtripwire-bot"
+          git config user.email "adtripwire-bot@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add packages/indicators feeds
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "Indicators: refresh from upstream Zero Breach list"
+          git push --force origin "$branch"
+          gh pr create --title "Indicators: refresh from upstream ($(date -u +%F))" \
+            --body-file refresh-summary.md --head "$branch" --base main \
+            || gh issue create --title "Indicator refresh ready on $branch" --body-file refresh-summary.md
+      - name: Ask for a curation decision
+        if: steps.refresh.outputs.code == '3'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --title "Indicator refresh needs a curation decision ($(date -u +%F))" --body-file refresh-summary.md

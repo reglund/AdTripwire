@@ -2,6 +2,8 @@ import type { Detection, MonitoringStatus } from "@adtripwire/shared";
 import { h } from "../dom.js";
 import {
   capabilityLabel,
+  indicatorAgeDays,
+  INDICATOR_STALE_DAYS,
   metricRows,
   NO_DETECTIONS_NOTICE,
   severityLabel,
@@ -22,6 +24,25 @@ import {
   type View,
 } from "./common.js";
 
+function staleIndicatorNotice(status: MonitoringStatus): HTMLElement | null {
+  const curated = status.indicatorSets.filter((s) => !s.imported && !s.synthetic);
+  const ages = curated
+    .map((s) => ({ s, days: indicatorAgeDays(s.asOf) }))
+    .filter((x): x is { s: (typeof curated)[number]; days: number } => x.days !== null);
+  const stale = ages.filter((x) => x.days > INDICATOR_STALE_DAYS);
+  if (stale.length === 0) return null;
+  const x = stale[0]!;
+  return h(
+    "div",
+    { class: "notice-warn", role: "status" },
+    h("strong", null, t("Indicator set may be out of date. ")),
+    t(
+      "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the project's releases for a signed indicator update and import it under Indicators.",
+      { days: x.days, date: x.s.asOf },
+    ),
+  );
+}
+
 export const renderOverview: View = async () => {
   const [status, detections] = await Promise.all([
     rpc<MonitoringStatus>({ type: "get_status" }),
@@ -36,6 +57,7 @@ export const renderOverview: View = async () => {
     "div",
     { class: "view" },
     h("h2", null, t("Overview")),
+    staleIndicatorNotice(status),
     card(
       t("Monitoring status"),
       h("p", null, statusPill(status)),
