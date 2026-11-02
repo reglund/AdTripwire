@@ -153,13 +153,13 @@ The opt-in page sensor observed a hidden (at most 2x2 px or display:none) cross-
 - **False-positive considerations:** Ad creatives and measurement vendors routinely insert small or invisible frames and third-party scripts after load (viewability, verification, cookie sync). Cookie-sync and viewability frames are hidden cross-origin frames by design.
 - **References:** [The Citizen Lab — How Discover-Tech turned targeted ads into a pipeline for spyware (2026-10-15)](https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/), [Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming (2026-10-15)](https://blog.confiant.com/p/adint-weaponized-ad-tech-for-zero-click-spyware-and-mass-identity-vacuuming)
 
-#### `page.late_third_party_script` — Third-party script inserted after load (v1.0.0)
+#### `page.late_third_party_script` — Third-party script inserted after load (v1.1.0)
 
-The opt-in page sensor observed a cross-origin script element inserted after the frame loaded. Informational alone; suspicious after a NOAS/getAd-pattern request in the same frame lineage.
+The opt-in page sensor observed a cross-origin script element inserted after the frame loaded after a NOAS/getAd-pattern request in the same frame lineage. Without that request no detection is produced (the event stays in the window for correlation), because late third-party scripts are ordinary ad-tag behaviour.
 
 - **Default severity:** suspicious · **Confidence:** medium
-- **Confidence basis:** Low on its own: late script insertion is how most ad tags work. Medium with a NOAS contact in the same frame lineage, matching the documented step where selected devices received code that loaded further scripts.
-- **Required evidence:** page_signal of kind script_inserted with crossOrigin true.; For suspicious: a NOAS/getAd-pattern request or NOAS indicator contact in the same frame lineage within the correlation window.
+- **Confidence basis:** No detection on its own: late script insertion is how most ad tags work. Medium with a NOAS contact in the same frame lineage, matching the documented step where selected devices received code that loaded further scripts.
+- **Required evidence:** page_signal of kind script_inserted with crossOrigin true.; A NOAS/getAd-pattern request or NOAS indicator contact in the same frame lineage within the correlation window.
 - **Required capabilities:** `page_signals`
 - **Limitations:** Page signals come from an opt-in content script in sub-frames and report structural facts only (element kind, size class, target hostname); page text, cookie values and full URLs are never collected. A hostile page can suppress or imitate these DOM signals; absence of a signal is not evidence that nothing happened, and a signal alone does not show what the inserted element did.
 - **False-positive considerations:** Ad creatives and measurement vendors routinely insert small or invisible frames and third-party scripts after load (viewability, verification, cookie sync). Tag managers and header-bidding wrappers insert many third-party scripts after load.
@@ -265,27 +265,27 @@ An inspected script defines a getter on an Error stack property, the documented 
 - **False-positive considerations:** Error-monitoring libraries and anti-piracy scripts use similar traps.
 - **References:** [The Citizen Lab — How Discover-Tech turned targeted ads into a pipeline for spyware (2026-10-15)](https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/), [Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming (2026-10-15)](https://blog.confiant.com/p/adint-weaponized-ad-tech-for-zero-click-spyware-and-mass-identity-vacuuming)
 
-#### `page.sdk_ready_message` — Cross-window message carrying the documented SDK ready type (v1.0.0)
+#### `page.sdk_ready_message` — Cross-window message carrying the documented SDK ready type (v1.2.0)
 
-The opt-in page sensor observed a cross-window message whose type is 'analytics_sdk_ready', the string specific to the documented AdFection delivery SDK, in a sub-frame. A cross-origin object message with a generic 'type' field is recorded as informational context only.
+The opt-in page sensor observed a cross-window message whose type is 'analytics_sdk_ready', the string specific to the documented AdFection delivery SDK, in a sub-frame. Generic typed messages (postmessage_wildcard_like) produce no detection; they remain in the correlation window as corroboration only.
 
 - **Default severity:** elevated · **Confidence:** high
-- **Confidence basis:** High for the SDK ready type in a sub-frame: the string is specific to the documented SDK and the message was observed directly rather than inferred from script text. Medium in the top document (the documented SDK ran in ad frames); low for generic typed messages, which are ubiquitous.
-- **Required evidence:** page_signal event of kind postmessage_sdk_ready (sub-frame for elevated), or postmessage_wildcard_like (informational).
+- **Confidence basis:** High for the SDK ready type in a sub-frame: the string is specific to the documented SDK and the message was observed directly rather than inferred from script text. Medium in the top document (the documented SDK ran in ad frames); low for a same-origin message.
+- **Required evidence:** page_signal event of kind postmessage_sdk_ready from another origin (sub-frame for elevated); same-origin (crossOrigin false) is informational. postmessage_wildcard_like never produces a detection.
 - **Required capabilities:** `page_signals`
 - **Limitations:** Page signals come from an opt-in content script in sub-frames and report structural facts only (element kind, size class, target hostname); page text, cookie values and full URLs are never collected. A hostile page can suppress or imitate these DOM signals; absence of a signal is not evidence that nothing happened, and a signal alone does not show what the inserted element did. Only the message type is checked; the message origin, target and payload are not retained.
-- **False-positive considerations:** A page that discusses or replays the documented SDK could post the same message type. Typed cross-window messages ('type' fields) are used by most ad and embed frameworks.
+- **False-positive considerations:** A page that discusses or replays the documented SDK could post the same message type.
 - **References:** [The Citizen Lab — How Discover-Tech turned targeted ads into a pipeline for spyware (2026-10-15)](https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/), [Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming (2026-10-15)](https://blog.confiant.com/p/adint-weaponized-ad-tech-for-zero-click-spyware-and-mass-identity-vacuuming)
 
 ### E — Temporal correlation
 
-#### `correlation.adfection_chain` — Sequence consistent with the documented AdFection delivery chain (v1.1.0)
+#### `correlation.adfection_chain` — Sequence consistent with the documented AdFection delivery chain (v1.3.0)
 
 Within the correlation window and the same frame lineage: (1) a NOAS/getAd-pattern request or NOAS indicator contact, then (2) a non-empty JavaScript response for it, a suspicious inspected script, or (with the opt-in page sensor) an observed cross-origin hidden-iframe or script insertion, then (3) contact with infrastructure documented as malicious. A sequence found only across unrelated frames of one tab, or without frame ancestry, is reported one level lower.
 
 - **Default severity:** high_priority · **Confidence:** medium
 - **Confidence basis:** Medium: each step is observed directly and the order matches the documented chain, but the links between steps are inferred from frame lineage (or tab) and timing, and temporal proximity does not prove causation.
-- **Required evidence:** Step 1: NOAS/getAd-pattern request or contact with a surveillance indicator with role 'noas'.; Step 2: inspected non-empty JavaScript response to a NOAS-pattern request or NOAS-role host, a response_inspected event graded suspicious or higher, or a cross-origin hidden_iframe_inserted/script_inserted page signal in the same frame lineage.; Step 3: request to a malicious-classified indicator.; All in the same frame lineage, in order, within the correlation window (same tab only: one severity level lower).
+- **Required evidence:** Step 1: NOAS/getAd-pattern request or contact with a surveillance indicator with role 'noas'.; Step 2: inspected non-empty JavaScript response to a NOAS-pattern request or NOAS-role host, a response_inspected event graded suspicious or higher, or a page signal in the same frame lineage: a cross-origin hidden_iframe_inserted, or a script_inserted whose target matches a surveillance/malicious indicator (a plain cross-origin script_inserted lowers the chain one level; any page-signal step 2 caps the chain at elevated unless step 1 is a documented NOAS-role host). Evaluated on step 3, and again when a page-signal step 2 arrives late.; Step 3: request to a malicious-classified indicator.; All in the same frame lineage, in order, within the correlation window (same tab only: one severity level lower).
 - **Required capabilities:** `request_metadata` · **any of:** `response_body_inspection`, `page_signals`
 - **Limitations:** Temporal proximity does not prove causation; events are linked by frame lineage (or, when that is unavailable, by tab or correlation id) and time only. Browser request ids and frame ids do not survive restarts, and a single tab may host unrelated ad activity.
 - **False-positive considerations:** A researcher or analyst visiting documented infrastructure on an ad-heavy page can produce the sequence by coincidence.

@@ -40,30 +40,31 @@ operational, IOC + boundary matching, response inspection byte-for-byte, synthet
 suspicious event → visible detection, benign → no high priority, restart persistence,
 deletion, redacted export, tests pass, README/limitations/privacy documented.
 
-## Phase 2 — Enhanced behavioural detection ⬜
+## Phase 2 — Enhanced behavioural detection (in progress, started 2026-11-02)
 
-Priority order (proposed):
-
-1. **Benign-browsing false-positive study** with the production build
-   (`tests/fixtures/benign-browsing.md`); tune `ad_delivery.noas_request`,
-   `correlation.noas_then_hidden_frame` (`impid` is a common parameter) and tab-level
-   chain anchoring based on results. Publish `docs/evaluations/`.
-2. **Ad-frame correlation**: correlate on frame lineage (ancestor chain) rather than tab,
-   so unrelated frames in one tab do not form a chain; weight evidence by frame proximity.
-3. **Context-aware JS analysis**: proximity-based marker co-occurrence (same function
-   body), reduced lexical false positives (comments/strings), minified-bundle baseline.
-4. **Optional isolated page sensor** behind an explicit opt-in with its own threat model:
-   observe `postMessage('*', analytics_sdk_ready)`, hidden iframe insertion and
-   `document.cookie` reads in ad frames via a content script in ad-frame contexts only.
-5. **Public Suffix List** (bundled, versioned) for registrable-domain logic.
-6. **Indicator provenance v2**: per-indicator validity window (`validFrom`/`validTo`),
-   time-bounded CloudFront hosts expire automatically; signed indicator bundles with
-   versioning and rollback (still offline by default; opt-in update check).
-7. **Performance**: measure real-world overhead with the Firefox profiler; adaptive
-   inspection caps; sampled metrics in the dashboard.
+1. **Benign-browsing false-positive study** 🔶 — `pnpm eval:benign` automates a headless
+   run over `tests/fixtures/benign-sites.txt`; results under `docs/evaluations/` (zero
+   detections over 24 sites, ~3,200 observed requests). An interactive session following
+   the protocol is still needed.
+2. **Frame-lineage correlation** ✅ — chains anchored on frame lineage; tab-only chains
+   downgraded one level with explicit inferred evidence.
+3. **Context-aware JS analysis** ✅ — comment/string-blanked code view, marker proximity
+   (4000 chars), minified-bundle baseline, fixed timer/iframe heuristics.
+4. **Optional isolated page sensor** ✅ — opt-in content script in sub-frames, structural
+   signals only, three `page.*` rules, threat model documented; verified in headless
+   Firefox (`pnpm e2e:firefox`). `document.cookie` reads are not observable from an
+   isolated world and are deliberately out of scope. UI consent flow is manual to verify.
+5. **Public Suffix List** ✅ — bundled ICANN section (MPL-2.0 notice), used for
+   registrable-domain logic in the engine.
+6. **Indicator validity windows** ✅ (`validFrom`/`validTo`; expired matches lower
+   confidence). **Signed indicator bundles** 🔶 — design in `docs/indicator-updates.md`;
+   implementation pending, extension stays offline-only.
+7. **Performance** 🔶 — runtime metrics card in the dashboard and a periodic aggregate
+   stats line; Firefox-profiler measurement and adaptive caps pending.
 
 Gate 2: documented false-positive rate on the benign protocol with zero high-priority
-false positives, frame-lineage correlation tested, page sensor (if shipped) reviewed.
+false positives (met for the headless run; interactive run pending), frame-lineage
+correlation tested (met), page sensor reviewed (met, two reviews; see threat model).
 
 ## Phase 3 — Chrome/Chromium support ⬜
 

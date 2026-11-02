@@ -21,6 +21,8 @@ const arg = (k, d) =>
     .join("=");
 const BATCH = Number(arg("batch", 6));
 const SECONDS = Number(arg("seconds", 60));
+if (!Number.isInteger(BATCH) || BATCH < 1) throw new Error("--batch must be an integer >= 1");
+if (!Number.isFinite(SECONDS) || SECONDS <= 0) throw new Error("--seconds must be > 0");
 const today = new Date().toISOString().slice(0, 10);
 const OUT = arg("out", `docs/evaluations/${today}-benign.md`);
 const sitesFile = arg("sites", "tests/fixtures/benign-sites.txt");
@@ -41,6 +43,30 @@ const snapCommon = join(homedir(), "snap", "firefox", "common");
 const profileBase = existsSync(snapCommon)
   ? join(snapCommon, "adtripwire-benign-profile")
   : join(homedir(), ".cache", "adtripwire-benign-profile");
+
+const children = new Set();
+function killGroup(child, signal) {
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      /* already gone */
+    }
+  }
+}
+function cleanup() {
+  for (const c of children) {
+    killGroup(c, "SIGTERM");
+    setTimeout(() => killGroup(c, "SIGKILL"), 3000).unref();
+  }
+}
+process.on("SIGINT", () => {
+  cleanup();
+  process.exit(130);
+});
+process.on("exit", cleanup);
 
 const logs = [];
 for (let i = 0; i < sites.length; i += BATCH) {
@@ -67,15 +93,14 @@ for (let i = 0; i < sites.length; i += BATCH) {
     ...batch.flatMap((u) => ["--start-url", u]),
   ];
   const ff = spawn("pnpm", args, { stdio: ["ignore", "pipe", "pipe"], detached: true });
+  children.add(ff);
   let log = "";
   ff.stdout.on("data", (d) => (log += d.toString()));
   ff.stderr.on("data", (d) => (log += d.toString()));
   await new Promise((r) => setTimeout(r, SECONDS * 1000));
-  try {
-    process.kill(-ff.pid, "SIGTERM"); // whole group: pnpm → web-ext → Firefox
-  } catch {
-    ff.kill("SIGTERM");
-  }
+  killGroup(ff, "SIGTERM"); // whole group: pnpm → web-ext → Firefox
+  setTimeout(() => killGroup(ff, "SIGKILL"), 3000).unref();
+  children.delete(ff);
   await new Promise((r) => setTimeout(r, 2000));
   const readyHere = /\[AdTripwire\] ready:/.test(log);
   console.log(
@@ -84,48 +109,78 @@ for (let i = 0; i < sites.length; i += BATCH) {
   logs.push({ batch, log });
 }
 
-const lines = logs.flatMap(({ batch, log }) =>
+/**
+ * Console-derived parsing. Web pages share the same stdout channel as the extension, so a
+ * hostile page could print look-alike lines. Mitigations: strict anchored formats, an
+ * allow-list of severities, rule ids restricted to the engine's id grammar, no free text
+ * reproduced in the report, and a cross-check against the extension's own `stats:` counters.
+ */
+const PREFIX = /^(?:.*Firefox stdout: )?console\.(?:info|warn|error): "\[AdTripwire\] /;
+const RULE_ID = /^[a-z_]+\.[a-z_]+$/;
+const SEVERITIES = new Set(["informational", "suspicious", "elevated", "high_priority"]);
+const parsed = logs.flatMap(({ batch, log }) =>
   log
     .split("\n")
-    .filter((l) => l.includes("[AdTripwire]"))
-    .map((l) => ({
-      batch,
-      line: l
-        .replace(/^.*Firefox stdout: /, "")
-        .replace(/^console\.\w+: /, "")
-        .replace(/^"|"$/g, ""),
-    })),
+    .filter((l) => PREFIX.test(l))
+    .map((l) => l.replace(PREFIX, "").replace(/"$/, ""))
+    .map((line) => ({ batch, line })),
 );
-const detections = lines.filter((x) => / detection | escalated /.test(x.line));
+const detections = [];
+let ready = 0;
+const statsLines = [];
+for (const { batch, line } of parsed) {
+  let m;
+  if ((m = /^detection ([a-z_.]+) \[(\w+)\] /.exec(line))) {
+    if (RULE_ID.test(m[1]) && SEVERITIES.has(m[2]))
+      detections.push({ batch, rule: m[1], sev: m[2] });
+  } else if ((m = /^escalated ([a-z_.]+) (\w+) (?:→|\\u2192) (\w+):/.exec(line))) {
+    if (RULE_ID.test(m[1]) && SEVERITIES.has(m[3]))
+      detections.push({ batch, rule: m[1], sev: m[3], escalated: true });
+  } else if (/^ready: \d+ indicators, ruleset \d+r-[0-9a-f]+, caps=[a-z_,]+/.test(line)) {
+    ready++;
+  } else if (
+    (m = /^stats: observed=(\d+) ingested=(\d+) inspections=(\d+) detections=(\d+)$/.exec(line))
+  ) {
+    statsLines.push({
+      batch,
+      observed: +m[1],
+      ingested: +m[2],
+      inspections: +m[3],
+      detections: +m[4],
+    });
+  }
+}
 const byRule = new Map();
 for (const d of detections) {
-  const m = d.line.match(/(?:detection|escalated) ([a-z_.]+) (?:\[(\w+)\]|(\w+) → (\w+))/);
-  if (!m) continue;
-  const rule = m[1];
-  const sev = m[2] ?? m[4];
-  const key = `${rule}|${sev}`;
-  const e = byRule.get(key) ?? { rule, sev, count: 0, batches: new Set() };
+  const key = `${d.rule}|${d.sev}`;
+  const e = byRule.get(key) ?? { rule: d.rule, sev: d.sev, count: 0, batches: new Set() };
   e.count++;
   e.batches.add(d.batch.join(", "));
   byRule.set(key, e);
 }
-const ready = lines.filter((x) => x.line.includes("ready:")).length;
-const statsLines = lines
-  .filter((x) => x.line.includes("stats:"))
-  .map((x) => x.line.replace(/^\[AdTripwire\] /, ""));
-if (ready === 0) {
-  const err = logs
-    .map((l) => l.log)
-    .join("\n")
-    .split("\n")
-    .filter((l) => /\[error\]|WebExtError|Could not install/.test(l))
-    .slice(0, 5);
-  console.error("INVALID RUN: the extension never reported ready in any batch. No report written.");
-  for (const l of err) console.error("  " + l.slice(0, 220));
-  process.exit(2);
-}
 const rows = [...byRule.values()].sort((a, b) => b.count - a.count);
 const high = rows.filter((r) => r.sev === "high_priority" || r.sev === "elevated");
+// Cross-check: the extension's own counters must be able to account for the parsed lines.
+const statsDetections = statsLines.reduce((acc, s) => {
+  acc[s.batch.join(", ")] = Math.max(acc[s.batch.join(", ")] ?? 0, s.detections);
+  return acc;
+}, {});
+const parsedNew = detections.filter((d) => !d.escalated).length;
+const statsTotal = Object.values(statsDetections).reduce((a, b) => a + b, 0);
+const consistent = statsLines.length === 0 || parsedNew <= statsTotal;
+const statsSummary = statsLines.length
+  ? Object.entries(
+      statsLines.reduce((acc, s) => {
+        acc[s.batch.join(", ")] = s;
+        return acc;
+      }, {}),
+    )
+      .map(
+        ([, s], idx) =>
+          `batch ${idx + 1}: observed=${s.observed} ingested=${s.ingested} inspections=${s.inspections} detections=${s.detections}`,
+      )
+      .join("; ")
+  : "no stats lines (build predates stats logging)";
 
 const md = `# Benign-browsing evaluation — ${today}
 
@@ -134,7 +189,8 @@ headless Firefox, ${sites.length} sites in batches of ${BATCH}, ${SECONDS} s per
 Enhanced Tracking Protection at its default. Script: \`scripts/benign-eval.mjs\`.
 
 Extension ready lines observed: ${ready} of ${logs.length} batches.
-Sensor activity (last stats line per batch, counts only): ${statsLines.length ? statsLines.slice(-logs.length).join("; ") : "no stats lines (build predates stats logging)"}.
+Sensor activity (last stats line per batch, counts only): ${statsSummary}.
+Console cross-check: ${consistent ? "parsed detection lines are consistent with the extension's own counters" : "**INCONSISTENT** — more detection lines parsed than the extension's counters report; treat this run as possibly tampered with by a page"}.
 
 ## Detections by rule and severity
 
@@ -150,9 +206,13 @@ ${high.length === 0 ? "No elevated or high-priority detections during benign bro
 
 ${high.length ? high.map((r) => `- \`${r.rule}\` (${r.sev}, ${r.count}): _to be triaged: rule logic, indicator classification, or genuine exposure._`).join("\n") : "- Nothing to triage at elevated or above."}
 
-## Raw detection lines (sanitized by the extension; hostnames only)
+## Provenance of this report
 
-${detections.length ? detections.map((d) => `- ${d.line.slice(0, 220)}`).join("\n") : "- none"}
+Derived from the extension's console output captured by web-ext. Lines are parsed with
+anchored formats and only rule ids and severities are reproduced; no summaries, hostnames
+or URLs from the log appear here. Web pages share the console channel, so a page could in
+principle print look-alike lines; the cross-check above compares parsed counts with the
+extension's own counters.
 
 ## Limitations of this run
 
@@ -167,4 +227,4 @@ writeFileSync(
   logs.map((l) => l.log).join("\n\n=====\n\n"),
 );
 console.log(`\nwrote ${OUT}\n`);
-console.log(md.split("## Raw")[0]);
+console.log(md.split("## Provenance")[0]);

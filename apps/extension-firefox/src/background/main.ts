@@ -178,8 +178,19 @@ class Background {
     );
   }
 
-  /** Registers or unregisters the opt-in page sensor content script and updates capabilities. */
-  private async applyPageSensorSetting(): Promise<void> {
+  private pageSensorChain: Promise<void> = Promise.resolve();
+
+  /**
+   * Registers or unregisters the opt-in page sensor content script and updates capabilities.
+   * Calls are serialised and the setting is re-read after each await so a rapid
+   * enable→disable sequence can never leave the script registered while the setting is off.
+   */
+  private applyPageSensorSetting(): Promise<void> {
+    this.pageSensorChain = this.pageSensorChain.then(() => this.applyPageSensorSettingNow());
+    return this.pageSensorChain;
+  }
+
+  private async applyPageSensorSettingNow(): Promise<void> {
     const enabled = this.store.getSettings().monitoring.pageSensorEnabled;
     const caps = new Set<SensorCapability>(
       this.capabilities.capabilities.filter((c) => c !== "page_signals"),
@@ -189,19 +200,29 @@ class Background {
       const existing = await browser.scripting.getRegisteredContentScripts({
         ids: [PAGE_SENSOR_ID],
       });
+      // Re-read after the await: the user may have toggled again meanwhile.
+      if (this.store.getSettings().monitoring.pageSensorEnabled !== enabled) return;
       if (enabled) {
         if (existing.length === 0) {
-          await browser.scripting.registerContentScripts([
-            {
-              id: PAGE_SENSOR_ID,
-              js: ["page-sensor.js"],
-              matches: ["http://*/*", "https://*/*"],
-              allFrames: true,
-              matchOriginAsFallback: true,
-              runAt: "document_start",
-              persistAcrossSessions: false,
-            },
-          ]);
+          try {
+            await browser.scripting.registerContentScripts([
+              {
+                id: PAGE_SENSOR_ID,
+                js: ["page-sensor.js"],
+                matches: ["http://*/*", "https://*/*"],
+                allFrames: true,
+                runAt: "document_start",
+                persistAcrossSessions: false,
+              },
+            ]);
+          } catch (e) {
+            // A duplicate-id error means a concurrent call already registered it.
+            if (!/already|duplicate/i.test(String(e))) throw e;
+          }
+          if (!this.store.getSettings().monitoring.pageSensorEnabled) {
+            await browser.scripting.unregisterContentScripts({ ids: [PAGE_SENSOR_ID] });
+            return;
+          }
         }
         caps.add("page_signals");
         log("info", "page sensor registered (sub-frames only)");
@@ -234,7 +255,7 @@ class Background {
     const tabId = sender.tab?.id ?? -1;
     const frameId = sender.frameId ?? -1;
     const now = Date.now();
-    if (!pageSignalAllowed(tabId, now)) return;
+    if (!pageSignalAllowed(tabId, now, frameId)) return;
     if (sender.tab?.incognito && this.store.getSettings().monitoring.excludeIncognito) return;
     void this.frameAncestry(tabId, frameId).then((ancestry) => {
       const ev = buildPageSignalEvent(
@@ -258,28 +279,33 @@ class Background {
   private async frameAncestry(
     tabId: number,
     frameId: number,
-  ): Promise<{ frameIds: number[]; hostnames: string[] } | undefined> {
+  ): Promise<{ frameIds: number[]; hostnames: string[]; truncated: boolean } | undefined> {
     if (tabId < 0 || frameId <= 0) return undefined;
-    const frameIds: number[] = [];
-    const hostnames: string[] = [];
-    let current = frameId;
     try {
-      for (let depth = 0; depth < 12; depth++) {
-        const f = await browser.webNavigation.getFrame({ tabId, frameId: current });
-        if (!f) return undefined;
-        if (f.parentFrameId < 0) break;
-        const parent = await browser.webNavigation.getFrame({ tabId, frameId: f.parentFrameId });
+      const frames = await browser.webNavigation.getAllFrames({ tabId });
+      if (!frames) return undefined;
+      const byId = new Map(frames.map((f) => [f.frameId, f]));
+      const frameIds: number[] = [];
+      const hostnames: string[] = [];
+      const seen = new Set<number>([frameId]);
+      let current = byId.get(frameId);
+      let truncated = false;
+      while (current && current.parentFrameId >= 0) {
+        if (seen.has(current.parentFrameId) || frameIds.length >= 16) {
+          truncated = true;
+          break;
+        }
+        const parent = byId.get(current.parentFrameId);
         if (!parent) return undefined;
-        const h = hostnameOf(parent.url);
-        frameIds.push(f.parentFrameId);
-        hostnames.push(h ?? "unknown.invalid");
-        current = f.parentFrameId;
-        if (f.parentFrameId === 0) break;
+        seen.add(parent.frameId);
+        frameIds.push(parent.frameId);
+        hostnames.push(hostnameOf(parent.url) ?? "unknown.invalid");
+        current = parent;
       }
+      return { frameIds, hostnames, truncated };
     } catch {
       return undefined;
     }
-    return { frameIds, hostnames };
   }
 
   /**

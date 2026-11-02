@@ -63,3 +63,20 @@ response inspection. Medium findings fixed: synchronous listener registration fo
 event page, a global inspection budget, stricter snapshot validation, O(R) chain search
 with a downgrade for first-party "NOAS" hosts, duplicate-pending handling, `close()` on
 stream end, a deletion race, and sanitizer gaps for contact-like and JWT-like tokens.
+
+### Phase 2 review (2026-11-02)
+
+Two read-only Opus reviews covered the page sensor, lineage correlation, the JavaScript
+code view, PSL, indicator validity and the evaluation scripts. No critical or high
+findings. Fixed: a toggle race that could leave the page-sensor script registered after
+opt-out (calls serialised, setting re-read), page-signal timestamps now carry the insertion
+time so late-arriving signals complete chains, descendant scanning of inserted subtrees,
+per-frame rate limiting, single-call frame ancestry with truncation marking, chains with a
+page-signal step 2 capped at elevated unless step 1 is a documented NOAS host, the generic
+typed-postMessage and plain late-script signals no longer produce stand-alone detections,
+anchored parsing and no raw lines in console-derived evaluation reports, process-group
+cleanup in the Firefox scripts, and the registrable-domain fallback for hosts that are
+themselves public suffixes. Documented, not fixed: hidden-ness is judged at insertion time;
+page signals can be forged by a hostile frame (bounded to that frame's lineage and capped
+below high priority without a documented NOAS host); the code view can be steered by
+crafted regex literals.

@@ -167,8 +167,9 @@ export function indicatorValidity(rec: IndicatorRecord, now: number): IndicatorM
     if (Number.isFinite(from) && now < from) return "not_yet_valid";
   }
   if (rec.validTo !== undefined) {
-    const to = Date.parse(rec.validTo + "T23:59:59Z");
-    if (Number.isFinite(to) && now > to) return "expired";
+    // Inclusive end date: expired from the first instant of the following day.
+    const to = Date.parse(rec.validTo + "T00:00:00Z") + 86_400_000;
+    if (Number.isFinite(to) && now >= to) return "expired";
   }
   return "current";
 }

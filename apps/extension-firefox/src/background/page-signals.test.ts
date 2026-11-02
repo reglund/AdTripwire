@@ -87,10 +87,42 @@ describe("buildPageSignalEvent", () => {
     expect(buildPageSignalEvent({ type: "get_status" }, sender, 1)).toBeNull();
     expect(buildPageSignalEvent("page_signal", sender, 1)).toBeNull();
   });
-  it("rate-limits per tab", () => {
+  it("rate-limits per tab and per frame", () => {
     let ok = 0;
     for (let i = 0; i < 200; i++) if (pageSignalAllowed(99, 5_000_000 + i)) ok++;
     expect(ok).toBe(120);
     expect(pageSignalAllowed(99, 5_000_000 + 61_000)).toBe(true);
+    let frameOk = 0;
+    for (let i = 0; i < 60; i++) if (pageSignalAllowed(77, 6_000_000 + i, 5)) frameOk++;
+    expect(frameOk).toBe(40);
+    expect(pageSignalAllowed(77, 6_000_000 + 100, 6)).toBe(true); // sibling frame not starved
+  });
+  it("uses the clamped insertion time as the event timestamp", () => {
+    const now = 10_000_000;
+    const ev = buildPageSignalEvent(
+      { type: "page_signal", kind: "script_inserted", insertedAt: now - 2500 },
+      sender,
+      now,
+    )!;
+    expect(ev.timestamp).toBe(now - 2500);
+    const old = buildPageSignalEvent(
+      { type: "page_signal", kind: "script_inserted", insertedAt: now - 999_999 },
+      sender,
+      now,
+    )!;
+    expect(old.timestamp).toBe(now - 60_000);
+    const future = buildPageSignalEvent(
+      { type: "page_signal", kind: "script_inserted", insertedAt: now + 5000 },
+      sender,
+      now,
+    )!;
+    expect(future.timestamp).toBe(now);
+    expect(
+      buildPageSignalEvent(
+        { type: "page_signal", kind: "script_inserted", insertedAt: "soon" },
+        sender,
+        now,
+      ),
+    ).toBeNull();
   });
 });

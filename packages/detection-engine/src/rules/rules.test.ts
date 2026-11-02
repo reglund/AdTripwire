@@ -55,6 +55,9 @@ describe("helpers", () => {
     expect(approxRegistrableDomain("a.b.example.co.uk")).toBe("example.co.uk");
     expect(approxRegistrableDomain("x.y.synthetic-dsp.test")).toBe("synthetic-dsp.test");
     expect(approxRegistrableDomain("203.0.113.5")).toBe("203.0.113.5");
+    // A host that is itself a public suffix stays whole instead of collapsing to "kawasaki.jp".
+    expect(approxRegistrableDomain("a.kawasaki.jp")).toBe("a.kawasaki.jp");
+    expect(approxRegistrableDomain("x.a.kawasaki.jp")).toBe("x.a.kawasaki.jp");
   });
   it("jsGrade", () => {
     expect(jsGrade([])).toBeNull();

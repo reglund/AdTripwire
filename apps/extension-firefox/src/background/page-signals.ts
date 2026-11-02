@@ -11,19 +11,27 @@ const KINDS = new Set<PageSignalKind>([
   "beacon_image_inserted",
 ]);
 
-/** Per-tab rate limit so a hostile frame cannot flood the engine. */
+/** Rate limits so a hostile frame cannot flood the engine or starve sibling frames. */
 const PER_TAB_MAX_PER_MINUTE = 120;
-const tabBuckets = new Map<number, { windowStart: number; count: number }>();
+const PER_FRAME_MAX_PER_MINUTE = 40;
+const buckets = new Map<string, { windowStart: number; count: number }>();
 
-export function pageSignalAllowed(tabId: number, now: number): boolean {
-  const b = tabBuckets.get(tabId);
+function allow(key: string, limit: number, now: number): boolean {
+  const b = buckets.get(key);
   if (!b || now - b.windowStart > 60_000) {
-    tabBuckets.set(tabId, { windowStart: now, count: 1 });
-    if (tabBuckets.size > 500) tabBuckets.delete(tabBuckets.keys().next().value as number);
+    buckets.set(key, { windowStart: now, count: 1 });
+    if (buckets.size > 2000) buckets.delete(buckets.keys().next().value as string);
     return true;
   }
   b.count++;
-  return b.count <= PER_TAB_MAX_PER_MINUTE;
+  return b.count <= limit;
+}
+
+export function pageSignalAllowed(tabId: number, now: number, frameId = -1): boolean {
+  const tabOk = allow(`t:${tabId}`, PER_TAB_MAX_PER_MINUTE, now);
+  const frameOk =
+    frameId >= 0 ? allow(`f:${tabId}:${frameId}`, PER_FRAME_MAX_PER_MINUTE, now) : true;
+  return tabOk && frameOk;
 }
 
 /**
@@ -35,7 +43,7 @@ export function buildPageSignalEvent(
   raw: unknown,
   sender: { tabId: number; frameId: number; frameUrl?: string; incognito?: boolean },
   now: number,
-  ancestry?: { frameIds: number[]; hostnames: string[] },
+  ancestry?: { frameIds: number[]; hostnames: string[]; truncated?: boolean },
 ): NormalizedEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -55,6 +63,13 @@ export function buildPageSignalEvent(
     if (typeof r.crossOrigin !== "boolean") return null;
     signal.crossOrigin = r.crossOrigin;
   }
+  // Insertion time from the content script's clock: used as the event timestamp so the
+  // signal orders before the requests it caused. Clamped to [now - 60 s, now].
+  let timestamp = now;
+  if (r.insertedAt !== undefined) {
+    if (typeof r.insertedAt !== "number" || !Number.isFinite(r.insertedAt)) return null;
+    timestamp = Math.min(now, Math.max(now - 60_000, Math.round(r.insertedAt)));
+  }
   if (r.msSinceLoad !== undefined) {
     if (typeof r.msSinceLoad !== "number" || !Number.isFinite(r.msSinceLoad) || r.msSinceLoad < 0)
       return null;
@@ -66,7 +81,7 @@ export function buildPageSignalEvent(
   // travels in pageSignal.targetHostname.
   const ev: NormalizedEvent = {
     eventId: newId(),
-    timestamp: now,
+    timestamp,
     browser: "firefox",
     sensor: "page",
     eventType: "page_signal",
@@ -95,7 +110,11 @@ export function buildPageSignalEvent(
     matchedIndicators: [],
     matchedRules: [],
     evidenceQuality: "direct",
-    observationLimitations: ancestry ? [] : ["frame_ancestry_unavailable"],
+    observationLimitations: ancestry
+      ? ancestry.truncated
+        ? ["frame_ancestry_unavailable"]
+        : []
+      : ["frame_ancestry_unavailable"],
   };
   return ev;
 }

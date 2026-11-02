@@ -54,7 +54,7 @@ const routes = {
     const idfa = "00000000-0000-0000-0000-000000000000";
     return page(
       "Creative",
-      `<div id="ad-wrapper"><script src="http://${H.noas}/getAd?idfa=${idfa}&ipv4=192.0.2.1&dom=publisher.synthetic-site.test&devicemodel=test&os=test&mode=${mode}"></script></div>`,
+      `<div id="ad-wrapper"><script src="http://${H.noas}/getAd?idfa=${idfa}&ipv4=192.0.2.1&dom=publisher.synthetic-site.test&devicemodel=test&os=test&mode=${esc(mode)}"></script></div>`,
     );
   },
   "/ad.js": () => ({
@@ -83,8 +83,15 @@ var s=document.createElement("script");s.id="getAdScript";s.src="http://${H.vali
   }),
 };
 
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 createServer((req, res) => {
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  let url;
+  try {
+    url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  } catch {
+    res.writeHead(400).end("bad request");
+    return;
+  }
   const handler = routes[url.pathname];
   if (!handler) {
     res.writeHead(404).end("not found");

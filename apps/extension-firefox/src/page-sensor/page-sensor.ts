@@ -42,10 +42,14 @@
     if (sent >= MAX_SIGNALS) return;
     if (performance.now() - t0 > QUIET_AFTER_MS) return;
     sent++;
+    if (sent >= MAX_SIGNALS) observer.disconnect();
     const payload: Record<string, unknown> = {
       type: "page_signal",
       kind,
       msSinceLoad: Math.round(performance.now() - t0),
+      // Wall-clock insertion time so the background can order the signal relative to the
+      // network requests it caused (the message itself arrives later).
+      insertedAt: Date.now(),
     };
     if (targetHostname) {
       payload.targetHostname = targetHostname;
@@ -69,23 +73,37 @@
     return false;
   }
 
+  const MAX_SCAN_PER_MUTATION = 50;
+
+  function examine(el: Element): void {
+    const tag = el.tagName;
+    if (tag === "IFRAME") {
+      const f = el as HTMLIFrameElement;
+      if (isHidden(f)) send("hidden_iframe_inserted", hostOf(f.getAttribute("src")));
+    } else if (tag === "SCRIPT") {
+      const host = hostOf((el as HTMLScriptElement).getAttribute("src"));
+      if (host && host !== ownHost) send("script_inserted", host);
+    } else if (tag === "IMG") {
+      const img = el as HTMLImageElement;
+      const w = parseInt(img.getAttribute("width") ?? "", 10);
+      const h = parseInt(img.getAttribute("height") ?? "", 10);
+      const host = hostOf(img.getAttribute("src"));
+      if (host && host !== ownHost && w <= 1 && h <= 1) send("beacon_image_inserted", host);
+    }
+  }
+
   const observer = new MutationObserver((records) => {
+    let scanned = 0;
     for (const r of records) {
       for (const node of Array.from(r.addedNodes)) {
         if (!(node instanceof Element)) continue;
-        const tag = node.tagName;
-        if (tag === "IFRAME") {
-          const f = node as HTMLIFrameElement;
-          if (isHidden(f)) send("hidden_iframe_inserted", hostOf(f.getAttribute("src")));
-        } else if (tag === "SCRIPT") {
-          const host = hostOf((node as HTMLScriptElement).getAttribute("src"));
-          if (host && host !== ownHost) send("script_inserted", host);
-        } else if (tag === "IMG") {
-          const img = node as HTMLImageElement;
-          const w = parseInt(img.getAttribute("width") ?? "", 10);
-          const h = parseInt(img.getAttribute("height") ?? "", 10);
-          const host = hostOf(img.getAttribute("src"));
-          if (host && host !== ownHost && w <= 1 && h <= 1) send("beacon_image_inserted", host);
+        examine(node);
+        // Elements inserted via innerHTML arrive as a subtree: look one level into it, bounded.
+        if (scanned < MAX_SCAN_PER_MUTATION) {
+          const nested = node.querySelectorAll("iframe,script,img");
+          for (let i = 0; i < nested.length && scanned < MAX_SCAN_PER_MUTATION; i++, scanned++) {
+            examine(nested[i]!);
+          }
         }
       }
     }

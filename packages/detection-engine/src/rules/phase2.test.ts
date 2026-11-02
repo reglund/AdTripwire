@@ -315,7 +315,7 @@ describe("page-signal rules", () => {
     expect(new Harness().engine.rulesetVersion).toMatch(/^22r-[0-9a-f]{8}$/);
   });
 
-  it("page.sdk_ready_message: sub-frame elevated/high, top suspicious, wildcard-like informational", () => {
+  it("page.sdk_ready_message: sub-frame elevated/high, top suspicious, wildcard-like no detection", () => {
     const h = new Harness({ pageSensor: true });
     const d = h.ingest(sig("postmessage_sdk_ready", F5)).detections;
     expect(ids(d)).toEqual(["page.sdk_ready_message"]);
@@ -325,8 +325,10 @@ describe("page-signal rules", () => {
       sig("postmessage_sdk_ready", { ...TOP, host: "other.synthetic-publisher.test" }),
     ).detections;
     expect(top[0]!.severity).toBe("suspicious");
-    const w = h.ingest(sig("postmessage_wildcard_like", F5)).detections;
-    expect([w[0]!.severity, w[0]!.confidence]).toEqual(["informational", "low"]);
+    // Generic typed messages: event only, never a detection (benign run 2026-11-02).
+    const w = h.ingest(sig("postmessage_wildcard_like", { ...F5, crossOrigin: true }));
+    expect(w.detections).toEqual([]);
+    expect(h.engine.window.recent().some((e) => e.eventId === w.event.eventId)).toBe(true);
   });
 
   it("page.hidden_iframe_after_load: cross-origin suspicious, after lineage NOAS elevated, same-origin nothing", () => {
@@ -369,12 +371,12 @@ describe("page-signal rules", () => {
     );
   });
 
-  it("page.late_third_party_script: informational alone, suspicious after lineage NOAS", () => {
+  it("page.late_third_party_script: no detection alone, suspicious after lineage NOAS", () => {
     const h = new Harness({ pageSensor: true });
     const alone = h.ingest(
       sig("script_inserted", { ...F5, crossOrigin: true, target: "cdn.synthetic-benign.test" }),
     ).detections;
-    expect(alone[0]!.severity).toBe("informational");
+    expect(alone).toEqual([]);
     expect(h.ingest(sig("script_inserted", { ...F5, crossOrigin: false })).detections).toEqual([]);
     const h2 = new Harness({ pageSensor: true });
     h2.ingest(noas(F5));
@@ -445,5 +447,142 @@ describe("page-signal rules", () => {
     engine.ingest(sig("script_inserted", { ...F5, crossOrigin: true, t: T0 + 500 }));
     const r = engine.ingest(c2(F5));
     expect(r.detections.map((d) => d.ruleId)).toContain("correlation.adfection_chain");
+  });
+});
+
+describe("review follow-up: late page signals and step-2 strength", () => {
+  const chains = (h: Harness) => h.all.filter((d) => d.ruleId === "correlation.adfection_chain");
+  const hidden = (t: number, frame: object = F5) =>
+    sig("hidden_iframe_inserted", {
+      ...frame,
+      crossOrigin: true,
+      target: "d111.synthetic-cdn.test",
+      t,
+    });
+
+  it("a page-signal step 2 arriving after step 3 (earlier timestamp) completes the chain exactly once", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingest(noas(F5, T0));
+    h.ingest(c2(F5, T0 + 2000));
+    expect(chains(h)).toEqual([]);
+    const r = h.ingest(hidden(T0 + 700));
+    expect(r.detections.filter((d) => d.ruleId === "correlation.adfection_chain")).toHaveLength(1);
+    expect(chains(h)).toHaveLength(1);
+    expect(chains(h)[0]!.severity).toBe("high_priority");
+    expect(chains(h)[0]!.eventIds).toHaveLength(3);
+  });
+
+  it("the late-signal form and a later step-3 form share a dedup key", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingest(noas(F5, T0));
+    h.ingest(c2(F5, T0 + 2000));
+    h.ingest(hidden(T0 + 700));
+    const again = h.ingest(c2(F5, T0 + 4000));
+    expect(again.detections.filter((d) => d.ruleId === "correlation.adfection_chain")).toEqual([]);
+    expect(again.updated.some((d) => d.ruleId === "correlation.adfection_chain")).toBe(true);
+    expect(chains(h)).toHaveLength(1);
+  });
+
+  it("a late signal does not complete a chain across sibling frames or outside the window", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingest(noas(F7, T0));
+    h.ingest(c2(F5, T0 + 2000));
+    h.ingest(hidden(T0 + 700));
+    expect(chains(h)).toEqual([]);
+    const h2 = new Harness({ pageSensor: true, windowMs: 60_000 });
+    h2.ingest(noas(F5, T0));
+    h2.ingest(c2(F5, T0 + 100_000));
+    h2.ingest(hidden(T0 + 50_000));
+    expect(chains(h2)).toEqual([]);
+  });
+
+  it("a plain cross-origin script insertion as the only step 2 lowers the chain one level", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingestAll([
+      noas(F5),
+      sig("script_inserted", {
+        ...F5,
+        crossOrigin: true,
+        target: "cdn.synthetic-benign.test",
+        t: T0 + 500,
+      }),
+      c2(F5),
+    ]);
+    const d = chains(h)[0]!;
+    expect(d.severity).toBe("elevated");
+    expect(
+      d.evidence.some(
+        (e) => e.kind === "inferred" && /only a cross-origin script insertion/.test(e.observed),
+      ),
+    ).toBe(true);
+    // late arrival of the same weak signal is lowered the same way
+    const h2 = new Harness({ pageSensor: true });
+    h2.ingest(noas(F5, T0));
+    h2.ingest(c2(F5, T0 + 2000));
+    h2.ingest(sig("script_inserted", { ...F5, crossOrigin: true, t: T0 + 500 }));
+    expect(chains(h2)[0]!.severity).toBe("elevated");
+  });
+
+  it("a script insertion targeting documented infrastructure is a full step 2", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingestAll([
+      noas(F5),
+      sig("script_inserted", {
+        ...F5,
+        crossOrigin: true,
+        target: "cdn.synthetic-dsp.test",
+        t: T0 + 500,
+      }),
+      c2(F5),
+    ]);
+    expect(chains(h)[0]!.severity).toBe("high_priority");
+  });
+
+  it("a strong step 2 is preferred over a later weak one", () => {
+    const h = new Harness({ pageSensor: true });
+    h.ingestAll([
+      noas(F5),
+      hidden(T0 + 300),
+      sig("script_inserted", { ...F5, crossOrigin: true, t: T0 + 600 }),
+      c2(F5),
+    ]);
+    expect(chains(h)[0]!.severity).toBe("high_priority");
+  });
+
+  it("page.sdk_ready_message: same-origin message is informational", () => {
+    const h = new Harness({ pageSensor: true });
+    const same = h.ingest(sig("postmessage_sdk_ready", { ...F5, crossOrigin: false })).detections;
+    expect([same[0]!.severity, same[0]!.confidence]).toEqual(["informational", "low"]);
+    const cross = h.ingest(sig("postmessage_sdk_ready", { ...F5, crossOrigin: true })).detections;
+    expect(cross[0]!.severity).toBe("elevated");
+  });
+});
+
+describe("review follow-up 2: page-signal step 2 needs a documented NOAS host for high priority", () => {
+  const staged = (s1Host: string) => {
+    const h = new Harness({ pageSensor: true });
+    h.ingestAll([
+      ev({ host: s1Host, path: "/getAd", params: NOAS_PARAMS, ...F5 }),
+      sig("hidden_iframe_inserted", {
+        ...F5,
+        crossOrigin: true,
+        target: "d111.synthetic-cdn.test",
+        t: T0 + 500,
+      }),
+      ev({ host: "c2.synthetic-adfection.test", type: "image", t: T0 + 1000, ...F5 }),
+    ]);
+    return h.all.find((d) => d.ruleId === "correlation.adfection_chain")!;
+  };
+
+  it("a hostile frame staging /getAd + 1x1 frame + <img> to malicious infrastructure is capped at elevated", () => {
+    const d = staged("ads.synthetic-hostile.test");
+    expect(d.severity).toBe("elevated");
+    expect(
+      d.evidence.some((e) => e.kind === "inferred" && /capped at elevated/.test(e.observed)),
+    ).toBe(true);
+  });
+
+  it("with a documented NOAS indicator host as step 1 it stays high priority", () => {
+    expect(staged("noas.synthetic-adfection.test").severity).toBe("high_priority");
   });
 });

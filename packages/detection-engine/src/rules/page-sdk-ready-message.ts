@@ -7,16 +7,16 @@ import { PAGE_LIMITATIONS, isSubFrame, pageSignalOf, signalFrameHost } from "./p
 export const definition: RuleDefinition = {
   id: "page.sdk_ready_message",
   name: "Cross-window message carrying the documented SDK ready type",
-  version: "1.0.0",
+  version: "1.2.0",
   description:
-    "The opt-in page sensor observed a cross-window message whose type is 'analytics_sdk_ready', the string specific to the documented AdFection delivery SDK, in a sub-frame. A cross-origin object message with a generic 'type' field is recorded as informational context only.",
+    "The opt-in page sensor observed a cross-window message whose type is 'analytics_sdk_ready', the string specific to the documented AdFection delivery SDK, in a sub-frame. Generic typed messages (postmessage_wildcard_like) produce no detection; they remain in the correlation window as corroboration only.",
   category: "javascript_technique",
   severity: "elevated",
   confidence: "high",
   confidenceBasis:
-    "High for the SDK ready type in a sub-frame: the string is specific to the documented SDK and the message was observed directly rather than inferred from script text. Medium in the top document (the documented SDK ran in ad frames); low for generic typed messages, which are ubiquitous.",
+    "High for the SDK ready type in a sub-frame: the string is specific to the documented SDK and the message was observed directly rather than inferred from script text. Medium in the top document (the documented SDK ran in ad frames); low for a same-origin message.",
   requiredEvidence: [
-    "page_signal event of kind postmessage_sdk_ready (sub-frame for elevated), or postmessage_wildcard_like (informational).",
+    "page_signal event of kind postmessage_sdk_ready from another origin (sub-frame for elevated); same-origin (crossOrigin false) is informational. postmessage_wildcard_like never produces a detection.",
   ],
   requiredCapabilities: ["page_signals"],
   references: BOTH,
@@ -26,36 +26,39 @@ export const definition: RuleDefinition = {
   ],
   falsePositiveConsiderations: [
     "A page that discusses or replays the documented SDK could post the same message type.",
-    "Typed cross-window messages ('type' fields) are used by most ad and embed frameworks.",
   ],
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
-  const p = pageSignalOf(event, "postmessage_sdk_ready", "postmessage_wildcard_like");
+  // Generic typed cross-origin messages (postmessage_wildcard_like) are ubiquitous (benign run
+  // 2026-11-02: sign-in and ad frames); they stay in the window as corroboration only.
+  const p = pageSignalOf(event, "postmessage_sdk_ready");
   if (!p) return [];
   const host = signalFrameHost(event);
-  if (p.kind === "postmessage_wildcard_like") {
+  if (p.crossOrigin === false) {
+    // Sent by the frame's own origin: the sensor cannot tell this apart from a page
+    // referencing the string itself, so it is context only.
     return [
       buildDetection(definition, ctx, {
-        subject: `${host}|wildcard_like`,
+        subject: `${host}|sdk_ready_same_origin`,
         severity: "informational",
         confidence: "low",
         confidenceRationale:
-          "Typed cross-origin messages are used by most ad and embed frameworks; this is context for an analyst, not a finding.",
-        summary: `A frame on ${host} received a cross-origin message with a typed object payload.`,
+          "The message came from the frame's own origin rather than from another frame, unlike the documented cross-frame SDK announcement.",
+        summary: `A frame on ${host} posted a same-origin message with the 'analytics_sdk_ready' type documented for the AdFection delivery SDK.`,
         significance:
-          "The documented SDK announced itself with a typed cross-window message. Generic typed messages are very common and say nothing on their own.",
+          "The documented SDK announced readiness to its embedding frame across origins. A same-origin message with this type is recorded as context only.",
         evidence: [
           {
             eventIds: [event.eventId],
-            observed: "The page sensor observed a cross-origin message carrying a 'type' field.",
+            observed: `The page sensor observed a same-origin message of type 'analytics_sdk_ready' on ${host}.`,
             kind: "observed",
           },
         ],
         events: [event],
         subjectHostnames: [host],
         alternativeExplanations: [
-          "Ordinary ad, video or social-embed frameworks exchanging resize or state messages.",
+          "A page or test harness reusing the documented message type within its own origin.",
         ],
         recommendedActions: [
           "No action is needed unless other detections occurred in the same frame.",

@@ -60,11 +60,41 @@ export function ancestryMissing(events: readonly NormalizedEvent[]): boolean {
 
 export type ChainScope = "lineage" | "tab";
 
-/** A page-sensor signal usable as an observed step-2 equivalent (cross-origin insertion). */
-export function isPageSignalStep2(e: NormalizedEvent): boolean {
+/**
+ * Strength of a page-sensor signal as an observed step-2 equivalent:
+ * "strong": a cross-origin hidden iframe insertion, or a script insertion whose target host
+ *   matches a current (not expired) surveillance or malicious indicator;
+ * "weak": any other cross-origin script insertion (nearly every ad frame does this, so a chain
+ *   whose only step 2 is weak is lowered one level);
+ * null: not a usable step 2.
+ */
+export type PageStep2Strength = "strong" | "weak";
+
+export function pageSignalStep2Strength(
+  e: NormalizedEvent,
+  ctx: RuleContext,
+): PageStep2Strength | null {
   const p = e.eventType === "page_signal" ? e.pageSignal : undefined;
-  if (!p || p.crossOrigin !== true) return false;
-  return p.kind === "hidden_iframe_inserted" || p.kind === "script_inserted";
+  if (!p || p.crossOrigin !== true) return null;
+  if (p.kind === "hidden_iframe_inserted") return "strong";
+  if (p.kind !== "script_inserted") return null;
+  if (p.targetHostname !== undefined) {
+    const hit = ctx.matcher
+      .match(p.targetHostname, undefined, ctx.now)
+      .some(
+        (m) =>
+          m.validity !== "expired" &&
+          (m.indicator.classification === "surveillance" ||
+            m.indicator.classification === "malicious"),
+      );
+    if (hit) return "strong";
+  }
+  return "weak";
+}
+
+/** True when `e` is a page signal usable as step 2 at any strength. */
+export function isPageSignalStep2(e: NormalizedEvent, ctx: RuleContext): boolean {
+  return pageSignalStep2Strength(e, ctx) !== null;
 }
 
 /**
@@ -88,6 +118,54 @@ export function isStep2(e: NormalizedEvent, ctx: RuleContext): boolean {
       .indicatorMatches(e)
       .some((m) => m.indicator.classification === "surveillance" && m.indicator.role === "noas")
   );
+}
+
+/**
+ * A stored event that can serve as step 3 when the chain is completed retroactively by a late
+ * page signal: a request-lifecycle event (not inspection, redirect, error or page signal) to
+ * malicious-classified infrastructure.
+ */
+export function isStoredStep3(e: NormalizedEvent, ctx: RuleContext): boolean {
+  if (
+    e.eventType === "response_inspected" ||
+    e.eventType === "request_redirected" ||
+    e.eventType === "request_error" ||
+    e.eventType === "page_signal" ||
+    e.eventType === "frame_navigated"
+  )
+    return false;
+  return ctx.indicatorMatches(e).some((m) => m.indicator.classification === "malicious");
+}
+
+/**
+ * Retroactive chain for a late-arriving page-signal step 2 `sig`: the most recent lineage NOAS
+ * contact at or before it, and the earliest lineage malicious contact at or after it, with
+ * s1..s3 inside the correlation window and s1 lineage-related to s3. Page signals are ingested
+ * after the requests they caused (the background awaits an ancestry lookup), but carry the
+ * insertion time as timestamp. O(R) over the tab's events.
+ */
+export function findChainAroundSignal(
+  sig: NormalizedEvent,
+  ctx: RuleContext,
+): { s1: NormalizedEvent; s3: NormalizedEvent } | null {
+  if (sig.tabId === undefined || sig.tabId < 0) return null;
+  const w = ctx.settings.correlationWindowMs;
+  let s1: NormalizedEvent | undefined;
+  let s3: NormalizedEvent | undefined;
+  for (const x of ctx.window.byTab(sig.tabId)) {
+    if (x.eventId === sig.eventId) continue;
+    if (Math.abs(x.timestamp - sig.timestamp) > w) continue;
+    if (lineageRelation(x, sig) !== "related") continue;
+    if (x.timestamp <= sig.timestamp && isNoasContact(x, ctx)) {
+      if (!s1 || x.timestamp >= s1.timestamp) s1 = x;
+    } else if (x.timestamp >= sig.timestamp && isStoredStep3(x, ctx)) {
+      if (!s3 || x.timestamp < s3.timestamp) s3 = x;
+    }
+  }
+  if (!s1 || !s3) return null;
+  if (s3.timestamp - s1.timestamp > w) return null;
+  if (lineageRelation(s1, s3) !== "related") return null;
+  return { s1, s3 };
 }
 
 /** Step 3: first sighting of a request to infrastructure classified malicious. */
@@ -163,11 +241,19 @@ export function findChain(
 ): ChainSearch {
   const related = relatedEvents(e, ctx);
   const lineage = related.filter((x) => lineageRelation(x, e) === "related");
-  const lin = searchChain(
+  // Prefer a strong step 2 (inspected script, hidden frame, indicator-matching script insertion);
+  // a plain script insertion only when no strong one completes a chain (it lowers severity).
+  let lin = searchChain(
     lineage,
     ctx,
-    (x) => isStep2(x, ctx) || (opts.pageSignalStep2 === true && isPageSignalStep2(x)),
+    (x) =>
+      isStep2(x, ctx) ||
+      (opts.pageSignalStep2 === true && pageSignalStep2Strength(x, ctx) === "strong"),
   );
+  if (opts.pageSignalStep2 === true && !(lin.s1 && lin.s2)) {
+    const weak = searchChain(lineage, ctx, (x) => isStep2(x, ctx) || isPageSignalStep2(x, ctx));
+    if (weak.s1 && weak.s2) lin = weak;
+  }
   if (lin.s1 && lin.s2 && lineageRelation(lin.s1, lin.s2) === "related")
     return { s1: lin.s1, s2: lin.s2, scope: "lineage", ancestryUnavailable: false };
   const tab = searchChain(related, ctx, (x) => isStep2(x, ctx));

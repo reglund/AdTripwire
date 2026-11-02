@@ -13,7 +13,7 @@ import {
   type Severity,
 } from "@adtripwire/shared";
 import type { RuleContext } from "./types.js";
-import { registrableDomain } from "@adtripwire/indicators";
+import { registrableDomain, publicSuffix, normalizeHostname } from "@adtripwire/indicators";
 
 export const RULE_VERSION = "1.0.0";
 
@@ -169,6 +169,9 @@ const MULTI_PART_SUFFIXES = new Set([
 export function approxRegistrableDomain(hostname: string): string {
   const psl = registrableDomain(hostname);
   if (psl) return psl;
+  // The PSL knows the host but it IS a public suffix (e.g. "a.kawasaki.jp"): keep it whole
+  // rather than collapsing distinct sites into their shared suffix.
+  if (publicSuffix(hostname) === normalizeHostname(hostname)) return hostname.toLowerCase();
   const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
   if (labels.length <= 2) return labels.join(".");
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return hostname;
@@ -190,7 +193,13 @@ export function isFirstObservation(e: NormalizedEvent, ctx: RuleContext): boolea
   return ctx.window.byRequestId(e.requestId).length === 0;
 }
 
-/** Events in the same tab or correlation group within the correlation window before `e` (exclusive of `e`). */
+/**
+ * Events in the same tab or correlation group within the correlation window before `e`
+ * (exclusive of `e`), in timestamp order. The window is kept in insertion order, which is
+ * almost always chronological, so the result is only sorted (O(R log R)) when an out-of-order
+ * arrival is detected (for example a page signal delivered after a later request); otherwise
+ * the cost is O(R).
+ */
 export function relatedEvents(e: NormalizedEvent, ctx: RuleContext): NormalizedEvent[] {
   const cutoff = e.timestamp - ctx.settings.correlationWindowMs;
   const seen = new Set<string>([e.eventId]);
@@ -205,7 +214,12 @@ export function relatedEvents(e: NormalizedEvent, ctx: RuleContext): NormalizedE
   };
   if (e.tabId !== undefined && e.tabId >= 0) add(ctx.window.byTab(e.tabId));
   if (e.correlationId !== undefined) add(ctx.window.byCorrelationId(e.correlationId));
-  out.sort((a, b) => a.timestamp - b.timestamp);
+  for (let i = 1; i < out.length; i++) {
+    if (out[i]!.timestamp < out[i - 1]!.timestamp) {
+      out.sort((a, b) => a.timestamp - b.timestamp);
+      break;
+    }
+  }
   return out;
 }
 

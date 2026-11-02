@@ -89,15 +89,29 @@ const args = [
 ];
 console.log(`launching Firefox for ${RUN_SECONDS}s…`);
 const ff = spawn("pnpm", args, { stdio: ["ignore", "pipe", "pipe"], detached: true });
+const killGroup = (signal) => {
+  try {
+    process.kill(-ff.pid, signal);
+  } catch {
+    try {
+      ff.kill(signal);
+    } catch {
+      /* gone */
+    }
+  }
+};
+process.on("SIGINT", () => {
+  killGroup("SIGTERM");
+  fixture.kill("SIGTERM");
+  process.exit(130);
+});
+process.on("exit", () => killGroup("SIGKILL"));
 let log = "";
 ff.stdout.on("data", (d) => (log += d.toString()));
 ff.stderr.on("data", (d) => (log += d.toString()));
 await new Promise((r) => setTimeout(r, RUN_SECONDS * 1000));
-try {
-  process.kill(-ff.pid, "SIGTERM"); // whole group: pnpm → web-ext → Firefox
-} catch {
-  ff.kill("SIGTERM");
-}
+killGroup("SIGTERM"); // whole group: pnpm → web-ext → Firefox
+setTimeout(() => killGroup("SIGKILL"), 3000).unref();
 fixture.kill("SIGTERM");
 await new Promise((r) => setTimeout(r, 1500));
 
