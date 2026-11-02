@@ -16,6 +16,7 @@ import {
   categoryLabel,
   pluralize,
 } from "../format.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { detectionsTable, newestFirst, uid, type View } from "./common.js";
 
@@ -43,22 +44,26 @@ export const renderDetections: View = async (ctx) => {
         h(
           "p",
           { class: "muted", role: "status" },
-          pluralize(sorted.length, "detection") + (filtered ? " match the filters." : " recorded."),
+          filtered
+            ? t("{count} match the filters.", { count: pluralize(sorted.length, "detection") })
+            : t("{count} recorded.", { count: pluralize(sorted.length, "detection") }),
         ),
         sorted.length === 0
           ? h(
               "p",
               null,
               filtered
-                ? "No detections match these filters."
-                : "No detections recorded. This does not establish that nothing relevant occurred; see the Overview for what this tool can and cannot see.",
+                ? t("No detections match these filters.")
+                : t(
+                    "No detections recorded. This does not establish that nothing relevant occurred; see the Overview for what this tool can and cannot see.",
+                  ),
             )
-          : detectionsTable(sorted, "Detections, newest first"),
+          : detectionsTable(sorted, t("Detections, newest first")),
       );
     } catch (err) {
       replaceChildren(
         results,
-        errorState("Could not load detections", err, () => void refresh()),
+        errorState(t("Could not load detections"), err, () => void refresh()),
       );
     }
   };
@@ -96,7 +101,7 @@ export const renderDetections: View = async (ctx) => {
           void refresh();
         },
       },
-      options.map(([v, t]) => h("option", { value: v, selected: v === current }, t)),
+      options.map(([v, text]) => h("option", { value: v, selected: v === current }, text)),
     );
     return h("div", { class: "field" }, h("label", { for: id }, label), el);
   };
@@ -110,28 +115,34 @@ export const renderDetections: View = async (ctx) => {
     h(
       "fieldset",
       null,
-      h("legend", null, "Category"),
+      h("legend", null, t("Category")),
       h("div", { class: "checks" }, categoryBoxes),
     ),
     select(
-      "Severity (at least)",
-      [["any", "Any"], ...SEVERITY_ORDER.map((s): [string, string] => [s, SEVERITY_LABELS[s]])],
+      t("Severity (at least)"),
+      [
+        ["any", t("Any")],
+        ...SEVERITY_ORDER.map((s): [string, string] => [s, t(SEVERITY_LABELS[s])]),
+      ],
       state.minSeverity,
       (v) => {
         state.minSeverity = SEVERITY_ORDER.find((s) => s === v) ?? "any";
       },
     ),
     select(
-      "Confidence (at least)",
-      [["any", "Any"], ...CONFIDENCE_ORDER.map((c): [string, string] => [c, CONFIDENCE_LABELS[c]])],
+      t("Confidence (at least)"),
+      [
+        ["any", t("Any")],
+        ...CONFIDENCE_ORDER.map((c): [string, string] => [c, t(CONFIDENCE_LABELS[c])]),
+      ],
       state.minConfidence,
       (v) => {
         state.minConfidence = CONFIDENCE_ORDER.find((c) => c === v) ?? "any";
       },
     ),
     select(
-      "Since",
-      SINCE_OPTIONS.map((o): [string, string] => [o.key, o.label]),
+      t("Since"),
+      SINCE_OPTIONS.map((o): [string, string] => [o.key, t(o.label)]),
       state.since,
       (v) => {
         state.since = (SINCE_OPTIONS.find((o) => o.key === v)?.key ?? "all") as SinceKey;
@@ -147,7 +158,7 @@ export const renderDetections: View = async (ctx) => {
           ctx.reload();
         },
       },
-      "Reset filters",
+      t("Reset filters"),
     ),
   );
 
@@ -155,11 +166,11 @@ export const renderDetections: View = async (ctx) => {
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Detections"),
+    h("h2", null, t("Detections")),
     h(
       "p",
       { class: "muted" },
-      "Severity is an investigation priority, not a probability of compromise.",
+      t("Severity is an investigation priority, not a probability of compromise."),
     ),
     form,
     results,

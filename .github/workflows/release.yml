@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm indicators:validate
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build && pnpm ext:lint
+      # Builds every variant twice and fails unless the second build is byte-identical.
+      - run: pnpm release:check
+      - name: Verify tag matches package version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          test "refs/tags/v$v" = "$GITHUB_REF" || { echo "tag $GITHUB_REF != v$v"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adtripwire-release
+          path: dist-release/*
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-release/*
+          body_path: CHANGELOG.md
+          draft: true

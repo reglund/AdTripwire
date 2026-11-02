@@ -40,6 +40,7 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
 | Key                       | Content                                                                |
 | ------------------------- | ---------------------------------------------------------------------- |
 | `settings`                | Monitoring, retention and (assist builds) local-assistance settings    |
+| `signedIndicatorBundle`   | A verified signed indicator bundle chosen by the person, if any        |
 | `detections`              | Detection records (summary, rule, evidence text, event ids, hostnames) |
 | `events`                  | Sanitized events referenced by detections                              |
 | `exposure`                | Per-hostname distinct-day counters for surveillance-classified hosts   |

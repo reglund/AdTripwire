@@ -61,3 +61,11 @@ Zero Breach scans browser artefacts offline for past contact with the same indic
 STIX export (`dist/adfection.stix.json`) imports into AdTripwire as described above (292
 domain records, IPs and hashes skipped). The two tools are complementary: Zero Breach looks
 backwards in time, AdTripwire observes going forward.
+
+## Signed indicator bundles
+
+`feeds/adtripwire-indicators-<version>.signed.json` is the curated set with an Ed25519
+signature that the extension verifies offline before activating it (Dashboard → Indicators →
+Signed indicator update). Verify outside the browser with
+`pnpm indicators:sign verify --in feeds/adtripwire-indicators-<version>.signed.json`. See
+`docs/indicator-updates.md`.

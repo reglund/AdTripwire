@@ -1,6 +1,7 @@
 import type { TimelineEntry } from "@adtripwire/shared";
 import { errorState, h, loadingState, replaceChildren, severityBadge } from "../dom.js";
 import { formatTimestamp, severityLabel } from "../format.js";
+import { t } from "../i18n.js";
 import { detectionHash } from "../route.js";
 import { rpc } from "../rpc.js";
 import {
@@ -52,14 +53,14 @@ function entryRow(entry: TimelineEntry): HTMLElement {
 export function timelineTable(entries: readonly TimelineEntry[]): HTMLElement {
   const groups = groupByTab(sortTimeline(entries));
   return tableWrap(
-    "Timeline",
+    t("Timeline"),
     h(
       "table",
       { class: "data timeline" },
       h(
         "caption",
         { class: "sr-only" },
-        "Detections and supporting events, oldest first, grouped by tab",
+        t("Detections and supporting events, oldest first, grouped by tab"),
       ),
       h(
         "thead",
@@ -67,7 +68,7 @@ export function timelineTable(entries: readonly TimelineEntry[]): HTMLElement {
         h(
           "tr",
           null,
-          COLUMNS.map((t) => h("th", { scope: "col" }, t)),
+          COLUMNS.map((label) => h("th", { scope: "col" }, t(label))),
         ),
       ),
       groups.map((g) =>
@@ -101,7 +102,7 @@ export const renderTimeline: View = async () => {
     "select",
     { id: sinceId },
     SINCE_OPTIONS.map((o) =>
-      h("option", { value: o.key, selected: o.key === DEFAULT_SINCE }, o.label),
+      h("option", { value: o.key, selected: o.key === DEFAULT_SINCE }, t(o.label)),
     ),
   );
   const results = h("div", { class: "results", "aria-live": "polite" });
@@ -111,7 +112,7 @@ export const renderTimeline: View = async () => {
     const parsed = parseTabId(tabInput.value);
     if (!parsed.ok) {
       tabInput.setAttribute("aria-invalid", "true");
-      tabError.textContent = parsed.error;
+      tabError.textContent = t(parsed.error);
       return;
     }
     tabInput.removeAttribute("aria-invalid");
@@ -133,7 +134,9 @@ export const renderTimeline: View = async () => {
           h(
             "p",
             { class: "muted" },
-            "No timeline entries in this selection. Only events that a detection refers to are kept, so this is not a record of all browsing or network activity.",
+            t(
+              "No timeline entries in this selection. Only events that a detection refers to are kept, so this is not a record of all browsing or network activity.",
+            ),
           ),
         );
         return;
@@ -143,7 +146,14 @@ export const renderTimeline: View = async () => {
         h(
           "p",
           { class: "muted small" },
-          `${entries.length} ${entries.length === 1 ? "entry" : "entries"}${entries.length >= TIMELINE_LIMIT ? ` (limit of ${TIMELINE_LIMIT} reached; narrow the range to see others)` : ""}. Only events referenced by detections are kept.`,
+          [
+            entries.length === 1 ? t("1 entry") : t("{n} entries", { n: entries.length }),
+            entries.length >= TIMELINE_LIMIT
+              ? ` ${t("(limit of {limit} reached; narrow the range to see others)", { limit: TIMELINE_LIMIT })}`
+              : "",
+            ". ",
+            t("Only events referenced by detections are kept."),
+          ].join(""),
         ),
         timelineTable(entries),
       );
@@ -151,7 +161,7 @@ export const renderTimeline: View = async () => {
       if (mine === token)
         replaceChildren(
           results,
-          errorState("Could not load the timeline", err, () => void load()),
+          errorState(t("Could not load the timeline"), err, () => void load()),
         );
     }
   };
@@ -167,15 +177,15 @@ export const renderTimeline: View = async () => {
         void load();
       },
     },
-    h("div", { class: "field" }, h("label", { for: sinceId }, "Show"), since),
+    h("div", { class: "field" }, h("label", { for: sinceId }, t("Show")), since),
     h(
       "div",
       { class: "field" },
-      h("label", { for: tabInputId }, "Tab id (optional)"),
+      h("label", { for: tabInputId }, t("Tab id (optional)")),
       tabInput,
       tabError,
     ),
-    h("div", { class: "field" }, h("button", { type: "submit", class: "btn" }, "Apply")),
+    h("div", { class: "field" }, h("button", { type: "submit", class: "btn" }, t("Apply"))),
   );
 
   await load();
@@ -183,11 +193,13 @@ export const renderTimeline: View = async () => {
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Timeline"),
+    h("h2", null, t("Timeline")),
     h(
       "p",
       { class: "muted" },
-      "Detections and the events they refer to, oldest first, grouped by browser tab. Event rows are context for a detection, not a complete activity log.",
+      t(
+        "Detections and the events they refer to, oldest first, grouped by browser tab. Event rows are context for a detection, not a complete activity log.",
+      ),
     ),
     form,
     results,

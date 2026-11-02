@@ -13,6 +13,7 @@ import type {
   ExportFile,
   ImportResult,
   IndicatorSet,
+  SignedBundlePreview,
   TimelineEntry,
   MonitoringSettings,
   MonitoringStatus,
@@ -24,7 +25,10 @@ import type {
 import {
   BUNDLED_INDICATOR_SETS,
   IndicatorMatcher,
+  diffIndicatorSets,
   validateIndicatorSet,
+  verifySignedBundle,
+  type SignedBundle,
 } from "@adtripwire/indicators";
 import {
   DetectionEngine,
@@ -159,6 +163,7 @@ class Background {
 
   private async init(): Promise<void> {
     await this.store.load();
+    await this.restoreSignedBundle();
     this.rebuildMatcher();
     if (__ADTRIPWIRE_DEV__ && !(await browser.storage.local.get("settings")).settings) {
       // DEV builds (never shipped) enable the page sensor so the browser-level test covers it.
@@ -167,6 +172,14 @@ class Background {
     this.metrics = await this.store.getMetrics();
     this.capabilities = await this.adapter.detectCapabilities();
     await this.applyPageSensorSetting();
+
+    if (__ADTRIPWIRE_DEV__) {
+      // DEV-only module (dropped from production bundles together with the bundle payload).
+      void import("./dev-selftest.js").then(
+        (m) => m.runSignedBundleSelfTest(this.updatableSetId(), log),
+        (e: unknown) => log("warn", `dev self-test module could not load: ${String(e)}`),
+      );
+    }
 
     let exposure = new MemoryExposureStore();
     const expSnap = await this.store.getExposureSnapshot();
@@ -214,9 +227,22 @@ class Background {
   }
 
   /** Bundled sets plus enabled imported sets. */
+  /** A verified signed bundle (if any) replacing the built-in set with the same id. */
+  private signedBundle: SignedBundle | null = null;
+
+  /** Curated sets: built-in, with the signed bundle substituted for the set it updates. */
+  private curatedSets(): IndicatorSet[] {
+    const sb = this.signedBundle;
+    return this.sets.map((s) => (sb && s.meta.id === sb.payload.meta.id ? sb.payload : s));
+  }
+
+  private builtInVersionOf(setId: string): string | undefined {
+    return this.sets.find((s) => s.meta.id === setId)?.meta.version;
+  }
+
   private activeSets(): IndicatorSet[] {
     return [
-      ...this.sets,
+      ...this.curatedSets(),
       ...this.store
         .listImportedSets()
         .filter((r) => r.enabled)
@@ -346,6 +372,104 @@ class Background {
       ...(req.clusterId !== undefined ? { cluster } : {}),
     };
     return renderPrompt(buildAssistContext(input));
+  }
+
+  // ── Phase 6: signed indicator bundles (offline) ───────────────────────────────────────
+
+  /** The one built-in curated set a signed bundle may replace (first non-synthetic set). */
+  private updatableSetId(): string {
+    return this.sets.find((s) => !s.meta.synthetic)?.meta.id ?? "";
+  }
+
+  private async verifyBundleText(
+    text: string,
+  ): Promise<{ ok: true; bundle: SignedBundle; keyId: string } | { ok: false; errors: string[] }> {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { ok: false, errors: ["not valid JSON"] };
+    }
+    const setId = this.updatableSetId();
+    const active = this.curatedSets().find((s) => s.meta.id === setId);
+    const opts = {
+      expectedSetId: setId,
+      ...(active ? { activeVersion: active.meta.version } : {}),
+    };
+    const r = await verifySignedBundle(parsed, opts);
+    return r.ok ? { ok: true, bundle: r.bundle, keyId: r.key.keyId } : r;
+  }
+
+  private async previewSignedBundle(text: string): Promise<SignedBundlePreview> {
+    const r = await this.verifyBundleText(text);
+    if (!r.ok) return { ok: false, errors: r.errors };
+    const current = this.curatedSets().find((s) => s.meta.id === r.bundle.payload.meta.id);
+    const preview: SignedBundlePreview = {
+      ok: true,
+      errors: [],
+      meta: r.bundle.meta,
+      setId: r.bundle.payload.meta.id,
+      indicatorCount: r.bundle.payload.indicators.length,
+    };
+    if (current) {
+      preview.activeVersion = current.meta.version;
+      const d = diffIndicatorSets(current, r.bundle.payload);
+      const lines = [
+        ...d.added.map(
+          (x) => `+ ${x.indicatorType} ${x.indicator}${x.pathPattern ?? ""} (${x.classification})`,
+        ),
+        ...d.removed.map((x) => `- ${x.indicatorType} ${x.indicator}${x.pathPattern ?? ""}`),
+        ...d.reclassified.map((x) => `~ ${x.indicator}: ${x.from} → ${x.to}`),
+        ...d.validityChanged.map((x) => `~ ${x.indicator}: validity ${x.from} → ${x.to}`),
+      ];
+      preview.diff = {
+        added: d.added.length,
+        removed: d.removed.length,
+        reclassified: d.reclassified.length,
+        validityChanged: d.validityChanged.length,
+        unchanged: d.unchanged,
+        lines: lines.slice(0, 50),
+      };
+    }
+    return preview;
+  }
+
+  private async activateSignedBundle(text: string): Promise<SignedBundlePreview> {
+    const preview = await this.previewSignedBundle(text);
+    if (!preview.ok) return preview;
+    const r = await this.verifyBundleText(text);
+    if (!r.ok) return { ok: false, errors: r.errors };
+    await this.store.setSignedBundle({
+      bundle: JSON.parse(text) as unknown,
+      keyId: r.keyId,
+      activatedAt: Date.now(),
+    });
+    this.signedBundle = r.bundle;
+    this.rebuildMatcher();
+    log("info", `activated signed indicator bundle ${r.bundle.meta.version} (key ${r.keyId})`);
+    return preview;
+  }
+
+  /** Re-verifies the stored bundle at startup; a failure falls back to the built-in set. */
+  private async restoreSignedBundle(): Promise<void> {
+    const rec = this.store.getSignedBundle();
+    if (!rec) return;
+    const setId = this.updatableSetId();
+    const builtIn = this.builtInVersionOf(setId);
+    const r = await verifySignedBundle(rec.bundle, {
+      expectedSetId: setId,
+      ...(builtIn !== undefined ? { activeVersion: builtIn } : {}),
+    });
+    if (r.ok) {
+      this.signedBundle = r.bundle;
+      log("info", `signed indicator bundle ${r.bundle.meta.version} restored (key ${r.key.keyId})`);
+    } else {
+      log(
+        "warn",
+        `stored signed bundle rejected on load (${r.errors.join("; ")}); using the built-in set`,
+      );
+      await this.store.setSignedBundle(null);
+    }
   }
 
   private pageSensorChain: Promise<void> = Promise.resolve();
@@ -481,7 +605,7 @@ class Background {
       };
     }
     // Bundled curation takes precedence (exact, parent and child overlaps; no url_path).
-    const policy = applyBundledPrecedence(v.set, this.sets);
+    const policy = applyBundledPrecedence(v.set, this.curatedSets());
     warnings.push(...summariseDrops(policy.dropped));
     const kept = policy.kept;
     if (kept.length === 0) {
@@ -704,7 +828,21 @@ class Background {
       capabilities: this.capabilities,
       counts,
       indicatorSets: [
-        ...this.sets.map((x) => x.meta),
+        ...this.curatedSets().map((x) => {
+          const sb = this.signedBundle;
+          const rec = this.store.getSignedBundle();
+          if (sb && rec && x.meta.id === sb.payload.meta.id) {
+            return {
+              ...x.meta,
+              signed: {
+                keyId: rec.keyId,
+                activatedAt: rec.activatedAt,
+                builtInVersion: this.builtInVersionOf(x.meta.id) ?? "unknown",
+              },
+            };
+          }
+          return x.meta;
+        }),
         ...this.store
           .listImportedSets()
           .map((r) => ({ ...r.set.meta, imported: true, enabled: r.enabled })),
@@ -780,7 +918,7 @@ class Background {
           productVersion: __ADTRIPWIRE_VERSION__,
           browser: this.capabilities,
           rulesetVersion: this.eng.rulesetVersion,
-          indicatorSets: this.sets.map((x) => x.meta),
+          indicatorSets: this.activeSets().map((x) => x.meta),
           detections,
           events,
           profile: req.profile,
@@ -852,6 +990,18 @@ class Background {
         return this.assistPackage(req);
       case "update_assist_settings":
         return this.store.updateAssistSettings(req.patch);
+      case "update_ui_settings":
+        return this.store.updateUiSettings(req.patch);
+      case "verify_signed_bundle":
+        return this.previewSignedBundle(req.text);
+      case "activate_signed_bundle":
+        return this.activateSignedBundle(req.text);
+      case "remove_signed_bundle": {
+        await this.store.setSignedBundle(null);
+        this.signedBundle = null;
+        this.rebuildMatcher();
+        return this.status();
+      }
     }
   }
 }

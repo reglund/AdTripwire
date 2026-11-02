@@ -8,6 +8,7 @@ import {
   pluralize,
   severityLabel,
 } from "../format.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { bulletList, type View } from "./common.js";
 
@@ -37,27 +38,31 @@ function ruleItem(entry: RuleEntry): HTMLElement {
       "p",
       { class: entry.evaluable ? "muted" : "notice-warn" },
       entry.evaluable
-        ? "Evaluable in this browser."
+        ? t("Evaluable in this browser.")
         : missingCapabilitiesText(entry.missingCapabilities),
     ),
     h(
       "p",
       null,
-      h("strong", null, `Confidence basis (${confidenceLabel(r.confidence)}): `),
+      h(
+        "strong",
+        null,
+        t("Confidence basis ({level}): ", { level: confidenceLabel(r.confidence) }),
+      ),
       r.confidenceBasis,
     ),
     h("p", null, r.description),
-    h("h4", null, "Required evidence"),
-    bulletList(r.requiredEvidence, "None listed."),
-    h("h4", null, "Limitations"),
-    bulletList(r.limitations, "None listed."),
-    h("h4", null, "False-positive considerations"),
-    bulletList(r.falsePositiveConsiderations, "None listed."),
+    h("h4", null, t("Required evidence")),
+    bulletList(r.requiredEvidence, t("None listed.")),
+    h("h4", null, t("Limitations")),
+    bulletList(r.limitations, t("None listed.")),
+    h("h4", null, t("False-positive considerations")),
+    bulletList(r.falsePositiveConsiderations, t("None listed.")),
     r.references.length > 0
       ? h(
           "div",
           null,
-          h("h4", null, "References"),
+          h("h4", null, t("References")),
           h(
             "ul",
             { class: "bullets" },
@@ -80,14 +85,18 @@ export const renderRules: View = async () => {
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Rules"),
+    h("h2", null, t("Rules")),
     h(
       "p",
       { class: "muted" },
-      `${pluralize(entries.length, "rule")} loaded` +
-        (notEvaluable > 0 ? `; ${notEvaluable} not evaluable in this browser.` : "."),
+      notEvaluable > 0
+        ? t("{count} loaded; {n} not evaluable in this browser.", {
+            count: pluralize(entries.length, "rule"),
+            n: notEvaluable,
+          })
+        : t("{count} loaded.", { count: pluralize(entries.length, "rule") }),
     ),
-    entries.length === 0 ? h("p", null, "No rules are loaded.") : null,
+    entries.length === 0 ? h("p", null, t("No rules are loaded.")) : null,
     categories.map((cat) => {
       const id = `rules-${cat}`;
       return h(

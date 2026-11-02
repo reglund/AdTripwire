@@ -7,6 +7,7 @@ import {
   severityLabel,
   summarizeVisibility,
 } from "../format.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { detectionHash } from "../route.js";
 import {
@@ -34,82 +35,94 @@ export const renderOverview: View = async () => {
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Overview"),
+    h("h2", null, t("Overview")),
     card(
-      "Monitoring status",
+      t("Monitoring status"),
       h("p", null, statusPill(status)),
       kv([
-        ["Host permission", status.hostPermissionGranted ? "Granted" : "Not granted"],
-        ["Product version", status.productVersion],
-        ["Ruleset version", status.rulesetVersion],
-        ["Events stored", String(status.counts.eventsStored)],
+        [t("Host permission"), status.hostPermissionGranted ? t("Granted") : t("Not granted")],
+        [t("Product version"), status.productVersion],
+        [t("Ruleset version"), status.rulesetVersion],
+        [t("Events stored"), String(status.counts.eventsStored)],
         [
-          "Last significant observation",
+          t("Last significant observation"),
           last
             ? [
                 `${last.summary} (${severityLabel(last.severity)}, `,
                 timeEl(last.timestamp),
                 ") ",
-                h("a", { href: detectionHash(last.detectionId) }, "View"),
+                h("a", { href: detectionHash(last.detectionId) }, t("View")),
               ]
-            : "None recorded",
+            : t("None recorded"),
         ],
       ]),
     ),
     card(
-      "Counts",
+      t("Counts"),
       kv([
-        ["Known IOC observations", String(status.counts.knownIocObservations)],
-        ["Suspicious patterns", String(status.counts.suspiciousPatterns)],
-        ["High-priority detections", String(status.counts.highPriority)],
-        ["Detections stored", String(status.counts.detectionsTotal)],
+        [t("Known IOC observations"), String(status.counts.knownIocObservations)],
+        [t("Suspicious patterns"), String(status.counts.suspiciousPatterns)],
+        [t("High-priority detections"), String(status.counts.highPriority)],
+        [t("Detections stored"), String(status.counts.detectionsTotal)],
       ]),
     ),
     status.metrics
       ? card(
-          "Runtime metrics",
+          t("Runtime metrics"),
           kv(metricRows(status.metrics).map((r) => [r.label, r.value])),
-          h("p", { class: "muted small" }, "Counting since ", timeEl(status.metrics.since), "."),
           h(
             "p",
             { class: "muted small" },
-            "These are aggregate counters only. No URLs are stored in them.",
+            t("Counting since"),
+            " ",
+            timeEl(status.metrics.since),
+            ".",
+          ),
+          h(
+            "p",
+            { class: "muted small" },
+            t("These are aggregate counters only. No URLs are stored in them."),
           ),
         )
       : null,
     card(
-      "Browser and sensor capabilities",
+      t("Browser and sensor capabilities"),
       kv([
         [
-          "Browser",
+          t("Browser"),
           `${caps.browser}${caps.browserVersion !== undefined ? ` ${caps.browserVersion}` : ""}`,
         ],
       ]),
-      h("h4", null, "Declared capabilities"),
+      h("h4", null, t("Declared capabilities")),
       chips(
         caps.capabilities.map((c) => capabilityLabel(c)),
-        "No capabilities declared.",
+        t("No capabilities declared."),
       ),
-      h("h4", null, "Notes"),
-      bulletList(caps.notes, "No notes."),
+      h("h4", null, t("Notes")),
+      bulletList(caps.notes, t("No notes.")),
     ),
     card(
-      "Recent detections",
+      t("Recent detections"),
       recent.length === 0
-        ? h("p", { class: "muted" }, "No detections recorded.")
-        : detectionsTable(recent, "Five most recent detections"),
-      h("p", null, h("a", { href: "#detections" }, "All detections")),
+        ? h("p", { class: "muted" }, t("No detections recorded."))
+        : detectionsTable(recent, t("Five most recent detections")),
+      h("p", null, h("a", { href: "#detections" }, t("All detections"))),
     ),
     h(
       "section",
       { class: "card callout", "aria-labelledby": "cansee-h" },
-      h("h3", { id: "cansee-h" }, "What this tool can and cannot see"),
-      h("p", { class: "callout-lead" }, NO_DETECTIONS_NOTICE),
+      h("h3", { id: "cansee-h" }, t("What this tool can and cannot see")),
+      h("p", { class: "callout-lead" }, t(NO_DETECTIONS_NOTICE)),
       h(
         "div",
         { class: "two-col" },
-        h("div", null, h("h4", null, "Can observe"), bulletList(visibility.canSee, "Nothing.")),
-        h("div", null, h("h4", null, "Cannot observe"), bulletList(visibility.cannotSee, "—")),
+        h(
+          "div",
+          null,
+          h("h4", null, t("Can observe")),
+          bulletList(visibility.canSee, t("Nothing.")),
+        ),
+        h("div", null, h("h4", null, t("Cannot observe")), bulletList(visibility.cannotSee, "—")),
       ),
     ),
   );

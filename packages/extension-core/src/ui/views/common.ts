@@ -10,6 +10,7 @@ import {
   relativeTime,
   severityLabel,
 } from "../format.js";
+import { t } from "../i18n.js";
 import { detectionHash } from "../route.js";
 
 export interface ViewContext {
@@ -61,7 +62,7 @@ export function kv(rows: Array<[string, Child | Child[]]>): HTMLElement {
 
 export function statusPill(status: Pick<MonitoringStatus, "monitoring" | "hostPermissionGranted">) {
   const state = monitoringPill(status);
-  return h("span", { class: `pill pill-${state}` }, PILL_TEXT[state]);
+  return h("span", { class: `pill pill-${state}` }, t(PILL_TEXT[state]));
 }
 
 export function timeEl(timestamp: number): HTMLElement {
@@ -89,8 +90,8 @@ export function detectionsTable(detections: readonly Detection[], caption: strin
   const head = h(
     "tr",
     null,
-    ["Time", "Severity", "Confidence", "Category", "Summary", "Subject hostnames"].map((t) =>
-      h("th", { scope: "col" }, t),
+    ["Time", "Severity", "Confidence", "Category", "Summary", "Subject hostnames"].map((label) =>
+      h("th", { scope: "col" }, t(label)),
     ),
   );
   const rows = detections.map((d) => {
@@ -114,7 +115,7 @@ export function detectionsTable(detections: readonly Detection[], caption: strin
         null,
         h("a", { href: detectionHash(d.detectionId) }, d.summary),
         d.occurrenceCount > 1
-          ? h("span", { class: "muted" }, ` (seen ${d.occurrenceCount} times)`)
+          ? h("span", { class: "muted" }, ` ${t("(seen {n} times)", { n: d.occurrenceCount })}`)
           : null,
       ),
       h("td", { class: "mono" }, formatHostnames(d.subjectHostnames)),
@@ -138,18 +139,18 @@ export function profileSelect(): { el: HTMLElement; value: () => "default" | "st
   const select = h(
     "select",
     { id, "aria-describedby": `${id}-help` },
-    h("option", { value: "default" }, "Default (sanitized hostnames)"),
-    h("option", { value: "strict" }, "Strict (pseudonymised hostnames)"),
+    h("option", { value: "default" }, t("Default (sanitized hostnames)")),
+    h("option", { value: "strict" }, t("Strict (pseudonymised hostnames)")),
   );
   const el = h(
     "div",
     { class: "field-inline" },
-    h("label", { for: id }, "Redaction profile"),
+    h("label", { for: id }, t("Redaction profile")),
     select,
     h(
       "span",
       { id: `${id}-help`, class: "muted small" },
-      "Neither profile includes cookie values, full URLs, or page content.",
+      t("Neither profile includes cookie values, full URLs, or page content."),
     ),
   );
   return { el, value: () => (select.value === "strict" ? "strict" : "default") };

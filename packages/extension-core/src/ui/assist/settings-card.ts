@@ -8,6 +8,7 @@ import type { Settings } from "@adtripwire/shared";
 import { OllamaProvider } from "@adtripwire/correlation";
 import { errorMessage, h } from "../dom.js";
 import { parseBoundedInt } from "../format.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { card, uid, type ViewContext } from "../views/common.js";
 import { NOT_INCLUDED_TEXT } from "./panel.js";
@@ -16,7 +17,10 @@ export function assistSettingsCard(settings: Settings, ctx: ViewContext): HTMLEl
   // Keep the assist-only call inside the constant branch so the default build tree-shakes
   // the provider (and with it every network code path) out of the bundle.
   if (__ADTRIPWIRE_ASSIST__) return fullCard(settings, ctx);
-  return card("Local model assistance (optional)", h("p", { class: "muted" }, NOT_INCLUDED_TEXT));
+  return card(
+    t("Local model assistance (optional)"),
+    h("p", { class: "muted" }, t(NOT_INCLUDED_TEXT)),
+  );
 }
 
 function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
@@ -49,12 +53,20 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
   const model = h("select", { id: modelId, "aria-describedby": `${modelId}-h` });
   const fillModels = (names: string[]): void => {
     model.replaceChildren(
-      h("option", { value: "" }, names.length === 0 ? "(no models found)" : "(choose a model)"),
+      h(
+        "option",
+        { value: "" },
+        names.length === 0 ? t("(no models found)") : t("(choose a model)"),
+      ),
       ...names.map((n) => h("option", { value: n, selected: n === a.model }, n)),
     );
     if (a.model && !names.includes(a.model)) {
       model.appendChild(
-        h("option", { value: a.model, selected: true }, `${a.model} (not currently listed)`),
+        h(
+          "option",
+          { value: a.model, selected: true },
+          t("{model} (not currently listed)", { model: a.model }),
+        ),
       );
     }
   };
@@ -68,11 +80,11 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
       onclick: () => {
         const p = parseBoundedInt(port.value, 1, 65535);
         if (p === null) {
-          status.textContent = "Enter a port between 1 and 65535.";
+          status.textContent = t("Enter a port between 1 and 65535.");
           return;
         }
         probeBtn.disabled = true;
-        status.textContent = `Checking 127.0.0.1:${p}…`;
+        status.textContent = t("Checking 127.0.0.1:{port}…", { port: p });
         void new OllamaProvider({
           baseUrl: `http://127.0.0.1:${p}`,
           model: "",
@@ -83,9 +95,14 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
           .then((r) => {
             if (r.ok) {
               fillModels(r.models);
-              status.textContent = `Runtime reachable; ${r.models.length} model(s) listed.`;
+              status.textContent = t("Runtime reachable; {n} model(s) listed.", {
+                n: r.models.length,
+              });
             } else {
-              status.textContent = `No runtime answered on 127.0.0.1:${p} (${r.error ?? "unknown error"}). Start Ollama or check the port.`;
+              status.textContent = t(
+                "No runtime answered on 127.0.0.1:{port} ({error}). Start Ollama or check the port.",
+                { port: p, error: r.error ?? t("unknown error") },
+              );
             }
           })
           .finally(() => {
@@ -93,7 +110,7 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
           });
       },
     },
-    "Check runtime and list models",
+    t("Check runtime and list models"),
   );
 
   const saveBtn = h(
@@ -104,11 +121,11 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
       onclick: () => {
         const p = parseBoundedInt(port.value, 1, 65535);
         if (p === null) {
-          status.textContent = "Enter a port between 1 and 65535. Nothing was saved.";
+          status.textContent = t("Enter a port between 1 and 65535. Nothing was saved.");
           return;
         }
         saveBtn.disabled = true;
-        status.textContent = "Saving…";
+        status.textContent = t("Saving…");
         void rpc<Settings>({
           type: "update_assist_settings",
           patch: {
@@ -120,11 +137,11 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
         })
           .then(
             () => {
-              status.textContent = "Saved.";
+              status.textContent = t("Saved.");
               ctx.reload();
             },
             (err: unknown) => {
-              status.textContent = `Saving failed: ${errorMessage(err)}`;
+              status.textContent = t("Saving failed: {error}", { error: errorMessage(err) });
             },
           )
           .finally(() => {
@@ -132,15 +149,15 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
           });
       },
     },
-    "Save assistance settings",
+    t("Save assistance settings"),
   );
 
   return card(
-    "Local model assistance (optional)",
+    t("Local model assistance (optional)"),
     h(
       "div",
       { class: "notice-warn" },
-      h("h4", null, "What this does"),
+      h("h4", null, t("What this does")),
       h(
         "ul",
         { class: "bullets" },
@@ -149,42 +166,42 @@ function fullCard(settings: Settings, ctx: ViewContext): HTMLElement {
           "Never sends analyst notes, cookie values, full URLs or page content; you can preview the exact text first.",
           "The answer is interpretation: it is screened for claims about infection or safety and for hostnames not in the evidence, labelled, and never stored or exported.",
           "The model cannot change a detection, its priority or the evidence.",
-        ].map((t) => h("li", null, t)),
+        ].map((text) => h("li", null, t(text))),
       ),
     ),
     h(
       "div",
       { class: "field field-check" },
-      h("label", { for: enabledId }, enabled, "Enable local model assistance"),
+      h("label", { for: enabledId }, enabled, t("Enable local model assistance")),
       h(
         "p",
         { id: `${enabledId}-h`, class: "muted small" },
-        "Off by default. Requires an Ollama-compatible runtime listening on this computer.",
+        t("Off by default. Requires an Ollama-compatible runtime listening on this computer."),
       ),
     ),
     h(
       "div",
       { class: "field" },
-      h("label", { for: portId }, "Runtime port on 127.0.0.1"),
+      h("label", { for: portId }, t("Runtime port on 127.0.0.1")),
       port,
       h(
         "p",
         { id: `${portId}-h`, class: "muted small" },
-        "Ollama's default is 11434. Only loopback is ever contacted.",
+        t("Ollama's default is 11434. Only loopback is ever contacted."),
       ),
     ),
     h(
       "div",
       { class: "field" },
-      h("label", { for: modelId }, "Model"),
+      h("label", { for: modelId }, t("Model")),
       model,
       h(
         "p",
         { id: `${modelId}-h`, class: "muted small" },
-        "Press the check button to list models the runtime has available.",
+        t("Press the check button to list models the runtime has available."),
       ),
     ),
-    h("div", { class: "field" }, h("label", { for: langId }, "Answer language"), lang),
+    h("div", { class: "field" }, h("label", { for: langId }, t("Answer language")), lang),
     h("div", { class: "button-row" }, probeBtn, saveBtn),
     status,
   );

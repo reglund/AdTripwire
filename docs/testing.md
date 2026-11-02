@@ -118,6 +118,37 @@ This proves the CSP, CORS, fetch, JSON handling and screening together in the re
 writes `docs/evaluations/assist-eval.md` (`--rescreen <json>` re-applies screening to saved
 answers). See `docs/local-assist.md`.
 
+## Release and signed bundles (Phase 6)
+
+```bash
+pnpm release:check          # builds every variant twice; fails unless byte-identical; writes dist-release/
+pnpm indicators:sign verify --in feeds/adtripwire-indicators-<version>.signed.json
+```
+
+`tests/integration/signed-feed.test.ts` verifies the published bundle against the pinned key
+on every test run. DEV builds additionally verify it inside the browser at startup and log
+`signed bundle selftest ok key=… version=…`, which both e2e harnesses expect, proving
+Ed25519 WebCrypto verification in the real Firefox and Chromium builds.
+
+## Accessibility review (Phase 6)
+
+Checked on 2026-11-02 against the shipped stylesheet and markup:
+
+- Contrast: every text/background token pair in both themes is at least 6.7:1 (WCAG AA needs
+  4.5:1); severity badges 6.8–11.9:1. The border token used for form controls was 1.6:1 and
+  was darkened to 3.6:1 light / 3.8:1 dark (WCAG 1.4.11 needs 3:1). Computed from the CSS
+  variables with a small script; see the review date above.
+- Keyboard: skip link, roving tabindex on the tab list (arrow keys, Home/End), focus moved to
+  the main region after navigation, visible `:focus-visible` outline, buttons for every
+  action (no click-only elements; table rows that navigate also contain a real link).
+- Semantics: one `h1` per page, `h2` per view, cards use `h3`, tables have captions and
+  `scope`d headers, status messages use `role="status"`, destructive flows confirm.
+- Motion: animation only under `prefers-reduced-motion: no-preference`.
+- Language: `<html lang>` follows the UI language setting; rule content stays English and is
+  labelled as such in the Language setting.
+- Not done: screen-reader walkthrough with NVDA/VoiceOver; automated axe run (would add a
+  dependency).
+
 ## Detection quality
 
 Two separate evaluations are maintained and must not be conflated:

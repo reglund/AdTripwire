@@ -1,9 +1,38 @@
-# Indicator updates — design (Phase 2 deliverable, not yet implemented)
+# Indicator updates — signed bundles
 
-AdTripwire ships a bundled, reviewed indicator set and makes no network requests. This
-document specifies how optional indicator updates will work when they are introduced, so
-that the data model and validation already in place (`validateIndicatorSet`,
-`validFrom`/`validTo`, set `meta.version`) carry over without a rewrite.
+AdTripwire ships a bundled, reviewed indicator set and makes no network requests. Since
+Phase 6 (2026-11-02) the project can also publish **signed bundles** that a person downloads
+and imports from a file; the extension verifies them offline and lets them replace the
+built-in curated set, with one-click rollback. The network-fetching flow described further
+down remains a design only: implementing it would widen the CSP and was deliberately not
+done.
+
+## Implemented (Phase 6, offline)
+
+- Format `adtripwire-signed-indicators/1`: one JSON file with `meta` (version, createdAt,
+  keyId, sha256 of the canonical payload, changelog), `payload` (the IndicatorSet) and a
+  base64 Ed25519 `signature` over the canonical JSON of `{ meta, payload }`. Canonical JSON
+  = sorted keys, no whitespace (`canonicalJson` in `@adtripwire/indicators`).
+- Pinned keys in `packages/indicators/src/trusted-keys.ts` (`adtripwire-2026a`). Private keys
+  stay outside the repository (`~/.config/adtripwire/signing/` on the maintainer machine).
+- Verification (`verifySignedBundle`): format, key id and key validity, Ed25519 via
+  WebCrypto (Firefox 130+, Chromium 137+; older browsers refuse with a clear message), SHA-256
+  of the payload, the full `validateIndicatorSet` rules, not synthetic, same set id as the
+  built-in set it replaces, same version in meta and payload, and version strictly newer than
+  the active one (replay protection). All checks run before any trust is granted.
+- Dashboard → Indicators → "Signed indicator update": verify shows version, key, hash,
+  changelog and the diff against the active set (added / removed / reclassified / validity
+  changed); activation is a second explicit click; rollback returns to the built-in set.
+  The stored bundle is re-verified on every start and dropped if it fails.
+- Imports from other sources still defer to the curated set; the signed bundle counts as the
+  curated set once active.
+- Maintainer tooling: `pnpm indicators:sign keygen|sign|verify` (see the script header).
+  `feeds/adtripwire-indicators-<version>.signed.json` is the published artifact;
+  `tests/integration/signed-feed.test.ts` checks it against the pinned key on every CI run.
+
+## Original design (fetching variant, not implemented)
+
+The remainder of this document is the Phase 2 design for an opt-in network update check.
 
 ## Goals
 

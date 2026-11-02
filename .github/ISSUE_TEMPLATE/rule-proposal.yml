@@ -1,0 +1,69 @@
+name: Detection rule proposal
+description: Propose a new rule or a change to an existing one. Rules must be explainable and evidence-based.
+labels: ["rule-proposal"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Proposed rule id and name
+      placeholder: ad_delivery.example_pattern — Example pattern in ad delivery
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        [
+          "A known_infrastructure",
+          "B ad_delivery_behaviour",
+          "C profiling",
+          "D javascript_technique",
+          "E temporal_correlation",
+          "F repeated_exposure",
+          "page signals",
+        ]
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: What observable fact does the rule key on?
+      description: Only what a browser sensor can see (request metadata, frame context, inspected script markers, page signals). No inference about device state.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Public sources documenting the technique
+      description: Links with publication dates. Rules without sources are not accepted.
+    validations:
+      required: true
+  - type: textarea
+    id: severity
+    attributes:
+      label: Proposed severity and confidence, with rationale
+      description: Severity is an investigation priority, never a probability of compromise.
+    validations:
+      required: true
+  - type: textarea
+    id: benign
+    attributes:
+      label: Benign explanations and false-positive considerations
+      description: What ordinary advertising, analytics or site behaviour would trigger it, and how the rule avoids that.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Test scenarios
+      description: Positive, negative and false-positive cases using reserved .test / .invalid names only.
+    validations:
+      required: true
+  - type: checkboxes
+    id: wording
+    attributes:
+      label: Wording
+      options:
+        - label: The proposed summary and significance use conservative wording (observed traffic, documented infrastructure) and never "infected", "spied on" or "safe".
+          required: true

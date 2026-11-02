@@ -51,6 +51,15 @@ what happens in a browser, and nothing outside it.
 - Small local models (≈ 8–30 B parameters) were evaluated on synthetic scenarios only;
   see `docs/evaluations/assist-eval.md`. No browser-native on-device model API is used.
 
+## Signed indicator bundles (Phase 6)
+
+- Verification needs Ed25519 in WebCrypto: Firefox 130+ and Chromium 137+. Older builds
+  refuse the bundle with a clear message and keep the built-in set.
+- Bundles are imported from a file; there is no update check or download. Whoever publishes a
+  bundle must also publish its SHA-256 and the person must obtain it over a channel they trust;
+  the signature protects integrity and origin, not delivery.
+- A single project key is pinned. Rotation requires an extension release.
+
 ## Engineering
 
 - Firefox only. Chromium cannot inspect bodies with MV3; a Chromium sensor would run a

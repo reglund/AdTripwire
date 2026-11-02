@@ -95,6 +95,8 @@ pnpm e2e:firefox         # headless Firefox run against local synthetic fixtures
 pnpm e2e:chromium        # headless Chrome/Chromium run (reduced capability expectations)
 pnpm e2e:firefox:assist  # same, with the optional --assist build and a mock local model runtime
 pnpm eval:assist         # evaluate local models on synthetic scenarios (see docs/local-assist.md)
+pnpm release:check       # reproducible release zips, source archive, SBOM, SHA256SUMS (docs/release.md)
+pnpm indicators:sign     # keygen | sign | verify signed indicator bundles (docs/indicator-updates.md)
 pnpm docs:rules          # regenerate the rule catalogue in docs/detection-methodology.md
 ```
 
@@ -116,11 +118,14 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/exposure-session.md` – how to look for real exposure in your own browsing
 - `docs/integration.md` – STIX/SIEM exports, imports, Zeek/Suricata feeds
 - `docs/local-assist.md` – related-activity grouping and the optional local-model build
+- `docs/release.md` – reproducible packaging, SBOM, store submission steps
+- `CHANGELOG.md` – release notes
 - `docs/roadmap.md` – phases and gates
 - `docs/phase-1-report.md` – Phase 1 deliverables and status
 - `docs/phase-3-report.md` – Phase 3 (Chromium) deliverables and status
 - `docs/phase-4-report.md` – Phase 4 (research integration) deliverables and status
 - `docs/phase-5-report.md` – Phase 5 (local correlation and assistance) deliverables and status
+- `docs/phase-6-report.md` – Phase 6 (release readiness) deliverables and status
 
 ## Indicators and attribution
 

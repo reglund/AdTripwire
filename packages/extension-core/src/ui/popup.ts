@@ -7,6 +7,7 @@ import {
   relativeTime,
   severityLabel,
 } from "./format.js";
+import { applyLanguageSetting, t } from "./i18n.js";
 import { requestHostPermission, rpc } from "./rpc.js";
 
 const root = document.getElementById("app");
@@ -23,12 +24,13 @@ async function load(): Promise<void> {
       rpc<MonitoringStatus>({ type: "get_status" }),
       rpc<Settings>({ type: "get_settings" }),
     ]);
+    applyLanguageSetting(settings);
     render(status, settings);
   } catch (err) {
     replaceChildren(
       app,
       h("header", { class: "popup-header" }, h("h1", null, "AdTripwire")),
-      errorState("Status unavailable", err, () => void load()),
+      errorState(t("Status unavailable"), err, () => void load()),
       footerNote(),
     );
   }
@@ -49,7 +51,7 @@ async function act(fn: () => Promise<unknown>): Promise<void> {
 }
 
 function footerNote(): HTMLElement {
-  return h("p", { class: "popup-note" }, NO_DETECTIONS_NOTICE);
+  return h("p", { class: "popup-note" }, t(NO_DETECTIONS_NOTICE));
 }
 
 function summaryRow(label: string, value: number): HTMLElement {
@@ -66,7 +68,7 @@ function render(status: MonitoringStatus, settings: Settings): void {
       "header",
       { class: "popup-header" },
       h("h1", null, "AdTripwire"),
-      h("span", { class: `pill pill-${pill}`, role: "status" }, PILL_TEXT[pill]),
+      h("span", { class: `pill pill-${pill}`, role: "status" }, t(PILL_TEXT[pill])),
     ),
   ];
 
@@ -78,7 +80,9 @@ function render(status: MonitoringStatus, settings: Settings): void {
         h(
           "p",
           null,
-          "Monitoring needs permission to observe network requests. Nothing is observed until it is granted.",
+          t(
+            "Monitoring needs permission to observe network requests. Nothing is observed until it is granted.",
+          ),
         ),
         h(
           "button",
@@ -87,7 +91,7 @@ function render(status: MonitoringStatus, settings: Settings): void {
             class: "btn btn-primary btn-block",
             onclick: () => void act(() => requestHostPermission()),
           },
-          "Grant monitoring permission",
+          t("Grant monitoring permission"),
         ),
       ),
     );
@@ -97,19 +101,19 @@ function render(status: MonitoringStatus, settings: Settings): void {
     h(
       "section",
       { class: "popup-section", "aria-labelledby": "summary-h" },
-      h("h2", { id: "summary-h" }, "Summary"),
+      h("h2", { id: "summary-h" }, t("Summary")),
       h(
         "dl",
         { class: "summary" },
-        summaryRow("Known IOC observations", status.counts.knownIocObservations),
-        summaryRow("Suspicious patterns", status.counts.suspiciousPatterns),
-        summaryRow("High-priority detections", status.counts.highPriority),
+        summaryRow(t("Known IOC observations"), status.counts.knownIocObservations),
+        summaryRow(t("Suspicious patterns"), status.counts.suspiciousPatterns),
+        summaryRow(t("High-priority detections"), status.counts.highPriority),
       ),
     ),
     h(
       "section",
       { class: "popup-section", "aria-labelledby": "last-h" },
-      h("h2", { id: "last-h" }, "Last significant observation"),
+      h("h2", { id: "last-h" }, t("Last significant observation")),
       last
         ? h(
             "div",
@@ -126,13 +130,17 @@ function render(status: MonitoringStatus, settings: Settings): void {
               ),
             ),
           )
-        : h("p", { class: "muted" }, "None recorded"),
+        : h("p", { class: "muted" }, t("None recorded")),
     ),
   );
 
   if (actionError !== null) {
     children.push(
-      h("p", { class: "state state-error", role: "alert" }, `Action failed: ${actionError}`),
+      h(
+        "p",
+        { class: "state state-error", role: "alert" },
+        t("Action failed: {error}", { error: actionError }),
+      ),
     );
   }
 
@@ -151,7 +159,7 @@ function render(status: MonitoringStatus, settings: Settings): void {
               .then(() => window.close());
           },
         },
-        "Open investigation dashboard",
+        t("Open investigation dashboard"),
       ),
       h(
         "button",
@@ -161,7 +169,7 @@ function render(status: MonitoringStatus, settings: Settings): void {
           onclick: () =>
             void act(() => rpc({ type: "update_settings", patch: { enabled: !enabled } })),
         },
-        enabled ? "Pause monitoring" : "Resume monitoring",
+        enabled ? t("Pause monitoring") : t("Resume monitoring"),
       ),
     ),
     footerNote(),

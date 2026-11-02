@@ -3,6 +3,7 @@
  * so strings coming from the background (hostnames, summaries, references) cannot inject markup.
  */
 import { safeHttpUrl } from "./format.js";
+import { t } from "./i18n.js";
 
 export type AttrValue = string | number | boolean | null | undefined | ((ev: Event) => void);
 export type Attrs = Record<string, AttrValue>;
@@ -65,12 +66,14 @@ export function errorState(title: string, err: unknown, retry?: () => void): HTM
     { class: "state state-error", role: "alert" },
     h("p", { class: "state-title" }, title),
     h("p", { class: "state-detail" }, errorMessage(err)),
-    retry ? h("button", { type: "button", class: "btn", onclick: () => retry() }, "Retry") : null,
+    retry
+      ? h("button", { type: "button", class: "btn", onclick: () => retry() }, t("Retry"))
+      : null,
   );
 }
 
-export function loadingState(label = "Loading…"): HTMLElement {
-  return h("p", { class: "state state-loading", role: "status" }, label);
+export function loadingState(label?: string): HTMLElement {
+  return h("p", { class: "state state-loading", role: "status" }, label ?? t("Loading…"));
 }
 
 /** Triggers a client-side download of `text` as `filename`. */

@@ -1,5 +1,6 @@
 /** Pure helpers for the Timeline view (filters and visual grouping). */
 import type { TimelineEntry } from "@adtripwire/shared";
+import { t } from "./i18n.js";
 
 export type SinceKey = "1h" | "24h" | "7d" | "all";
 
@@ -62,5 +63,5 @@ export function groupByTab(entries: readonly TimelineEntry[]): TimelineGroup[] {
 }
 
 export function tabLabel(tabId: number | undefined): string {
-  return tabId === undefined ? "No tab" : `Tab ${tabId}`;
+  return tabId === undefined ? t("No tab") : t("Tab {id}", { id: tabId });
 }

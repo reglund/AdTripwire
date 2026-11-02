@@ -234,6 +234,22 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
       }
       return { type: "update_assist_settings", patch };
     }
+    case "update_ui_settings": {
+      if (!r.patch || typeof r.patch !== "object") return null;
+      const patch: Partial<Settings["ui"]> = {};
+      for (const [k, v] of Object.entries(r.patch as Record<string, unknown>)) {
+        if (k === "language" && (v === "auto" || v === "en" || v === "nb")) patch.language = v;
+        else return null;
+      }
+      return { type: "update_ui_settings", patch };
+    }
+    case "verify_signed_bundle":
+    case "activate_signed_bundle":
+      return typeof r.text === "string" && r.text.length > 0 && r.text.length <= 20 * 1024 * 1024
+        ? { type: r.type, text: r.text }
+        : null;
+    case "remove_signed_bundle":
+      return { type: "remove_signed_bundle" };
     default:
       return null;
   }

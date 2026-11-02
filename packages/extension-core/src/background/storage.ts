@@ -19,12 +19,20 @@ const KEY_EXPOSURE = "exposure";
 const KEY_METRICS = "metrics";
 const KEY_IMPORTED_SETS = "importedIndicatorSets";
 const KEY_NOTES = "detectionNotes";
+const KEY_SIGNED_BUNDLE = "signedIndicatorBundle";
 
 export interface ImportedSetRecord {
   set: IndicatorSet;
   enabled: boolean;
   importedAt: number;
   format: "adtripwire" | "stix";
+}
+
+/** A verified signed bundle that replaces the built-in curated set with the same id. */
+export interface SignedBundleRecord {
+  bundle: unknown; // the full signed bundle JSON; re-verified on load
+  keyId: string;
+  activatedAt: number;
 }
 
 export interface NoteRecord {
@@ -63,6 +71,7 @@ export class LocalStore {
   private settings: Settings = DEFAULT_SETTINGS;
   private importedSets: ImportedSetRecord[] = [];
   private notes = new Map<string, NoteRecord>();
+  private signedBundle: SignedBundleRecord | null = null;
   private dirty = false;
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -73,7 +82,16 @@ export class LocalStore {
       KEY_EVENTS,
       KEY_IMPORTED_SETS,
       KEY_NOTES,
+      KEY_SIGNED_BUNDLE,
     ]);
+    const sb = data[KEY_SIGNED_BUNDLE] as SignedBundleRecord | undefined;
+    this.signedBundle =
+      sb &&
+      typeof sb === "object" &&
+      typeof sb.keyId === "string" &&
+      typeof sb.activatedAt === "number"
+        ? sb
+        : null;
     // Stored imports are re-validated on load so a stale or corrupted record can never
     // re-enter the matcher.
     this.importedSets = (
@@ -125,6 +143,26 @@ export class LocalStore {
     next.retention.detectionRetentionDays = clamp(next.retention.detectionRetentionDays, 1, 365);
     next.retention.maxDetections = clamp(next.retention.maxDetections, 50, 50_000);
     next.retention.maxEvents = clamp(next.retention.maxEvents, 500, 200_000);
+    this.settings = next;
+    await browser.storage.local.set({ [KEY_SETTINGS]: next });
+    return next;
+  }
+
+  /** The stored signed bundle, if any. The background re-verifies it before use. */
+  getSignedBundle(): SignedBundleRecord | null {
+    return this.signedBundle;
+  }
+
+  async setSignedBundle(rec: SignedBundleRecord | null): Promise<void> {
+    this.signedBundle = rec;
+    if (rec) await browser.storage.local.set({ [KEY_SIGNED_BUNDLE]: rec });
+    else await browser.storage.local.remove(KEY_SIGNED_BUNDLE);
+  }
+
+  async updateUiSettings(patch: Partial<Settings["ui"]>): Promise<Settings> {
+    const ui = { ...this.settings.ui };
+    if (patch.language !== undefined) ui.language = patch.language;
+    const next: Settings = { ...this.settings, ui };
     this.settings = next;
     await browser.storage.local.set({ [KEY_SETTINGS]: next });
     return next;
@@ -335,6 +373,9 @@ export function mergeSettings(raw: unknown): Settings {
     monitoring: { ...DEFAULT_SETTINGS.monitoring, ...(r.monitoring ?? {}) },
     retention: { ...DEFAULT_SETTINGS.retention, ...(r.retention ?? {}) },
     assist: mergeAssist(r.assist),
+    ui: {
+      language: (["auto", "en", "nb"] as const).find((l) => l === r.ui?.language) ?? "auto",
+    },
   };
 }
 

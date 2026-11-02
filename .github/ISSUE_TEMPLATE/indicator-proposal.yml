@@ -1,0 +1,45 @@
+name: Indicator proposal or correction
+description: Add, remove, reclassify or time-bound an indicator in the curated set.
+labels: ["indicators"]
+body:
+  - type: textarea
+    id: indicators
+    attributes:
+      label: Indicators (one per line, with type)
+      placeholder: |
+        hostname  example-host.example   malicious
+        domain    example-dsp.example    surveillance
+    validations:
+      required: true
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance
+      description: Public report(s) with URL and publication date, and the licence of the data. CC0 or permissively licensed sources only; no copied proprietary feeds.
+    validations:
+      required: true
+  - type: dropdown
+    id: classification
+    attributes:
+      label: Classification rationale
+      options:
+        [
+          "malicious — documented spyware delivery / C2 / validator",
+          "surveillance — documented ad-platform infrastructure used for the delivery path",
+          "contextual — related vendor or corporate infrastructure",
+        ]
+    validations:
+      required: true
+  - type: input
+    id: validity
+    attributes:
+      label: Validity window (validFrom / validTo) if the infrastructure was rotated
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: Not an IP address, not a shared-hosting / CDN apex, not a public suffix (the validator rejects these).
+          required: true
+        - label: Not a reserved name (.test / .invalid); those belong only in synthetic fixtures.
+          required: true

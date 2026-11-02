@@ -1,6 +1,6 @@
 {
   "name": "adtripwire",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Detect the threat behind the ad. Privacy-preserving browser sensor for advertising-based surveillance and spyware delivery.",
@@ -30,7 +30,10 @@
     "feeds:export": "node scripts/export-feeds.mjs",
     "eval:assist": "esbuild scripts/assist-eval.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/assist-eval.mjs --log-level=warning --alias:@adtripwire/detection-engine=./packages/detection-engine/src/index.ts --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts --alias:@adtripwire/privacy=./packages/privacy/src/index.ts --alias:@adtripwire/correlation=./packages/correlation/src/index.ts --alias:@adtripwire/sensor-firefox=./packages/sensor-firefox/src/index.ts && node node_modules/.cache/adtripwire/assist-eval.mjs",
     "e2e:firefox:assist": "node scripts/e2e-firefox.mjs --assist",
-    "e2e:chromium:assist": "node scripts/e2e-chromium.mjs --assist"
+    "e2e:chromium:assist": "node scripts/e2e-chromium.mjs --assist",
+    "indicators:sign": "esbuild scripts/sign-indicators.mjs --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/sign-indicators.mjs --log-level=warning --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts && node node_modules/.cache/adtripwire/sign-indicators.mjs",
+    "release:package": "node scripts/release-package.mjs",
+    "release:check": "node scripts/release-package.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

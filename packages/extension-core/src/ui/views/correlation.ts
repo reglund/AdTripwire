@@ -18,6 +18,7 @@ import {
   pluralize,
   severityLabel,
 } from "../format.js";
+import { t } from "../i18n.js";
 import { clusterHash } from "../route.js";
 import { rpc } from "../rpc.js";
 import { assistPanel } from "../assist/panel.js";
@@ -41,8 +42,8 @@ export function clustersTable(clusters: readonly DetectionCluster[]): HTMLElemen
   const head = h(
     "tr",
     null,
-    ["Latest", "Priority", "Detections", "Rules", "Hostnames", "Summary"].map((t) =>
-      h("th", { scope: "col" }, t),
+    ["Latest", "Priority", "Detections", "Rules", "Hostnames", "Summary"].map((label) =>
+      h("th", { scope: "col" }, t(label)),
     ),
   );
   const rows = clusters.map((c) =>
@@ -64,11 +65,11 @@ export function clustersTable(clusters: readonly DetectionCluster[]): HTMLElemen
     ),
   );
   return tableWrap(
-    "Related activity",
+    t("Related activity"),
     h(
       "table",
       { class: "data" },
-      h("caption", { class: "sr-only" }, "Clusters of related detections, newest first"),
+      h("caption", { class: "sr-only" }, t("Clusters of related detections, newest first")),
       h("thead", null, head),
       h("tbody", null, rows),
     ),
@@ -81,21 +82,26 @@ export const renderCorrelation: View = async () => {
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Related activity"),
+    h("h2", null, t("Related activity")),
     h(
       "p",
       null,
-      "Detections are grouped when they cite the same request, matched the same indicator, name the same hostname or domain, or occurred in the same tab within the correlation window. Grouping is deterministic and adds no new findings.",
+      t(
+        "Detections are grouped when they cite the same request, matched the same indicator, name the same hostname or domain, or occurred in the same tab within the correlation window. Grouping is deterministic and adds no new findings.",
+      ),
     ),
     clusters.length === 0
-      ? h("p", { class: "muted" }, "No detections recorded, so nothing to group.")
+      ? h("p", { class: "muted" }, t("No detections recorded, so nothing to group."))
       : h(
           "div",
           null,
           h(
             "p",
             { class: "muted" },
-            `${pluralize(clusters.length, "group")}, of which ${multi} contain more than one detection.`,
+            t("{count}, of which {n} contain more than one detection.", {
+              count: pluralize(clusters.length, "group"),
+              n: multi,
+            }),
           ),
           clustersTable(clusters),
         ),
@@ -105,7 +111,7 @@ export const renderCorrelation: View = async () => {
 export function actionsSection(detail: ClusterDetail): HTMLElement {
   const a = detail.actions;
   return card(
-    "Suggested investigative actions",
+    t("Suggested investigative actions"),
     h("p", { class: "muted small" }, a.disclaimer),
     h(
       "ol",
@@ -114,10 +120,10 @@ export function actionsSection(detail: ClusterDetail): HTMLElement {
         h(
           "li",
           null,
-          h("span", { class: `badge priority-${x.priority}` }, PRIORITY_LABEL[x.priority]),
+          h("span", { class: `badge priority-${x.priority}` }, t(PRIORITY_LABEL[x.priority])),
           " ",
           h("strong", null, x.text),
-          h("div", { class: "muted small" }, `Because: ${x.rationale}`),
+          h("div", { class: "muted small" }, t("Because: {reason}", { reason: x.rationale })),
         ),
       ),
     ),
@@ -125,7 +131,7 @@ export function actionsSection(detail: ClusterDetail): HTMLElement {
       ? h(
           "div",
           null,
-          h("h4", null, "Also recommended by the rules involved"),
+          h("h4", null, t("Also recommended by the rules involved")),
           bulletList(a.fromRules, ""),
         )
       : null,
@@ -133,30 +139,30 @@ export function actionsSection(detail: ClusterDetail): HTMLElement {
 }
 
 export function timelineSection(detail: ClusterDetail): HTMLElement {
-  const t = detail.timeline;
+  const tl = detail.timeline;
   return card(
-    "Timeline summary",
-    h("p", null, t.text),
-    t.steps.length > 0
+    t("Timeline summary"),
+    h("p", null, tl.text),
+    tl.steps.length > 0
       ? tableWrap(
-          "Timeline steps",
+          t("Timeline steps"),
           h(
             "table",
             { class: "data" },
-            h("caption", { class: "sr-only" }, "Timeline steps in order"),
+            h("caption", { class: "sr-only" }, t("Timeline steps in order")),
             h(
               "thead",
               null,
               h(
                 "tr",
                 null,
-                ["Offset", "Time", "Kind", "What"].map((x) => h("th", { scope: "col" }, x)),
+                ["Offset", "Time", "Kind", "What"].map((x) => h("th", { scope: "col" }, t(x))),
               ),
             ),
             h(
               "tbody",
               null,
-              t.steps.map((s) =>
+              tl.steps.map((s) =>
                 h(
                   "tr",
                   null,
@@ -167,7 +173,7 @@ export function timelineSection(detail: ClusterDetail): HTMLElement {
                     null,
                     s.kind === "detection" && s.severity
                       ? severityBadge(s.severity, severityLabel(s.severity))
-                      : h("span", { class: "badge kind" }, "event"),
+                      : h("span", { class: "badge kind" }, t("event")),
                   ),
                   h("td", { class: "wrap" }, s.text),
                 ),
@@ -184,17 +190,19 @@ export async function renderClusterDetail(clusterId: string): Promise<Node> {
     rpc<ClusterDetail | null>({ type: "get_cluster", clusterId }),
     rpc<Settings>({ type: "get_settings" }),
   ]);
-  const back = h("p", null, h("a", { href: "#correlation" }, "← All related activity"));
+  const back = h("p", null, h("a", { href: "#correlation" }, t("← All related activity")));
   if (!detail) {
     return h(
       "div",
       { class: "view" },
       back,
-      h("h2", null, "Group not found"),
+      h("h2", null, t("Group not found")),
       h(
         "p",
         { class: "muted" },
-        "This group no longer exists; its detections may have been removed by retention or the grouping changed.",
+        t(
+          "This group no longer exists; its detections may have been removed by retention or the grouping changed.",
+        ),
       ),
     );
   }
@@ -203,7 +211,11 @@ export async function renderClusterDetail(clusterId: string): Promise<Node> {
     "div",
     { class: "view cluster-detail" },
     back,
-    h("h2", null, `Related activity: ${pluralize(c.detectionIds.length, "detection")}`),
+    h(
+      "h2",
+      null,
+      t("Related activity: {count}", { count: pluralize(c.detectionIds.length, "detection") }),
+    ),
     h(
       "div",
       { class: "detail-meta" },
@@ -212,34 +224,34 @@ export async function renderClusterDetail(clusterId: string): Promise<Node> {
       h(
         "span",
         null,
-        c.tabIds.length === 0 ? "no tab recorded" : pluralize(c.tabIds.length, "tab"),
+        c.tabIds.length === 0 ? t("no tab recorded") : pluralize(c.tabIds.length, "tab"),
       ),
     ),
     card(
-      "Summary",
+      t("Summary"),
       h("p", null, c.summary),
       kv([
-        ["Categories", c.categories.map(categoryLabel).join(", ") || "—"],
-        ["Rules", c.ruleIds.join(", ")],
-        ["Hostnames", h("span", { class: "mono" }, c.hostnames.join(", ") || "—")],
+        [t("Categories"), c.categories.map(categoryLabel).join(", ") || "—"],
+        [t("Rules"), c.ruleIds.join(", ")],
+        [t("Hostnames"), h("span", { class: "mono" }, c.hostnames.join(", ") || "—")],
         [
-          "Registrable domains",
+          t("Registrable domains"),
           h("span", { class: "mono" }, c.registrableDomains.join(", ") || "—"),
         ],
-        ["Matched indicators", c.indicatorIds.join(", ") || "none"],
+        [t("Matched indicators"), c.indicatorIds.join(", ") || t("none")],
         [
-          "Why grouped",
+          t("Why grouped"),
           c.links.length === 0
-            ? "Single detection"
+            ? t("Single detection")
             : h(
                 "ul",
                 { class: "bullets" },
-                c.links.map((l) => h("li", null, `${REASON_LABEL[l.reason]} (${l.key})`)),
+                c.links.map((l) => h("li", null, `${t(REASON_LABEL[l.reason])} (${l.key})`)),
               ),
         ],
       ]),
     ),
-    detectionsTable(detail.detections, "Detections in this group"),
+    detectionsTable(detail.detections, t("Detections in this group")),
     timelineSection(detail),
     actionsSection(detail),
     assistPanel({ clusterId }, settings),

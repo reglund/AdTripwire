@@ -14,6 +14,7 @@ import type {
 } from "@adtripwire/shared";
 import { ASSIST_LABEL, OllamaProvider, screenAssistOutput } from "@adtripwire/correlation";
 import { errorMessage, h } from "../dom.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { card, uid } from "../views/common.js";
 
@@ -39,7 +40,7 @@ export const NOT_INCLUDED_TEXT =
 
 export function assistPanel(target: AssistTarget, settings: Settings): HTMLElement {
   if (__ADTRIPWIRE_ASSIST__) return fullPanel(target, settings);
-  return card("Local model assistance", h("p", { class: "muted" }, NOT_INCLUDED_TEXT));
+  return card(t("Local model assistance"), h("p", { class: "muted" }, t(NOT_INCLUDED_TEXT)));
 }
 
 export function renderScreened(out: ScreenedAssistOutput): HTMLElement {
@@ -48,7 +49,7 @@ export function renderScreened(out: ScreenedAssistOutput): HTMLElement {
     .filter((p) => p.trim().length > 0);
   return h(
     "div",
-    { class: "assist-output", role: "region", "aria-label": "Model interpretation" },
+    { class: "assist-output", role: "region", "aria-label": t("Model interpretation") },
     h("p", { class: "assist-label" }, ASSIST_LABEL),
     out.flags.length > 0
       ? h(
@@ -60,11 +61,11 @@ export function renderScreened(out: ScreenedAssistOutput): HTMLElement {
               null,
               h("span", { class: "badge badge-warn" }, f.replace(/_/g, " ")),
               " ",
-              FLAG_TEXT[f],
+              t(FLAG_TEXT[f]),
             ),
           ),
         )
-      : h("p", { class: "muted small" }, "Screening found nothing to remove or mask."),
+      : h("p", { class: "muted small" }, t("Screening found nothing to remove or mask.")),
     ...paragraphs.map((p) => {
       const lines = p.split("\n");
       return h(
@@ -80,13 +81,15 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
   const a = settings.assist;
   if (!a.enabled) {
     return card(
-      "Local model assistance",
+      t("Local model assistance"),
       h(
         "p",
         { class: "muted" },
-        "Off. Enable it under Settings to let a local model runtime on this computer explain this evidence. Nothing leaves the device.",
+        t(
+          "Off. Enable it under Settings to let a local model runtime on this computer explain this evidence. Nothing leaves the device.",
+        ),
       ),
-      h("a", { href: "#settings" }, "Open settings"),
+      h("a", { href: "#settings" }, t("Open settings")),
     );
   }
   const status = h("p", { class: "muted", role: "status" });
@@ -107,7 +110,7 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
       class: "btn",
       onclick: () => {
         previewBtn.disabled = true;
-        status.textContent = "Building the exact text that would be sent…";
+        status.textContent = t("Building the exact text that would be sent…");
         void load()
           .then(
             (p) => {
@@ -120,17 +123,22 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
                   h(
                     "summary",
                     null,
-                    `What would be sent (${p.user.length + p.system.length} characters, hostnames and rule text only; no notes)`,
+                    t(
+                      "What would be sent ({n} characters, hostnames and rule text only; no notes)",
+                      { n: p.user.length + p.system.length },
+                    ),
                   ),
-                  h("h4", { id }, "System instructions"),
+                  h("h4", { id }, t("System instructions")),
                   h("pre", { class: "prompt-text", "aria-labelledby": id }, p.system),
-                  h("h4", null, "Evidence"),
+                  h("h4", null, t("Evidence")),
                   h("pre", { class: "prompt-text" }, p.user),
                 ),
               );
             },
             (err: unknown) => {
-              status.textContent = `Could not build the package: ${errorMessage(err)}`;
+              status.textContent = t("Could not build the package: {error}", {
+                error: errorMessage(err),
+              });
             },
           )
           .finally(() => {
@@ -138,7 +146,7 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
           });
       },
     },
-    "Preview what would be sent",
+    t("Preview what would be sent"),
   );
 
   const askBtn = h(
@@ -149,7 +157,10 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
       disabled: a.model === "",
       onclick: () => {
         askBtn.disabled = true;
-        status.textContent = `Asking ${a.model} on 127.0.0.1:${a.port}… this can take a minute on a small machine.`;
+        status.textContent = t(
+          "Asking {model} on 127.0.0.1:{port}… this can take a minute on a small machine.",
+          { model: a.model, port: a.port },
+        );
         void (async () => {
           try {
             const p = await load();
@@ -161,24 +172,32 @@ function fullPanel(target: AssistTarget, settings: Settings): HTMLElement {
             const raw = await provider.complete(p);
             const screened = screenAssistOutput(raw, p.context);
             output.replaceChildren(renderScreened(screened));
-            status.textContent = `Answer received and screened (${screened.removedSentences} sentence(s) removed, ${screened.maskedHostnames} hostname(s) masked).`;
+            status.textContent = t(
+              "Answer received and screened ({removed} sentence(s) removed, {masked} hostname(s) masked).",
+              { removed: screened.removedSentences, masked: screened.maskedHostnames },
+            );
           } catch (err) {
-            status.textContent = `The local model could not be used: ${errorMessage(err)}`;
+            status.textContent = t("The local model could not be used: {error}", {
+              error: errorMessage(err),
+            });
           } finally {
             askBtn.disabled = false;
           }
         })();
       },
     },
-    "Ask local model to explain",
+    t("Ask local model to explain"),
   );
 
   return card(
-    "Local model assistance",
+    t("Local model assistance"),
     h(
       "p",
       { class: "muted small" },
-      `Sends sanitized hostnames, path patterns and rule text to ${a.model || "(no model chosen)"} on this computer. The answer is interpretation: it is screened, labelled and never stored.`,
+      t(
+        "Sends sanitized hostnames, path patterns and rule text to {model} on this computer. The answer is interpretation: it is screened, labelled and never stored.",
+        { model: a.model || t("(no model chosen)") },
+      ),
     ),
     h("div", { class: "button-row" }, previewBtn, askBtn),
     status,

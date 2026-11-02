@@ -1,6 +1,7 @@
 import type { ExportFile, UiRequest } from "@adtripwire/shared";
 import { downloadText, errorMessage, h } from "../dom.js";
 import { isExportFile, safeFilename } from "../exports.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { profileSelect, uid } from "./common.js";
 
@@ -31,12 +32,12 @@ export function exportGroup(opts: {
         "aria-describedby": describedBy ? `${describedBy} ${statusId}` : statusId,
         onclick: () => {
           for (const b of buttons) b.disabled = true;
-          status.textContent = "Preparing export…";
+          status.textContent = t("Preparing export…");
           void (async () => {
             try {
               status.textContent = await run();
             } catch (err) {
-              status.textContent = `Export failed: ${errorMessage(err)}`;
+              status.textContent = t("Export failed: {error}", { error: errorMessage(err) });
             } finally {
               for (const b of buttons) b.disabled = false;
             }
@@ -51,27 +52,29 @@ export function exportGroup(opts: {
 
   const saveFile = async (req: UiRequest, fallbackName: string): Promise<string> => {
     const file = await rpc<ExportFile>(req);
-    if (!isExportFile(file)) throw new Error("The background returned an unexpected export.");
+    if (!isExportFile(file)) throw new Error(t("The background returned an unexpected export."));
     downloadText(safeFilename(file.filename, fallbackName), file.text, file.mediaType);
-    return `Downloaded ${safeFilename(file.filename, fallbackName)}.`;
+    return t("Downloaded {filename}.", {
+      filename: safeFilename(file.filename, fallbackName),
+    });
   };
 
   const handoffId = uid("handoff-help");
-  const evidence = action("Evidence JSON (default / strict)", async () => {
+  const evidence = action(t("Evidence JSON (default / strict)"), async () => {
     const p = profile.value();
     const data = await rpc<unknown>({ type: "export_evidence", profile: p, ...scope });
     const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
     downloadText(opts.evidenceFilename(p), text);
-    return "Export downloaded.";
+    return t("Export downloaded.");
   });
-  const stix = action("STIX 2.1 bundle", () =>
+  const stix = action(t("STIX 2.1 bundle"), () =>
     saveFile({ type: "export_stix", ...scope, includeIndicators: true }, "adtripwire-stix.json"),
   );
-  const siem = action("SIEM NDJSON (ECS)", () =>
+  const siem = action(t("SIEM NDJSON (ECS)"), () =>
     saveFile({ type: "export_siem", ...scope }, "adtripwire-siem.ndjson"),
   );
   const handoff = action(
-    "Hand-off package",
+    t("Hand-off package"),
     () =>
       saveFile(
         { type: "export_handoff", ...scope, profile: profile.value() },
@@ -82,10 +85,10 @@ export function exportGroup(opts: {
 
   return h(
     "div",
-    { class: "export-controls", role: "group", "aria-label": "Export" },
+    { class: "export-controls", role: "group", "aria-label": t("Export") },
     profile.el,
     h("div", { class: "button-row" }, evidence, stix, siem, handoff),
-    h("p", { id: handoffId, class: "muted small" }, HANDOFF_EXPLANATION),
+    h("p", { id: handoffId, class: "muted small" }, t(HANDOFF_EXPLANATION)),
     status,
   );
 }

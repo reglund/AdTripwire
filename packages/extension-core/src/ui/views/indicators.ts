@@ -1,8 +1,10 @@
 import type { ImportResult, MonitoringStatus } from "@adtripwire/shared";
 import { errorMessage, externalLink, h, replaceChildren } from "../dom.js";
 import { checkImportFile, importSummary, isImportResult } from "../exports.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { card, kv, uid, type View } from "./common.js";
+import { signedBundleCard } from "./signed-bundle.js";
 
 type SetMeta = MonitoringStatus["indicatorSets"][number];
 
@@ -23,7 +25,7 @@ function importedControls(s: SetMeta, apply: (status: MonitoringStatus) => void)
 
   toggle.addEventListener("change", () => {
     busy(true);
-    status.textContent = "Saving…";
+    status.textContent = t("Saving…");
     void (async () => {
       try {
         const next = await rpc<MonitoringStatus>({
@@ -34,7 +36,7 @@ function importedControls(s: SetMeta, apply: (status: MonitoringStatus) => void)
         apply(next);
       } catch (err) {
         toggle.checked = !toggle.checked;
-        status.textContent = `Could not change the set: ${errorMessage(err)}`;
+        status.textContent = t("Could not change the set: {error}", { error: errorMessage(err) });
         busy(false);
       }
     })();
@@ -44,13 +46,13 @@ function importedControls(s: SetMeta, apply: (status: MonitoringStatus) => void)
     const remove = h(
       "button",
       { type: "button", class: "btn btn-danger", onclick: showConfirm },
-      "Remove set",
+      t("Remove set"),
     );
     replaceChildren(actions, remove);
   };
   function showConfirm(): void {
     status.textContent = "";
-    const cancel = h("button", { type: "button", class: "btn", onclick: showInitial }, "Cancel");
+    const cancel = h("button", { type: "button", class: "btn", onclick: showInitial }, t("Cancel"));
     const confirm = h(
       "button",
       {
@@ -58,23 +60,26 @@ function importedControls(s: SetMeta, apply: (status: MonitoringStatus) => void)
         class: "btn btn-danger",
         onclick: () => {
           busy(true);
-          status.textContent = "Removing…";
+          status.textContent = t("Removing…");
           void (async () => {
             try {
               apply(await rpc<MonitoringStatus>({ type: "remove_indicator_set", setId: s.id }));
             } catch (err) {
-              status.textContent = `Could not remove the set: ${errorMessage(err)}`;
+              status.textContent = t("Could not remove the set: {error}", {
+                error: errorMessage(err),
+              });
               busy(false);
               showInitial();
             }
           })();
         },
       },
-      "Confirm removal",
+      t("Confirm removal"),
     );
     replaceChildren(actions, confirm, cancel);
-    status.textContent =
-      "This removes the imported set from this browser. Click Confirm removal to continue.";
+    status.textContent = t(
+      "This removes the imported set from this browser. Click Confirm removal to continue.",
+    );
     cancel.focus();
   }
   showInitial();
@@ -85,7 +90,7 @@ function importedControls(s: SetMeta, apply: (status: MonitoringStatus) => void)
     h(
       "div",
       { class: "field field-check" },
-      h("label", { for: id }, toggle, "Enabled for matching"),
+      h("label", { for: id }, toggle, t("Enabled for matching")),
     ),
     actions,
     status,
@@ -96,26 +101,28 @@ function setCard(s: SetMeta, apply: (status: MonitoringStatus) => void): HTMLEle
   return card(
     s.name,
     kv([
-      ["Set ID", h("code", null, s.id)],
-      ["Version", s.version],
-      ["As of", s.asOf],
-      ["License", s.license],
+      [t("Set ID"), h("code", null, s.id)],
+      [t("Version"), s.version],
+      [t("As of"), s.asOf],
+      [t("License"), s.license],
       [
-        "Type",
+        t("Type"),
         s.synthetic
-          ? h("span", { class: "badge badge-warn" }, "Synthetic (test data)")
+          ? h("span", { class: "badge badge-warn" }, t("Synthetic (test data)"))
           : s.imported
-            ? h("span", { class: "badge kind" }, "Imported from a local file")
-            : "Curated from published sources",
+            ? h("span", { class: "badge kind" }, t("Imported from a local file"))
+            : t("Curated from published sources"),
       ],
       ...(s.imported
-        ? ([["Status", s.enabled === false ? "Disabled" : "Enabled"]] as Array<[string, string]>)
+        ? ([[t("Status"), s.enabled === false ? t("Disabled") : t("Enabled")]] as Array<
+            [string, string]
+          >)
         : []),
     ]),
     s.description ? h("p", null, s.description) : null,
-    h("h4", null, "Sources"),
+    h("h4", null, t("Sources")),
     s.sources.length === 0
-      ? h("p", { class: "muted" }, "No sources listed.")
+      ? h("p", { class: "muted" }, t("No sources listed."))
       : h(
           "ul",
           { class: "bullets" },
@@ -124,7 +131,7 @@ function setCard(s: SetMeta, apply: (status: MonitoringStatus) => void): HTMLEle
               "li",
               null,
               externalLink(src.url, src.name),
-              src.published ? ` (published ${src.published})` : "",
+              src.published ? ` ${t("(published {date})", { date: src.published })}` : "",
             ),
           ),
         ),
@@ -150,12 +157,12 @@ function resultView(result: ImportResult): HTMLElement {
     h("p", null, h("strong", null, importSummary(result))),
     result.ok && result.setId !== undefined
       ? kv([
-          ["Set ID", h("code", null, result.setId)],
-          ["Indicators", String(result.indicatorCount ?? 0)],
+          [t("Set ID"), h("code", null, result.setId)],
+          [t("Indicators"), String(result.indicatorCount ?? 0)],
         ])
       : null,
-    list(`Errors (${result.errors.length})`, result.errors),
-    list(`Warnings (${result.warnings.length})`, result.warnings),
+    list(t("Errors ({n})", { n: result.errors.length }), result.errors),
+    list(t("Warnings ({n})", { n: result.warnings.length }), result.warnings),
   );
 }
 
@@ -164,9 +171,9 @@ function readFileText(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("The file could not be read as text."));
+      else reject(new Error(t("The file could not be read as text.")));
     };
-    reader.onerror = () => reject(new Error("The file could not be read."));
+    reader.onerror = () => reject(new Error(t("The file could not be read.")));
     reader.readAsText(file);
   });
 }
@@ -183,8 +190,8 @@ function importCard(onImported: (status?: MonitoringStatus) => Promise<void>): H
       h("input", { type: "radio", name: fmtName, value, checked }),
       label,
     );
-  const adt = radio("adtripwire", "AdTripwire JSON", true);
-  const stix = radio("stix", "STIX 2.1 bundle", false);
+  const adt = radio("adtripwire", t("AdTripwire JSON"), true);
+  const stix = radio("stix", t("STIX 2.1 bundle"), false);
   const enable = h("input", { type: "checkbox", id: enableId, checked: true });
   const status = h("p", { class: "muted", role: "status" });
   const result = h("div", { class: "import-output" });
@@ -201,11 +208,11 @@ function importCard(onImported: (status?: MonitoringStatus) => Promise<void>): H
         const problem = checkImportFile(chosen);
         replaceChildren(result);
         if (problem !== null || chosen === null) {
-          status.textContent = problem ?? "Choose a .json file to import.";
+          status.textContent = problem ?? t("Choose a .json file to import.");
           return;
         }
         button.disabled = true;
-        status.textContent = "Importing…";
+        status.textContent = t("Importing…");
         void (async () => {
           try {
             const text = await readFileText(chosen);
@@ -216,7 +223,7 @@ function importCard(onImported: (status?: MonitoringStatus) => Promise<void>): H
               enabled: enable.checked,
             });
             if (!isImportResult(res))
-              throw new Error("The background returned an unexpected result.");
+              throw new Error(t("The background returned an unexpected result."));
             status.textContent = "";
             replaceChildren(result, resultView(res));
             if (res.ok) {
@@ -224,30 +231,30 @@ function importCard(onImported: (status?: MonitoringStatus) => Promise<void>): H
               await onImported();
             }
           } catch (err) {
-            status.textContent = `Import failed: ${errorMessage(err)}`;
+            status.textContent = t("Import failed: {error}", { error: errorMessage(err) });
           } finally {
             button.disabled = false;
           }
         })();
       },
     },
-    "Import",
+    t("Import"),
   );
 
   return card(
-    "Import indicator set",
-    h("p", null, IMPORT_NOTICE),
-    h("div", { class: "field" }, h("label", { for: fileId }, "Indicator file (.json)"), file),
+    t("Import indicator set"),
+    h("p", null, t(IMPORT_NOTICE)),
+    h("div", { class: "field" }, h("label", { for: fileId }, t("Indicator file (.json)")), file),
     h(
       "fieldset",
       { class: "field" },
-      h("legend", null, "Format"),
+      h("legend", null, t("Format")),
       h("div", { class: "radio-row" }, adt, stix),
     ),
     h(
       "div",
       { class: "field field-check" },
-      h("label", { for: enableId }, enable, "Enable immediately"),
+      h("label", { for: enableId }, enable, t("Enable immediately")),
     ),
     h("div", { class: "button-row" }, button),
     status,
@@ -259,8 +266,15 @@ export const renderIndicators: View = async () => {
   const initial = await rpc<MonitoringStatus>({ type: "get_status" });
   const list = h("div", { class: "indicator-sets" });
   const banner = h("div");
+  const signedSlot = h("div");
 
-  const render = (status: MonitoringStatus): void => {
+  // Declared before first render: the signed-bundle card captures it.
+  // eslint-disable-next-line prefer-const
+  let render: (status: MonitoringStatus) => void;
+  const refresh = async (): Promise<void> => {
+    render(await rpc<MonitoringStatus>({ type: "get_status" }));
+  };
+  render = (status: MonitoringStatus): void => {
     const sets = status.indicatorSets;
     const synthetic = sets.filter((s) => s.synthetic);
     replaceChildren(
@@ -269,35 +283,43 @@ export const renderIndicators: View = async () => {
         ? h(
             "div",
             { class: "banner banner-warn", role: "alert" },
-            h("strong", null, "Synthetic indicator set loaded. "),
-            `${synthetic.map((s) => s.name).join(", ")} contain${synthetic.length === 1 ? "s" : ""} test data, not real indicators. Observations matched against it do not reflect any documented infrastructure.`,
+            h("strong", null, `${t("Synthetic indicator set loaded.")} `),
+            synthetic.length === 1
+              ? t(
+                  "{names} contains test data, not real indicators. Observations matched against it do not reflect any documented infrastructure.",
+                  { names: synthetic.map((s) => s.name).join(", ") },
+                )
+              : t(
+                  "{names} contain test data, not real indicators. Observations matched against it do not reflect any documented infrastructure.",
+                  { names: synthetic.map((s) => s.name).join(", ") },
+                ),
           )
         : null,
     );
     replaceChildren(
       list,
       sets.length === 0
-        ? h("p", null, "No indicator sets are loaded. Known-infrastructure rules cannot match.")
+        ? h("p", null, t("No indicator sets are loaded. Known-infrastructure rules cannot match."))
         : sets.map((s) => setCard(s, render)),
     );
+    replaceChildren(signedSlot, signedBundleCard(sets, refresh));
   };
   render(initial);
-
-  const refresh = async (): Promise<void> => {
-    render(await rpc<MonitoringStatus>({ type: "get_status" }));
-  };
 
   return h(
     "div",
     { class: "view" },
-    h("h2", null, "Indicators"),
+    h("h2", null, t("Indicators")),
     banner,
     h(
       "p",
       { class: "muted" },
-      "Indicator updates: bundled with the extension, or imported from a local file below; the extension never fetches indicators.",
+      t(
+        "Indicator updates: bundled with the extension, or imported from a local file below; the extension never fetches indicators.",
+      ),
     ),
     list,
+    signedSlot,
     importCard(refresh),
   );
 };

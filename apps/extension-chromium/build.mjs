@@ -99,7 +99,7 @@ if (watch) {
       bad.push(
         `${name}: network client code present (${assist ? "outside the dashboard" : "non-assist build"})`,
       );
-    if (!dev && /assist selftest/.test(code))
+    if (!dev && /assist selftest|signed bundle selftest/.test(code))
       bad.push(`${name}: self-test code in production bundle`);
   }
   const builtManifest = JSON.parse(readFileSync(join(dist, "manifest.json"), "utf8"));

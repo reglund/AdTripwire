@@ -128,7 +128,44 @@ against rule evidence (done on synthetic scenarios with several local models; se
 evaluation report for the residual: screening is pattern-based and the label plus
 side-by-side evidence carry the guarantee).
 
-## Cross-cutting
+## Phase 6 — Release readiness 🔶 (delivered 2026-11-02, awaiting approval)
+
+`prompt.md` defines Phases 1–5 only. Phase 6 is the remaining roadmap, approved to start on
+2026-11-02: the cross-cutting items below plus what Phases 4–5 carried forward.
+
+Milestone 6.1 Signed indicator bundles, offline
+
+- Ed25519-signed bundle format (canonical JSON, SHA-256, key id), pinned project public key,
+  verification in the import path via WebCrypto, version monotonicity, diff against the
+  built-in set, one-click rollback to the built-in set. No network fetching: bundles are
+  downloaded by the person and imported from a file, so `connect-src 'none'` stays.
+- Maintainer tooling to generate keys and sign the generated dataset.
+
+Milestone 6.2 Release engineering
+
+- Deterministic packaging (sorted entries, fixed timestamps) for both browsers plus a source
+  archive for store review; `SHA256SUMS`; CycloneDX SBOM; CHANGELOG; version 0.2.0.
+- Tag-driven release workflow producing the artifacts; AMO/Chrome Web Store submission
+  documented (needs maintainer credentials, not executed here).
+
+Milestone 6.3 Accessibility and localisation
+
+- Accessibility pass over popup and dashboard (landmarks, focus order, live regions,
+  contrast, reduced motion).
+- UI chrome in Norwegian bokmål behind a language setting (tabs, headings, settings, popup,
+  buttons). Rule text (summaries, significance, actions) remains English in this phase.
+
+Milestone 6.4 Community and carried-forward checks
+
+- Rule proposal template, indicator review process, issue templates.
+- Suricata `-T` / Zeek check if a tool is available; otherwise documented as unverified.
+
+Gate 6: a tagged build reproduces byte-for-byte from a clean checkout (met locally via
+`pnpm release:check`; CI run pending a pushed tag); a signed bundle verifies in both browsers
+(met via the DEV self-test; the import UI itself was not click-tested); keyboard-only
+walkthrough reviewed from markup, not performed by a person. Report: `docs/phase-6-report.md`.
+
+## Cross-cutting (folded into Phase 6)
 
 - Accessibility and localisation of the UI (Norwegian first after English).
 - Release engineering: signed AMO listing, reproducible builds, SBOM, release notes.

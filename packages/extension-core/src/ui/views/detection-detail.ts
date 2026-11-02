@@ -20,6 +20,7 @@ import {
   severityLabel,
 } from "../format.js";
 import { clampNote, NOTE_MAX_LENGTH } from "../exports.js";
+import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { bulletList, card, kv, tableWrap, timeEl, uid } from "./common.js";
 import { exportGroup } from "./export-actions.js";
@@ -33,23 +34,27 @@ function eventRowId(detectionId: string, eventId: string): string {
 }
 
 function eventStatus(ev: NormalizedEvent): string {
-  if (ev.pageSignal) return "not applicable";
-  const base = humanize(ev.requestStatus);
+  if (ev.pageSignal) return t("not applicable");
+  const base = t(humanize(ev.requestStatus));
   return ev.statusCode !== undefined ? `${base} (${ev.statusCode})` : base;
 }
 
 function eventNotes(ev: NormalizedEvent): string {
-  const parts: string[] = ev.observationLimitations.map((l) => humanize(l));
+  const parts: string[] = ev.observationLimitations.map((l) => t(humanize(l)));
   const ps = ev.pageSignal ? describePageSignal(ev.pageSignal) : null;
   if (ps?.timing) parts.push(ps.timing);
   const ri = ev.responseInspection;
   if (ri) {
     parts.push(
-      `Inspected ${formatBytes(ri.observedBytes)}${ri.truncated ? " (truncated)" : ""}`,
-      ri.markers.length > 0 ? `Markers: ${ri.markers.join(", ")}` : "No technique markers",
+      ri.truncated
+        ? t("Inspected {size} (truncated)", { size: formatBytes(ri.observedBytes) })
+        : t("Inspected {size}", { size: formatBytes(ri.observedBytes) }),
+      ri.markers.length > 0
+        ? t("Markers: {list}", { list: ri.markers.join(", ") })
+        : t("No technique markers"),
     );
   }
-  return parts.length > 0 ? parts.join("; ") : "None";
+  return parts.length > 0 ? parts.join("; ") : t("None");
 }
 
 function eventCell(ev: NormalizedEvent): HTMLElement {
@@ -57,8 +62,8 @@ function eventCell(ev: NormalizedEvent): HTMLElement {
   return h(
     "td",
     null,
-    ps ? `Page signal: ${ps.label}` : humanize(ev.eventType),
-    h("div", { class: "muted small" }, `Sensor: ${sensorLabel(ev.sensor)}`),
+    ps ? t("Page signal: {label}", { label: ps.label }) : t(humanize(ev.eventType)),
+    h("div", { class: "muted small" }, t("Sensor: {name}", { name: sensorLabel(ev.sensor) })),
   );
 }
 
@@ -66,7 +71,7 @@ function destinationCell(ev: NormalizedEvent): HTMLElement {
   if (!ev.pageSignal) {
     return h(
       "td",
-      { class: "mono wrap", title: "Query parameter names only; values are never stored." },
+      { class: "mono wrap", title: t("Query parameter names only; values are never stored.") },
       formatSanitizedUrl(ev.destination),
     );
   }
@@ -76,8 +81,8 @@ function destinationCell(ev: NormalizedEvent): HTMLElement {
     { class: "wrap" },
     ps.targetHostname !== null
       ? h("span", { class: "mono" }, ps.targetHostname)
-      : h("span", { class: "muted" }, "No target hostname"),
-    ps.crossOrigin ? [" ", h("span", { class: "badge kind" }, "cross-origin")] : null,
+      : h("span", { class: "muted" }, t("No target hostname")),
+    ps.crossOrigin ? [" ", h("span", { class: "badge kind" }, t("cross-origin"))] : null,
   );
 }
 
@@ -102,33 +107,33 @@ function eventTable(detectionId: string, events: NormalizedEvent[]): HTMLElement
         formatTimeMs(ev.timestamp),
       ),
       eventCell(ev),
-      h("td", null, ev.pageSignal ? "not applicable" : (ev.resourceType ?? "unknown")),
+      h("td", null, ev.pageSignal ? t("not applicable") : (ev.resourceType ?? t("unknown"))),
       destinationCell(ev),
-      h("td", null, ev.frameContext.depth < 0 ? "unknown" : String(ev.frameContext.depth)),
+      h("td", null, ev.frameContext.depth < 0 ? t("unknown") : String(ev.frameContext.depth)),
       h("td", null, eventStatus(ev)),
       h(
         "td",
         { class: "nowrap" },
         ev.responseSizeIfObservable !== undefined
           ? formatBytes(ev.responseSizeIfObservable)
-          : "unknown",
+          : t("unknown"),
       ),
       h("td", null, eventNotes(ev)),
     ),
   );
   return tableWrap(
-    "Event sequence",
+    t("Event sequence"),
     h(
       "table",
       { class: "data" },
-      h("caption", { class: "sr-only" }, "Events supporting this detection, oldest first"),
+      h("caption", { class: "sr-only" }, t("Events supporting this detection, oldest first")),
       h(
         "thead",
         null,
         h(
           "tr",
           null,
-          head.map((t) => h("th", { scope: "col" }, t)),
+          head.map((label) => h("th", { scope: "col" }, t(label))),
         ),
       ),
       h("tbody", null, rows),
@@ -137,11 +142,12 @@ function eventTable(detectionId: string, events: NormalizedEvent[]): HTMLElement
 }
 
 function eventLinks(detectionId: string, ids: string[], available: Set<string>): Child {
-  if (ids.length === 0) return h("span", { class: "muted small" }, "No linked events.");
+  if (ids.length === 0) return h("span", { class: "muted small" }, t("No linked events."));
   return h(
     "span",
     { class: "event-links small" },
-    "Events: ",
+    t("Events:"),
+    " ",
     ids.map((id) =>
       available.has(id)
         ? h(
@@ -149,7 +155,7 @@ function eventLinks(detectionId: string, ids: string[], available: Set<string>):
             {
               type: "button",
               class: "linklike mono",
-              title: `Show event ${id} in the event sequence`,
+              title: t("Show event {id} in the event sequence", { id }),
               onclick: () => {
                 const row = document.getElementById(eventRowId(detectionId, id));
                 row?.scrollIntoView({ block: "center" });
@@ -160,7 +166,11 @@ function eventLinks(detectionId: string, ids: string[], available: Set<string>):
             },
             shortId(id),
           )
-        : h("span", { class: "mono muted", title: `Event ${id} is no longer stored` }, shortId(id)),
+        : h(
+            "span",
+            { class: "mono muted", title: t("Event {id} is no longer stored", { id }) },
+            shortId(id),
+          ),
     ),
   );
 }
@@ -169,7 +179,7 @@ async function eventSection(d: Detection): Promise<{ node: HTMLElement; availabl
   const available = new Set<string>();
   let body: HTMLElement;
   if (d.eventIds.length === 0) {
-    body = h("p", { class: "muted" }, "No events are linked to this detection.");
+    body = h("p", { class: "muted" }, t("No events are linked to this detection."));
   } else {
     try {
       const events = await rpc<NormalizedEvent[]>({ type: "get_events", eventIds: d.eventIds });
@@ -183,18 +193,20 @@ async function eventSection(d: Detection): Promise<{ node: HTMLElement; availabl
           ? h(
               "p",
               { class: "muted" },
-              `${pluralize(missing, "linked event")} no longer stored (removed by retention limits or deletion).`,
+              t("{count} no longer stored (removed by retention limits or deletion).", {
+                count: pluralize(missing, "linked event"),
+              }),
             )
           : null,
         sorted.length > 0
           ? eventTable(d.detectionId, sorted)
-          : h("p", { class: "muted" }, "No stored events."),
+          : h("p", { class: "muted" }, t("No stored events.")),
       );
     } catch (err) {
-      body = errorState("Could not load events", err);
+      body = errorState(t("Could not load events"), err);
     }
   }
-  return { node: card("Event sequence", body), available };
+  return { node: card(t("Event sequence"), body), available };
 }
 
 function noteSection(d: DetectionWithNote): HTMLElement {
@@ -208,13 +220,16 @@ function noteSection(d: DetectionWithNote): HTMLElement {
   textarea.value = clampNote(d.note ?? "");
   const count = h("span", { id: `${id}-count`, class: "muted small" });
   const updateCount = (): void => {
-    count.textContent = `${textarea.value.length} / ${NOTE_MAX_LENGTH} characters`;
+    count.textContent = t("{n} / {max} characters", {
+      n: textarea.value.length,
+      max: NOTE_MAX_LENGTH,
+    });
   };
   updateCount();
   textarea.addEventListener("input", updateCount);
   const status = h("p", { class: "muted", role: "status" });
   if (d.note !== undefined && d.note !== "")
-    status.textContent = "A previously saved note is shown above.";
+    status.textContent = t("A previously saved note is shown above.");
   const save = h(
     "button",
     {
@@ -222,7 +237,7 @@ function noteSection(d: DetectionWithNote): HTMLElement {
       class: "btn",
       onclick: () => {
         save.disabled = true;
-        status.textContent = "Saving…";
+        status.textContent = t("Saving…");
         void (async () => {
           try {
             await rpc<DetectionWithNote>({
@@ -230,28 +245,30 @@ function noteSection(d: DetectionWithNote): HTMLElement {
               detectionId: d.detectionId,
               note: clampNote(textarea.value),
             });
-            status.textContent = `Saved at ${formatTimestamp(Date.now())}.`;
+            status.textContent = t("Saved at {time}.", { time: formatTimestamp(Date.now()) });
           } catch (err) {
-            status.textContent = `Saving failed: ${errorMessage(err)}`;
+            status.textContent = t("Saving failed: {error}", { error: errorMessage(err) });
           } finally {
             save.disabled = false;
           }
         })();
       },
     },
-    "Save note",
+    t("Save note"),
   );
   return card(
-    "Analyst notes",
+    t("Analyst notes"),
     h(
       "div",
       { class: "field" },
-      h("label", { for: id }, "Your notes on this detection"),
+      h("label", { for: id }, t("Your notes on this detection")),
       textarea,
       h(
         "p",
         { id: `${id}-help`, class: "muted small" },
-        "Plain text, stored locally in this browser profile and included in hand-off packages. Do not paste passwords or other secrets.",
+        t(
+          "Plain text, stored locally in this browser profile and included in hand-off packages. Do not paste passwords or other secrets.",
+        ),
       ),
       count,
     ),
@@ -262,15 +279,15 @@ function noteSection(d: DetectionWithNote): HTMLElement {
 
 export async function renderDetectionDetail(id: string): Promise<Node> {
   const d = await rpc<DetectionWithNote | null>({ type: "get_detection", detectionId: id });
-  const back = h("p", null, h("a", { href: "#detections" }, "← All detections"));
+  const back = h("p", null, h("a", { href: "#detections" }, t("← All detections")));
   if (!d) {
     return h(
       "div",
       { class: "view" },
       back,
       errorState(
-        "Detection not found",
-        "It may have been removed by retention limits or deletion.",
+        t("Detection not found"),
+        t("It may have been removed by retention limits or deletion."),
       ),
     );
   }
@@ -282,25 +299,30 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
   ]);
   const cluster = clusters.find((c) => c.detectionIds.includes(d.detectionId));
   const related = card(
-    "Related activity",
+    t("Related activity"),
     cluster && cluster.detectionIds.length > 1
       ? h(
           "p",
           null,
-          `This detection belongs to a group of ${cluster.detectionIds.length} related detections. `,
-          h("a", { href: clusterHash(cluster.clusterId) }, "View the group"),
+          t("This detection belongs to a group of {n} related detections.", {
+            n: cluster.detectionIds.length,
+          }),
+          " ",
+          h("a", { href: clusterHash(cluster.clusterId) }, t("View the group")),
           h("span", { class: "muted" }, ` (${cluster.summary})`),
         )
       : h(
           "p",
           { class: "muted" },
-          "No other stored detection shares a request, indicator, hostname, domain or tab window with this one.",
+          t(
+            "No other stored detection shares a request, indicator, hostname, domain or tab window with this one.",
+          ),
         ),
   );
 
   const evidence =
     d.evidence.length === 0
-      ? h("p", { class: "muted" }, "No evidence items recorded.")
+      ? h("p", { class: "muted" }, t("No evidence items recorded."))
       : h(
           "ol",
           { class: "evidence" },
@@ -318,7 +340,7 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
 
   const references =
     d.references.length === 0
-      ? h("p", { class: "muted" }, "No source references.")
+      ? h("p", { class: "muted" }, t("No source references."))
       : h(
           "ul",
           { class: "bullets" },
@@ -334,18 +356,18 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
       "div",
       { class: "detail-meta" },
       severityBadge(d.severity, severityLabel(d.severity)),
-      h("span", null, `Confidence: ${confidenceLabel(d.confidence)}`),
+      h("span", null, t("Confidence: {level}", { level: confidenceLabel(d.confidence) })),
       h("span", null, categoryLabel(d.category)),
       h("span", null, timeEl(d.timestamp)),
     ),
     h(
       "p",
       { class: "confidence-rationale" },
-      h("strong", null, "Confidence rationale: "),
+      h("strong", null, t("Confidence rationale:"), " "),
       d.confidenceRationale,
     ),
     card(
-      "Export",
+      t("Export"),
       exportGroup({
         detectionIds: [d.detectionId],
         evidenceFilename: (p) =>
@@ -354,48 +376,51 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
     ),
     noteSection(d),
     card(
-      "What was observed",
+      t("What was observed"),
       h("p", null, d.summary),
       kv([
-        ["First event", formatTimestamp(d.firstEventTimestamp)],
-        ["Latest event", formatTimestamp(d.timestamp)],
+        [t("First event"), formatTimestamp(d.firstEventTimestamp)],
+        [t("Latest event"), formatTimestamp(d.timestamp)],
         [
-          "Subject hostnames",
-          d.subjectHostnames.length > 0 ? d.subjectHostnames.join(", ") : "none recorded",
+          t("Subject hostnames"),
+          d.subjectHostnames.length > 0 ? d.subjectHostnames.join(", ") : t("none recorded"),
         ],
         [
-          "Occurrences",
+          t("Occurrences"),
           d.occurrenceCount > 1
-            ? `Re-observed ${d.occurrenceCount} times in the suppression window`
+            ? t("Re-observed {n} times in the suppression window", { n: d.occurrenceCount })
             : "1",
         ],
       ]),
     ),
-    card("Why it matters", h("p", null, d.significance)),
+    card(t("Why it matters"), h("p", null, d.significance)),
     card(
-      "Rule",
+      t("Rule"),
       kv([
-        ["Rule name", d.ruleName],
-        ["Rule ID", h("code", null, d.ruleId)],
-        ["Rule version", d.ruleVersion],
-        ["Category", categoryLabel(d.category)],
+        [t("Rule name"), d.ruleName],
+        [t("Rule ID"), h("code", null, d.ruleId)],
+        [t("Rule version"), d.ruleVersion],
+        [t("Category"), categoryLabel(d.category)],
         [
-          "Matched indicators",
-          d.matchedIndicatorIds.length > 0 ? d.matchedIndicatorIds.join(", ") : "none",
+          t("Matched indicators"),
+          d.matchedIndicatorIds.length > 0 ? d.matchedIndicatorIds.join(", ") : t("none"),
         ],
       ]),
     ),
-    card("Evidence", evidence),
+    card(t("Evidence"), evidence),
     sequence,
-    card("Source references", references),
-    card("Possible benign explanations", bulletList(d.alternativeExplanations, "None listed.")),
-    card("Suggested investigation steps", bulletList(d.recommendedActions, "None listed.")),
+    card(t("Source references"), references),
     card(
-      "Detection limitations",
-      h("h4", null, "Limitations"),
-      bulletList(d.limitations, "None listed."),
-      h("h4", null, "What the sensor could not see"),
-      bulletList(d.missingVisibility, "None listed."),
+      t("Possible benign explanations"),
+      bulletList(d.alternativeExplanations, t("None listed.")),
+    ),
+    card(t("Suggested investigation steps"), bulletList(d.recommendedActions, t("None listed."))),
+    card(
+      t("Detection limitations"),
+      h("h4", null, t("Limitations")),
+      bulletList(d.limitations, t("None listed.")),
+      h("h4", null, t("What the sensor could not see")),
+      bulletList(d.missingVisibility, t("None listed.")),
     ),
     related,
     assistPanel({ detectionId: d.detectionId }, settings),

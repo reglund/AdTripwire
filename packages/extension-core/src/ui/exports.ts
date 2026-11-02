@@ -1,5 +1,6 @@
 /** Pure helpers for file exports and indicator imports. No DOM access, so they are unit-testable. */
 import type { ExportFile, ImportResult } from "@adtripwire/shared";
+import { t } from "./i18n.js";
 
 /** Maximum analyst note length, in UTF-16 code units (matches the textarea `maxlength`). */
 export const NOTE_MAX_LENGTH = 4000;
@@ -39,10 +40,12 @@ export function clampNote(text: string): string {
 
 /** Returns an error message for a file that should not be imported, or null when acceptable. */
 export function checkImportFile(file: { name: string; size: number } | null): string | null {
-  if (file === null) return "Choose a .json file to import.";
-  if (file.size === 0) return "The selected file is empty.";
+  if (file === null) return t("Choose a .json file to import.");
+  if (file.size === 0) return t("The selected file is empty.");
   if (file.size > IMPORT_MAX_BYTES) {
-    return `The selected file is larger than ${Math.round(IMPORT_MAX_BYTES / (1024 * 1024))} MB, which is more than this page will read.`;
+    return t("The selected file is larger than {mb} MB, which is more than this page will read.", {
+      mb: Math.round(IMPORT_MAX_BYTES / (1024 * 1024)),
+    });
   }
   return null;
 }
@@ -61,7 +64,7 @@ export function isImportResult(value: unknown): value is ImportResult {
 
 /** One-line outcome for an import result, with conservative wording. */
 export function importSummary(result: ImportResult): string {
-  if (!result.ok) return "The file was not imported.";
+  if (!result.ok) return t("The file was not imported.");
   const n = result.indicatorCount ?? 0;
-  return `Imported ${n} indicator${n === 1 ? "" : "s"}.`;
+  return n === 1 ? t("Imported 1 indicator.") : t("Imported {n} indicators.", { n });
 }

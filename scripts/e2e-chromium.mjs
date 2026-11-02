@@ -27,6 +27,7 @@ const DOMAINS = [
 ];
 const EXPECTED = [
   "[AdTripwire] ready:",
+  "signed bundle selftest ok key=adtripwire-2026a version=2026.11.02",
   "detection known_infra.surveillance_contact [elevated]",
   "detection ad_delivery.noas_request [suspicious]",
   "detection known_infra.malicious_contact [elevated]",

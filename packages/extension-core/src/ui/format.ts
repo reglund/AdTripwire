@@ -15,6 +15,7 @@ import type {
   SensorCapability,
   Severity,
 } from "@adtripwire/shared";
+import { t } from "./i18n.js";
 
 export const SEVERITY_LABELS: Record<Severity, string> = {
   informational: "Informational",
@@ -128,10 +129,10 @@ export function summarizeVisibility(
   const canSee: string[] = [];
   const cannotSee: string[] = [];
   for (const cap of Object.keys(CAPABILITY_LABELS) as SensorCapability[]) {
-    if (present.has(cap)) canSee.push(CAPABILITY_CAN_SEE[cap]);
-    else cannotSee.push(CAPABILITY_CANNOT_SEE[cap]);
+    if (present.has(cap)) canSee.push(t(CAPABILITY_CAN_SEE[cap]));
+    else cannotSee.push(t(CAPABILITY_CANNOT_SEE[cap]));
   }
-  cannotSee.push(...ALWAYS_CANNOT_SEE);
+  cannotSee.push(...ALWAYS_CANNOT_SEE.map((s) => t(s)));
   return { canSee, cannotSee };
 }
 
@@ -141,39 +142,44 @@ export function humanize(value: string): string {
 }
 
 export function severityLabel(severity: string): string {
-  return (SEVERITY_LABELS as Record<string, string | undefined>)[severity] ?? humanize(severity);
+  return t((SEVERITY_LABELS as Record<string, string | undefined>)[severity] ?? humanize(severity));
 }
 
 export function confidenceLabel(confidence: string): string {
-  return (
-    (CONFIDENCE_LABELS as Record<string, string | undefined>)[confidence] ?? humanize(confidence)
+  return t(
+    (CONFIDENCE_LABELS as Record<string, string | undefined>)[confidence] ?? humanize(confidence),
   );
 }
 
 export function categoryLabel(category: string): string {
-  return (CATEGORY_LABELS as Record<string, string | undefined>)[category] ?? humanize(category);
+  return t((CATEGORY_LABELS as Record<string, string | undefined>)[category] ?? humanize(category));
 }
 
 export function capabilityLabel(cap: string): string {
-  return (CAPABILITY_LABELS as Record<string, string | undefined>)[cap] ?? humanize(cap);
+  return t((CAPABILITY_LABELS as Record<string, string | undefined>)[cap] ?? humanize(cap));
 }
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-function plural(n: number, unit: string): string {
-  return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
-}
-
-/** English relative time ("3 minutes ago"). Falls back to a date for old timestamps. */
+/** Relative time ("3 minutes ago"). Falls back to a date for old timestamps. */
 export function relativeTime(timestamp: number, now: number = Date.now()): string {
   const diff = now - timestamp;
-  if (!Number.isFinite(diff)) return "unknown time";
-  if (diff < 45_000) return "just now"; // also covers small clock skew (negative diff)
-  if (diff < HOUR) return plural(Math.max(1, Math.round(diff / MINUTE)), "minute");
-  if (diff < DAY) return plural(Math.round(diff / HOUR), "hour");
-  if (diff < 30 * DAY) return plural(Math.round(diff / DAY), "day");
+  if (!Number.isFinite(diff)) return t("unknown time");
+  if (diff < 45_000) return t("just now"); // also covers small clock skew (negative diff)
+  if (diff < HOUR) {
+    const n = Math.max(1, Math.round(diff / MINUTE));
+    return n === 1 ? t("{n} minute ago", { n }) : t("{n} minutes ago", { n });
+  }
+  if (diff < DAY) {
+    const n = Math.round(diff / HOUR);
+    return n === 1 ? t("{n} hour ago", { n }) : t("{n} hours ago", { n });
+  }
+  if (diff < 30 * DAY) {
+    const n = Math.round(diff / DAY);
+    return n === 1 ? t("{n} day ago", { n }) : t("{n} days ago", { n });
+  }
   return new Date(timestamp).toISOString().slice(0, 10);
 }
 
@@ -182,19 +188,19 @@ const pad = (n: number, w = 2): string => String(n).padStart(w, "0");
 /** Local date and time, "YYYY-MM-DD HH:MM:SS". */
 export function formatTimestamp(timestamp: number): string {
   const d = new Date(timestamp);
-  if (Number.isNaN(d.getTime())) return "unknown time";
+  if (Number.isNaN(d.getTime())) return t("unknown time");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** Local time with milliseconds, "HH:MM:SS.mmm", for ordering events within a sequence. */
 export function formatTimeMs(timestamp: number): string {
   const d = new Date(timestamp);
-  if (Number.isNaN(d.getTime())) return "unknown";
+  if (Number.isNaN(d.getTime())) return t("unknown");
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 }
 
 export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "unknown";
+  if (!Number.isFinite(bytes) || bytes < 0) return t("unknown");
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
@@ -212,9 +218,12 @@ export function formatSanitizedUrl(url: SanitizedUrl): string {
 
 /** Short hostname summary for table cells. */
 export function formatHostnames(hostnames: readonly string[], max = 3): string {
-  if (hostnames.length === 0) return "none recorded";
+  if (hostnames.length === 0) return t("none recorded");
   if (hostnames.length <= max) return hostnames.join(", ");
-  return `${hostnames.slice(0, max).join(", ")} +${hostnames.length - max} more`;
+  return t("{hosts} +{n} more", {
+    hosts: hostnames.slice(0, max).join(", "),
+    n: hostnames.length - max,
+  });
 }
 
 export function msToMinutes(ms: number): number {
@@ -245,7 +254,7 @@ export function safeHttpUrl(raw: string): string | null {
 }
 
 export function pluralize(n: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${n} ${n === 1 ? singular : pluralForm}`;
+  return `${n} ${t(n === 1 ? singular : pluralForm)}`;
 }
 
 export type PillState = "active" | "paused" | "permission";
@@ -273,7 +282,7 @@ export const PAGE_SIGNAL_LABELS: Record<PageSignalKind, string> = {
 };
 
 export function pageSignalLabel(kind: string): string {
-  return (PAGE_SIGNAL_LABELS as Record<string, string | undefined>)[kind] ?? humanize(kind);
+  return t((PAGE_SIGNAL_LABELS as Record<string, string | undefined>)[kind] ?? humanize(kind));
 }
 
 export const SENSOR_LABELS: Record<SensorName, string> = {
@@ -285,12 +294,12 @@ export const SENSOR_LABELS: Record<SensorName, string> = {
 };
 
 export function sensorLabel(sensor: string): string {
-  return (SENSOR_LABELS as Record<string, string | undefined>)[sensor] ?? humanize(sensor);
+  return t((SENSOR_LABELS as Record<string, string | undefined>)[sensor] ?? humanize(sensor));
 }
 
 /** Milliseconds as "123 ms" or "1.5 s". Invalid input yields "unknown". */
 export function formatMs(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  if (!Number.isFinite(ms) || ms < 0) return t("unknown");
   if (ms < 1000) return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(1)} s`;
 }
@@ -311,7 +320,7 @@ export function describePageSignal(signal: PageSignal): PageSignalView {
     crossOrigin: signal.crossOrigin === true,
     timing:
       signal.msSinceLoad !== undefined && Number.isFinite(signal.msSinceLoad)
-        ? `${formatMs(signal.msSinceLoad)} after load`
+        ? t("{time} after load", { time: formatMs(signal.msSinceLoad) })
         : null,
   };
 }
@@ -319,9 +328,11 @@ export function describePageSignal(signal: PageSignal): PageSignalView {
 /** Text for a rule that cannot be evaluated. Page-sensor-only gaps point at Settings. */
 export function missingCapabilitiesText(missing: readonly string[]): string {
   if (missing.length === 1 && missing[0] === "page_signals") {
-    return "Requires the optional page sensor (Settings).";
+    return t("Requires the optional page sensor (Settings).");
   }
-  return `Not evaluable in this browser (missing: ${missing.map(capabilityLabel).join(", ") || "unspecified"}).`;
+  return t("Not evaluable in this browser (missing: {list}).", {
+    list: missing.map(capabilityLabel).join(", ") || t("unspecified"),
+  });
 }
 
 export interface MetricRow {
@@ -331,15 +342,16 @@ export interface MetricRow {
 
 /** Rows for the Runtime metrics card. Counts use locale grouping; means are in milliseconds. */
 export function metricRows(m: NonNullable<MonitoringStatus["metrics"]>): MetricRow[] {
-  const count = (n: number): string => (Number.isFinite(n) ? n.toLocaleString("en-US") : "unknown");
+  const count = (n: number): string =>
+    Number.isFinite(n) ? n.toLocaleString("en-US") : t("unknown");
   return [
-    { label: "Events observed", value: count(m.eventsObserved) },
-    { label: "Events ingested", value: count(m.eventsIngested) },
-    { label: "Response inspections", value: count(m.inspections) },
-    { label: "Bytes inspected", value: formatBytes(m.inspectedBytes) },
-    { label: "Mean pass-through time", value: formatMs(m.passThroughMsMean) },
-    { label: "Mean analysis time", value: formatMs(m.analysisMsMean) },
-    { label: "Mean ingest time", value: formatMs(m.ingestMsMean) },
-    { label: "Inspections skipped for budget", value: count(m.inspectionsSkippedForBudget) },
+    { label: t("Events observed"), value: count(m.eventsObserved) },
+    { label: t("Events ingested"), value: count(m.eventsIngested) },
+    { label: t("Response inspections"), value: count(m.inspections) },
+    { label: t("Bytes inspected"), value: formatBytes(m.inspectedBytes) },
+    { label: t("Mean pass-through time"), value: formatMs(m.passThroughMsMean) },
+    { label: t("Mean analysis time"), value: formatMs(m.analysisMsMean) },
+    { label: t("Mean ingest time"), value: formatMs(m.ingestMsMean) },
+    { label: t("Inspections skipped for budget"), value: count(m.inspectionsSkippedForBudget) },
   ];
 }

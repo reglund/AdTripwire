@@ -46,10 +46,15 @@ teams who want observable evidence rather than reassurance.
 | `webRequest`                                     | yes     | yes      | Observe request metadata (hosts, types, status).                                                                                     |
 | `webRequestBlocking`, `webRequestFilterResponse` | yes     | no       | Firefox requires these to create a pass-through `StreamFilter` for response inspection. Nothing is blocked or modified.              |
 | `webNavigation`                                  | yes     | yes      | Frame ancestry for the opt-in page sensor (Firefox) and for all requests (Chromium, which does not expose ancestry in `webRequest`). |
-| `tabs`                                           | no      | yes      | Chromium request details carry no private-window flag; the tab's incognito state is read to exclude private windows.                 |
 | `scripting`                                      | yes     | yes      | Register or unregister the opt-in page sensor content script at runtime. Nothing is injected unless enabled in Settings.             |
 | `storage`, `unlimitedStorage`                    | yes     | yes      | Local persistence of detections and settings.                                                                                        |
 | `alarms`                                         | yes     | yes      | Periodic retention sweeps on an event page / service worker.                                                                         |
+
+## Build variants
+
+The listed builds have `connect-src 'none'` and no network capability. A separate
+`--assist` variant (see `docs/local-assist.md`) can contact a local model runtime on
+127.0.0.1 only, when the person enables it; if it is ever listed, its description must say so.
 
 ## Data collection disclosure (Firefox `data_collection_permissions`: none)
 

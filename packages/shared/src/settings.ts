@@ -37,10 +37,16 @@ export interface AssistSettings {
   language: "en" | "nb";
 }
 
+export interface UiSettings {
+  /** "auto" follows the browser UI language; rule content stays English. */
+  language: "auto" | "en" | "nb";
+}
+
 export interface Settings {
   monitoring: MonitoringSettings;
   retention: RetentionSettings;
   assist: AssistSettings;
+  ui: UiSettings;
   /** Settings schema version for migrations. */
   schemaVersion: 1;
 }
@@ -65,5 +71,6 @@ export const DEFAULT_SETTINGS: Settings = {
     model: "",
     language: "en",
   },
+  ui: { language: "auto" },
   schemaVersion: 1,
 };

@@ -10,6 +10,9 @@ import { renderClusterDetail, renderCorrelation } from "./views/correlation.js";
 import { renderSettings } from "./views/settings.js";
 import type { ViewContext } from "./views/common.js";
 import { NO_DETECTIONS_NOTICE } from "./format.js";
+import { applyLanguageSetting, t } from "./i18n.js";
+import { rpc } from "./rpc.js";
+import type { Settings } from "@adtripwire/shared";
 
 const tabsEl = document.getElementById("tabs");
 const mainEl = document.getElementById("main");
@@ -26,6 +29,31 @@ const TITLES: Record<TabName, string> = {
   rules: "Rules",
   settings: "Settings",
 };
+
+/** Translates the static page chrome (skip link, navigation labels, tab labels). */
+function translateChrome(): void {
+  const skip = document.querySelector(".skip-link");
+  if (skip) skip.textContent = t("Skip to content");
+  const tagline = document.querySelector(".tagline");
+  if (tagline) tagline.textContent = t("Detect the threat behind the ad");
+  for (const el of Array.from(document.querySelectorAll("nav, #tabs"))) {
+    el.setAttribute("aria-label", t("Dashboard sections"));
+  }
+  for (const tab of TABS) {
+    const a = document.getElementById(`tab-${tab.name}`);
+    if (a) a.textContent = t(tab.label);
+  }
+}
+
+/** Applies the stored UI language; falls back to English when settings cannot be read. */
+async function applyLanguage(): Promise<void> {
+  try {
+    applyLanguageSetting(await rpc<Settings>({ type: "get_settings" }));
+  } catch {
+    // keep English; the view itself will show the error state if the background is down
+  }
+  translateChrome();
+}
 
 function navigate(name: TabName): void {
   location.hash = `#${name}`;
@@ -58,7 +86,7 @@ function buildTabs(): void {
           document.getElementById(`tab-${target.name}`)?.focus();
         },
       },
-      tab.label,
+      t(tab.label),
     );
     tabList.appendChild(a);
   });
@@ -110,16 +138,17 @@ async function renderRoute(route: Route): Promise<Node> {
 }
 
 async function show(): Promise<void> {
+  await applyLanguage();
   const route = parseHash(location.hash);
   const tab = routeTab(route);
   const token = ++renderToken;
   markActive(tab);
   const title =
     route.name === "detection"
-      ? "Detection detail"
+      ? t("Detection detail")
       : route.name === "cluster"
-        ? "Related activity detail"
-        : TITLES[tab];
+        ? t("Related activity detail")
+        : t(TITLES[tab]);
   document.title = `AdTripwire – ${title}`;
   main.setAttribute("aria-busy", "true");
   clear(main);
@@ -134,7 +163,7 @@ async function show(): Promise<void> {
     content = h(
       "div",
       { class: "view" },
-      errorState("Could not load this page", err, () => void show()),
+      errorState(t("Could not load this page"), err, () => void show()),
     );
   }
   if (token !== renderToken) return; // a newer navigation superseded this one
@@ -143,7 +172,7 @@ async function show(): Promise<void> {
     document.activeElement === document.body || main.contains(document.activeElement);
   clear(main);
   main.appendChild(content);
-  main.appendChild(h("p", { class: "dash-footnote" }, NO_DETECTIONS_NOTICE));
+  main.appendChild(h("p", { class: "dash-footnote" }, t(NO_DETECTIONS_NOTICE)));
   main.setAttribute("aria-busy", "false");
   if (hadFocusInside) main.focus({ preventScroll: true });
   window.scrollTo(0, 0);

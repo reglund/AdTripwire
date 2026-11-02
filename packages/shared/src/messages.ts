@@ -42,8 +42,17 @@ export interface MonitoringStatus {
     inspectionsSkippedForBudget: number;
     since: number;
   };
-  /** Bundled and user-imported sets; imported ones carry `imported: true`. */
-  indicatorSets: Array<IndicatorSetMeta & { imported?: boolean; enabled?: boolean }>;
+  /**
+   * Bundled and user-imported sets; imported ones carry `imported: true`. A curated set that
+   * came from a verified signed bundle carries `signed` with the key id and activation time.
+   */
+  indicatorSets: Array<
+    IndicatorSetMeta & {
+      imported?: boolean;
+      enabled?: boolean;
+      signed?: { keyId: string; activatedAt: number; builtInVersion: string };
+    }
+  >;
   rulesetVersion: string;
   productVersion: string;
 }
@@ -80,7 +89,12 @@ export type UiRequest =
       clusterId?: string;
       language?: AssistLanguage;
     }
-  | { type: "update_assist_settings"; patch: Partial<Settings["assist"]> };
+  | { type: "update_assist_settings"; patch: Partial<Settings["assist"]> }
+  | { type: "update_ui_settings"; patch: Partial<Settings["ui"]> }
+  // Phase 6: signed indicator bundles (offline, file-based)
+  | { type: "verify_signed_bundle"; text: string }
+  | { type: "activate_signed_bundle"; text: string }
+  | { type: "remove_signed_bundle" };
 
 export interface DetectionFilter {
   categories?: string[];
@@ -114,6 +128,25 @@ export interface ExportFile {
   filename: string;
   mediaType: string;
   text: string;
+}
+
+/** Preview of a signed bundle after verification, before activation. */
+export interface SignedBundlePreview {
+  ok: boolean;
+  errors: string[];
+  meta?: { version: string; createdAt: string; keyId: string; sha256: string; changelog: string[] };
+  setId?: string;
+  indicatorCount?: number;
+  activeVersion?: string;
+  diff?: {
+    added: number;
+    removed: number;
+    reclassified: number;
+    validityChanged: number;
+    unchanged: number;
+    /** Up to 50 human-readable lines describing the changes. */
+    lines: string[];
+  };
 }
 
 /** Result of an import: which set was added and what the validator said. */
