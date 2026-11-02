@@ -365,9 +365,11 @@ async function main() {
       results.push(row);
       continue;
     }
-    row.events = (cur.metrics?.eventsObserved ?? 0) - (prev.metrics?.eventsObserved ?? 0);
-    row.thirdPartyDomains =
-      (cur.metrics?.thirdPartyDomains ?? 0) - (prev.metrics?.thirdPartyDomains ?? 0);
+    row.events = Math.max(
+      0,
+      (cur.metrics?.eventsObserved ?? 0) - (prev.metrics?.eventsObserved ?? 0),
+    );
+    row.thirdPartyDomains = seenThirdParty.size;
     const list = (await rpc(dash, { type: "list_detections" })).data;
     for (const d of list) {
       if (knownDetections.has(d.detectionId)) continue;
@@ -394,9 +396,15 @@ async function main() {
     loaded: results.filter((r) => r.loaded).length,
     consent: results.filter((r) => r.consent).length,
     article: results.filter((r) => r.article).length,
-    events: (end.metrics?.eventsObserved ?? 0) - (start.metrics?.eventsObserved ?? 0),
-    thirdPartyDomains:
-      (end.metrics?.thirdPartyDomains ?? 0) - (start.metrics?.thirdPartyDomains ?? 0),
+    events: results.reduce((a, r) => a + r.events, 0),
+    thirdPartyMedian: (() => {
+      const v = results
+        .filter((r) => r.loaded)
+        .map((r) => r.thirdPartyDomains)
+        .sort((a, b) => a - b);
+      return v.length ? v[Math.floor(v.length / 2)] : 0;
+    })(),
+    lowAuction: results.filter((r) => r.loaded && r.thirdPartyDomains < 10).length,
     detections: results.flatMap((r) => r.detections),
   };
   const bySev = {};
@@ -413,10 +421,10 @@ async function main() {
   L.push("## Summary");
   L.push("");
   L.push(
-    `- Sites: ${totals.sites}; loaded ${totals.loaded}; consent clicked on ${totals.consent}; article opened on ${totals.article}.`,
+    `- Sites: ${totals.sites}; loaded ${totals.loaded}; consent clicked on ${totals.consent} (no click means no dialog was recognised, or consent was already stored in this persistent profile); article opened on ${totals.article}.`,
   );
   L.push(
-    `- Requests observed by the sensor: ${totals.events}; distinct third-party registrable domains contacted: ${totals.thirdPartyDomains} (auction evidence: a low number means consent did not take effect).`,
+    `- Requests observed by the sensor: ${totals.events}. Third-party registrable domains per site, counted by this script from the page's own requests: median ${totals.thirdPartyMedian}; ${totals.lowAuction} loaded site(s) contacted fewer than 10, which suggests few or no ad auctions ran there.`,
   );
   L.push(
     `- Detections: ${totals.detections.length}${
