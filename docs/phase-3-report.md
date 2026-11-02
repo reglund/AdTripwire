@@ -1,7 +1,7 @@
 # Phase 3 report — Chrome/Chromium support
 
-Date: 2026-11-02 · Commits: `2978cbb` (Chromium support), plus the hardening commit that
-follows this report · Packages: `apps/extension-firefox/web-ext-artifacts/adtripwire-0.1.0.zip`,
+Date: 2026-11-02 · Commits: `2978cbb` (Chromium support), `384c0a7` (hardening, exposure
+protocol) and the closing commit that includes this report · Packages: `apps/extension-firefox/web-ext-artifacts/adtripwire-0.1.0.zip`,
 `apps/extension-chromium/web-ext-artifacts/adtripwire-0.1.0.zip`
 
 ## What was built

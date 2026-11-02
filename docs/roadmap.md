@@ -70,7 +70,7 @@ Carried forward from Phase 2 (not blocking): interactive benign session, signed 
 bundle implementation (`docs/indicator-updates.md`), Firefox-profiler performance pass,
 manual verification of the page-sensor consent UI.
 
-## Phase 3 — Chrome/Chromium support (in progress, started 2026-11-02)
+## Phase 3 — Chrome/Chromium support (delivered 2026-11-02, awaiting approval)
 
 - `packages/sensor-chromium` ✅ — MV3 observational `webRequest`, frame tree from
   `webNavigation`, incognito handling via a tab cache, no inspection; 53 tests.
@@ -80,8 +80,10 @@ manual verification of the page-sensor consent UI.
   icons, manifest validator, CI package. Verified headless on Chromium 156
   (`pnpm e2e:chromium`): indicator and NOAS rules, page sensor, dashboard, no `js.*` rules.
 - Dashboard explains non-evaluable rules on Chromium ✅ (engine capability gating).
-- Pending: store-listing text and permission explanations, a Chromium benign-browsing run,
-  a review of the Chromium sensor by a second model, real Chrome (branded) manual check.
+- Store texts and permission justifications ✅ (`docs/store-listing.md`); Chromium
+  benign-browsing run ✅ (zero detections, 24 sites); second-model review of the Chromium
+  sensor ✅ (no critical/high; fixes applied). Pending: manual check in branded Google
+  Chrome, store submissions.
 
 Gate 3: synthetic suite passes on the Chromium rule subset (met headless); no faked body
 inspection (met: `no_response_body_access` on every event).
