@@ -1,0 +1,9 @@
+[Unit]
+Description=AdTripwire daily interactive exposure run (Firefox and Chromium, persistent profiles)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/git/AdTripwire
+Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
+ExecStart=/bin/sh -c 'node scripts/exposure-run.mjs --browser=firefox --seconds=75 --json=%h/.cache/adtripwire-exposure/firefox-$(date +%%F).json && node scripts/exposure-run.mjs --browser=chromium --seconds=75 --json=%h/.cache/adtripwire-exposure/chromium-$(date +%%F).json'
+Nice=10
