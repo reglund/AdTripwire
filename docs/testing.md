@@ -106,7 +106,8 @@ they remain a manual check. Console lines are prefixed `[AdTripwire]`.
 
 ```bash
 pnpm exposure:build                 # evaluation builds (production indicators, dashboard opens on install)
-pnpm exposure:firefox -- --seconds=75           # or exposure:chromium; add --mobile, --limit=N, --headed
+pnpm exposure:firefox -- --seconds=75           # or exposure:chromium; --device="iPhone 15" / "Pixel 5", --limit=N, --headed
+pnpm exposure:trend                             # cumulative report over ~/.cache/adtripwire-exposure/*.json
 node scripts/exposure-run.mjs --browser=firefox --sites=tests/fixtures/exposure-sites.txt --json=run.json
 ```
 

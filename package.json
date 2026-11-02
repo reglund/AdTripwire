@@ -36,7 +36,8 @@
     "release:check": "node scripts/release-package.mjs --check",
     "exposure:build": "node apps/extension-firefox/build.mjs --eval --out=$HOME/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=$HOME/snap/chromium/common/adtripwire-eval-dist",
     "exposure:firefox": "node scripts/exposure-run.mjs --browser=firefox",
-    "exposure:chromium": "node scripts/exposure-run.mjs --browser=chromium"
+    "exposure:chromium": "node scripts/exposure-run.mjs --browser=chromium",
+    "exposure:trend": "node scripts/exposure-trend.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

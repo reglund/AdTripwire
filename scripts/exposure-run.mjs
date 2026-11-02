@@ -292,6 +292,18 @@ async function main() {
   );
   const browser = await launch();
   const dash = await dashboardPage(browser);
+  // Long-term mapping: keep detections for a year (the default 7 days would erase history
+  // between daily runs) and enable the opt-in page sensor for structural signals.
+  const tuned = await rpc(dash, {
+    type: "update_settings",
+    patch: {
+      detectionRetentionDays: 365,
+      maxDetections: 50_000,
+      maxEvents: 200_000,
+      pageSensorEnabled: true,
+    },
+  });
+  if (!tuned?.ok) console.warn(`could not apply evaluation settings: ${tuned?.error}`);
   const start = await status(dash);
   console.log(
     `extension ${start.productVersion}, ${start.indicatorSets.length} indicator set(s), monitoring=${start.monitoring}, caps=${start.capabilities.capabilities.join(",")}`,

@@ -35,8 +35,13 @@ record whether the browser contacts infrastructure documented in the AdFection r
 this session automatically with a persistent profile: consent accepted, scrolling, one
 article per site, 75 s dwell, report with auction evidence per site. Run it daily for at
 least three days to let the repeated-exposure rule fire; `sh scripts/install-exposure-timer.sh`
-installs a user-level systemd timer (11:30 daily, both browsers, JSON per day under
-`~/.cache/adtripwire-exposure/`, reports under `docs/evaluations/`), `--remove` uninstalls it. It cannot stand in for your own
+installs a user-level systemd timer, `--remove` uninstalls it. Each day (11:30 ± 30 min) it
+rebuilds the evaluation bundles, then runs desktop Firefox, desktop Chromium and Chromium with
+iPhone 15 emulation one after another (60 s per site, persistent profiles, detections kept for
+a year, page sensor on), and finally `pnpm exposure:trend`. Everything is written outside the
+repository: JSON per run in `~/.cache/adtripwire-exposure/`, per-run reports in its
+`reports/`, and the cumulative view in `trend.md` (documented hosts with first/last seen,
+distinct days, variants and sites; runs by day and severity). It cannot stand in for your own
 profile (logins, history, your consent choices), so keep the manual session below as the
 reference.
 
