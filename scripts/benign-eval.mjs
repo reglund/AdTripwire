@@ -180,11 +180,13 @@ const parsed = logs.flatMap(({ batch, log }) =>
 const detections = [];
 let ready = 0;
 const statsLines = [];
+let pos = 0;
 for (const { batch, line } of parsed) {
+  pos++;
   let m;
   if ((m = /^detection ([a-z_.]+) \[(\w+)\] /.exec(line))) {
     if (RULE_ID.test(m[1]) && SEVERITIES.has(m[2]))
-      detections.push({ batch, rule: m[1], sev: m[2] });
+      detections.push({ batch, rule: m[1], sev: m[2], pos });
   } else if ((m = /^escalated ([a-z_.]+) (\w+) (?:→|\\u2192) (\w+):/.exec(line))) {
     if (RULE_ID.test(m[1]) && SEVERITIES.has(m[3]))
       detections.push({ batch, rule: m[1], sev: m[3], escalated: true });
@@ -199,6 +201,7 @@ for (const { batch, line } of parsed) {
       ingested: +m[2],
       inspections: +m[3],
       detections: +m[4],
+      pos,
     });
   }
 }
@@ -217,7 +220,11 @@ const statsDetections = statsLines.reduce((acc, s) => {
   acc[s.batch.join(", ")] = Math.max(acc[s.batch.join(", ")] ?? 0, s.detections);
   return acc;
 }, {});
-const parsedNew = detections.filter((d) => !d.escalated).length;
+// Only detections logged BEFORE the last counter line can be accounted for by it; a detection
+// that fires after the final periodic stats line is a timing gap, not tampering.
+const lastStatsPos = statsLines.length ? Math.max(...statsLines.map((s) => s.pos)) : Infinity;
+const parsedNew = detections.filter((d) => !d.escalated && d.pos < lastStatsPos).length;
+const parsedAfterStats = detections.filter((d) => !d.escalated && d.pos >= lastStatsPos).length;
 const statsTotal = Object.values(statsDetections).reduce((a, b) => a + b, 0);
 const consistent = statsLines.length === 0 || parsedNew <= statsTotal;
 const statsSummary = statsLines.length
@@ -234,15 +241,16 @@ const statsSummary = statsLines.length
       .join("; ")
   : "no stats lines (build predates stats logging)";
 
-const md = `# Benign-browsing evaluation — ${today}
+const isExposure = /exposure/i.test(sitesFile);
+const md = `# ${isExposure ? "Exposure evaluation (ad-heavy sites)" : "Benign-browsing evaluation"}, ${CHROMIUM ? "Chromium" : "Firefox"} — ${today}
 
-Protocol: \`tests/fixtures/benign-browsing.md\`. Production build (real indicator set only),
+Site list: \`${sitesFile}\`${isExposure ? " (see `docs/exposure-session.md`; the purpose is to look for real contact with documented infrastructure in live ad traffic from a fresh profile)" : " (protocol: `tests/fixtures/benign-browsing.md`)"}. Production build (real indicator set only),
 headless ${CHROMIUM ? "Chromium" : "Firefox"}, ${sites.length} sites in batches of ${EFFECTIVE_BATCH}, ${SECONDS} s per batch, default settings,
 Enhanced Tracking Protection at its default. Script: \`scripts/benign-eval.mjs\`.
 
 Extension ready lines observed: ${ready} of ${logs.length} batches.
 Sensor activity (last stats line per batch, counts only): ${statsSummary}.
-Console cross-check: ${consistent ? "parsed detection lines are consistent with the extension's own counters" : "**INCONSISTENT** — more detection lines parsed than the extension's counters report; treat this run as possibly tampered with by a page"}.
+Console cross-check: ${consistent ? "parsed detection lines are consistent with the extension's own counters" : "**INCONSISTENT** — more detection lines parsed than the extension's counters report; treat this run as possibly tampered with by a page"}${parsedAfterStats > 0 ? ` (${parsedAfterStats} detection line(s) were logged after the last counter line and could not be cross-checked)` : ""}.
 
 ## Detections by rule and severity
 
