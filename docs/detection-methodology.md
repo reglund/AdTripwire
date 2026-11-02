@@ -119,14 +119,14 @@ Classifies the response to a NOAS/getAd-pattern request. An empty response is th
 
 #### `ad_delivery.redirect_chain` — Multi-hop redirect chain from an ad-classified context (v1.0.0)
 
-A single request was redirected three or more times across at least two registrable domains, starting from a request Firefox classified as advertising or tracking.
+A request was redirected three or more times across at least two registrable domains, starting from a request Firefox classified as advertising or tracking. Reported once per tab per correlation window with an occurrence count; informational unless a hop reaches documented infrastructure.
 
-- **Default severity:** suspicious · **Confidence:** low
-- **Confidence basis:** Always low: redirect chains are routine in ad delivery (cookie syncing, click tracking). The rule exists to give context to stronger signals.
-- **Required evidence:** Three or more request_redirected events sharing a request id inside the correlation window.; The first observed hop classified as tracking_ad or tracking (third-party).; At least two distinct registrable domains across the hops.
+- **Default severity:** informational · **Confidence:** low
+- **Confidence basis:** Always low: redirect chains are routine in ad delivery (cookie syncing, click tracking); with consent a single page can produce dozens. Raised to suspicious only when a hop reaches a host in the indicator set.
+- **Required evidence:** Three or more request_redirected events sharing a request id inside the correlation window.; The first observed hop classified as tracking_ad or tracking (third-party).; At least two distinct registrable domains across the hops.; Suspicious only: at least one hop's host matches an indicator.
 - **Required capabilities:** `request_metadata`, `redirect_chain`, `url_classification`
 - **Limitations:** Registrable domains are approximated without a full public-suffix list. Only redirects of a single request id are linked; client-side navigations are not.
-- **False-positive considerations:** Cookie-sync and click-tracking chains routinely cross several ad-tech domains.
+- **False-positive considerations:** Cookie-sync and click-tracking chains routinely cross several ad-tech domains; an exposure evaluation with consent (2026-11-02) saw 30-60 such chains per ad-heavy page, which is why the rule aggregates per tab and stays informational by default.
 - **References:** [The Citizen Lab — How Discover-Tech turned targeted ads into a pipeline for spyware (2026-10-15)](https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/), [Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming (2026-10-15)](https://blog.confiant.com/p/adint-weaponized-ad-tech-for-zero-click-spyware-and-mass-identity-vacuuming)
 
 #### `ad_delivery.nested_frame_to_indicator` — Embedded frame loading documented infrastructure (v1.0.0)

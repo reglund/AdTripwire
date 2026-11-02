@@ -170,8 +170,94 @@ describe("individual rules", () => {
       }),
     ]);
     const d = out.find((x) => x.ruleId === "ad_delivery.redirect_chain")!;
-    expect(d.severity).toBe("suspicious");
+    expect(d.severity).toBe("informational");
     expect(d.confidence).toBe("low");
+    expect(d.summary).toMatch(/counted as occurrences/);
+  });
+
+  /** One redirect chain: first request then `hosts.length - 1` redirects, all on one request id. */
+  function chain(rid: string, tab: number, hosts: string[], t: number) {
+    const base = { rid, tab, tp: ["tracking_ad" as const] };
+    return [
+      ev({ ...base, host: hosts[0]!, type: "image", t }),
+      ...hosts.slice(0, -1).map((h, i) =>
+        ev({
+          ...base,
+          host: h,
+          eventType: "request_redirected",
+          redirectHost: hosts[i + 1]!,
+          t: t + i + 1,
+        }),
+      ),
+    ];
+  }
+  const SYNC = [
+    "a.synthetic-ads1.test",
+    "b.synthetic-ads2.test",
+    "c.synthetic-ads3.test",
+    "d.synthetic-ads4.test",
+  ];
+
+  it("redirect chains in one tab are aggregated into one detection with an occurrence count", () => {
+    const h = new Harness();
+    const created: string[] = [];
+    let last: { occurrenceCount: number } | undefined;
+    for (const [i, rid] of ["s1", "s2", "s3"].entries()) {
+      for (const e of chain(rid, 7, SYNC, T0 + i * 1000)) {
+        const r = h.ingest(e);
+        for (const d of r.detections)
+          if (d.ruleId === "ad_delivery.redirect_chain") created.push(d.detectionId);
+        for (const d of r.updated) if (d.ruleId === "ad_delivery.redirect_chain") last = d;
+      }
+    }
+    expect(created).toHaveLength(1);
+    expect(last?.occurrenceCount).toBe(3);
+  });
+
+  it("redirect chains in different tabs are reported separately", () => {
+    const h = new Harness();
+    const out = h.ingestAll([...chain("t1", 1, SYNC, T0), ...chain("t2", 2, SYNC, T0 + 10)]);
+    expect(out.filter((d) => d.ruleId === "ad_delivery.redirect_chain")).toHaveLength(2);
+  });
+
+  it("a chain reaching documented infrastructure is suspicious and escalates the tab's detection", () => {
+    const h = new Harness();
+    let escalated: { severity: string; summary: string } | undefined;
+    for (const e of chain("e1", 3, SYNC, T0)) h.ingest(e);
+    for (const e of chain(
+      "e2",
+      3,
+      [
+        "a.synthetic-ads1.test",
+        "b.synthetic-ads2.test",
+        "sync.synthetic-tracking.test",
+        "d.synthetic-ads4.test",
+      ],
+      T0 + 1000,
+    )) {
+      const r = h.ingest(e);
+      for (const d of r.updated) if (d.ruleId === "ad_delivery.redirect_chain") escalated = d;
+    }
+    expect(escalated?.severity).toBe("suspicious");
+    expect(escalated?.summary).toMatch(/sync\.synthetic-tracking\.test/);
+  });
+
+  it("a fresh tab whose first chain reaches documented infrastructure starts at suspicious", () => {
+    const h = new Harness();
+    const out = h.ingestAll(
+      chain(
+        "f1",
+        9,
+        [
+          "a.synthetic-ads1.test",
+          "sync.synthetic-tracking.test",
+          "c.synthetic-ads3.test",
+          "d.synthetic-ads4.test",
+        ],
+        T0,
+      ),
+    );
+    expect(out.find((d) => d.ruleId === "ad_delivery.redirect_chain")?.severity).toBe("suspicious");
   });
 
   it("redirect chain without ad classification does not fire", () => {

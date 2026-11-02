@@ -13,16 +13,17 @@ export const definition: RuleDefinition = {
   name: "Multi-hop redirect chain from an ad-classified context",
   version: RULE_VERSION,
   description:
-    "A single request was redirected three or more times across at least two registrable domains, starting from a request Firefox classified as advertising or tracking.",
+    "A request was redirected three or more times across at least two registrable domains, starting from a request Firefox classified as advertising or tracking. Reported once per tab per correlation window with an occurrence count; informational unless a hop reaches documented infrastructure.",
   category: "ad_delivery_behaviour",
-  severity: "suspicious",
+  severity: "informational",
   confidence: "low",
   confidenceBasis:
-    "Always low: redirect chains are routine in ad delivery (cookie syncing, click tracking). The rule exists to give context to stronger signals.",
+    "Always low: redirect chains are routine in ad delivery (cookie syncing, click tracking); with consent a single page can produce dozens. Raised to suspicious only when a hop reaches a host in the indicator set.",
   requiredEvidence: [
     "Three or more request_redirected events sharing a request id inside the correlation window.",
     "The first observed hop classified as tracking_ad or tracking (third-party).",
     "At least two distinct registrable domains across the hops.",
+    "Suspicious only: at least one hop's host matches an indicator.",
   ],
   requiredCapabilities: ["request_metadata", "redirect_chain", "url_classification"],
   references: BOTH,
@@ -31,7 +32,7 @@ export const definition: RuleDefinition = {
     "Only redirects of a single request id are linked; client-side navigations are not.",
   ],
   falsePositiveConsiderations: [
-    "Cookie-sync and click-tracking chains routinely cross several ad-tech domains.",
+    "Cookie-sync and click-tracking chains routinely cross several ad-tech domains; an exposure evaluation with consent (2026-11-02) saw 30-60 such chains per ad-heavy page, which is why the rule aggregates per tab and stays informational by default.",
   ],
 };
 
@@ -52,12 +53,22 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   }
   const domains = new Set([...hosts].map(approxRegistrableDomain));
   if (domains.size < 2) return [];
+  const indicatorHosts = [...hosts].filter((h) => ctx.matcher.match(h, "/", ctx.now).length > 0);
+  const severity = indicatorHosts.length > 0 ? "suspicious" : "informational";
   return [
     buildDetection(definition, ctx, {
-      subject: event.requestId,
+      // One detection per tab per correlation window; further chains raise occurrenceCount and
+      // a chain reaching documented infrastructure escalates the stored detection in place.
+      subject: `tab:${event.tabId ?? "unknown"}`,
+      severity,
       confidenceRationale:
-        "Multi-hop redirects from ad contexts are common in ordinary advertising; this is context, not evidence.",
-      summary: `A request from an ad-classified context was redirected ${hops.length} times across ${domains.size} domains.`,
+        indicatorHosts.length > 0
+          ? "A redirect hop reached a host in the indicator set; the chain itself is still routine ad-tech behaviour, so confidence stays low."
+          : "Multi-hop redirects from ad contexts are common in ordinary advertising; this is context, not evidence.",
+      summary:
+        indicatorHosts.length > 0
+          ? `An ad redirect chain in this tab reached documented infrastructure (${indicatorHosts.join(", ")}).`
+          : `Ad redirect chains observed in this tab (first seen: ${hops.length} hops across ${domains.size} domains); further chains are counted as occurrences.`,
       significance:
         "Documented delivery chains pass through several ad-tech hops; long chains add context to other signals but are routine on their own.",
       evidence: [
