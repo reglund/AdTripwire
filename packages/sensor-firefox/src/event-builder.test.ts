@@ -101,6 +101,7 @@ describe("scope", () => {
     expect(isNoasPath("/getAd")).toBe(true);
     expect(isNoasPath("/cplatform/getAd")).toBe(true);
     expect(isNoasPath("/getAd/")).toBe(true);
+    expect(isNoasPath("/getAd/deeper")).toBe(false);
     expect(isNoasPath("/getAdvanced")).toBe(false);
     expect(isNoasPath("/getad")).toBe(false);
     expect(isNoasPath("/x/getAd")).toBe(false);
@@ -194,5 +195,6 @@ describe("scope", () => {
     expect(patterns).not.toContain("*://c2.synthetic.test/*");
     expect(patterns).toContain("*://*/getAd");
     expect(patterns).toContain("*://*/cplatform/getAd?*");
+    expect(patterns).not.toContain("*://*/getAd/*");
   });
 });

@@ -26,6 +26,8 @@ const LIMITATION_SENTENCES: Record<ObservationLimitation, string> = {
   incognito_excluded: "Private browsing windows are excluded from observation.",
   sensor_restarted_during_request:
     "The sensor restarted during some requests, so those observations may be incomplete.",
+  response_body_skipped_budget:
+    "The response body was not inspected because too many inspections were already in progress (memory budget).",
 };
 
 const FIXED_LIMITATIONS: readonly string[] = [

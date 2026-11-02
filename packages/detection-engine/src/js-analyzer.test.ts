@@ -154,3 +154,24 @@ describe("analyzeJavaScript", () => {
     expect(performance.now() - start).toBeLessThan(1000);
   });
 });
+
+describe("ReDoS resistance (review H1)", () => {
+  it("analyses pathological whitespace-heavy inputs within a time budget", async () => {
+    const { analyzeJavaScript } = await import("./js-analyzer.js");
+    const cases = [
+      "width:1px" + " ".repeat(262_000) + "X",
+      "postMessage(" + " ".repeat(262_000) + "x",
+      "setInterval(" + " ".repeat(262_000) + "x",
+      "createElement(" + "'".repeat(100_000) + "iframe",
+      '"'.repeat(262_000),
+      "\\x41".repeat(60_000),
+      "a ".repeat(131_000),
+    ];
+    for (const input of cases) {
+      const t0 = performance.now();
+      analyzeJavaScript(input);
+      const ms = performance.now() - t0;
+      expect(ms, `input starting ${input.slice(0, 12)} took ${ms.toFixed(0)} ms`).toBeLessThan(300);
+    }
+  });
+});

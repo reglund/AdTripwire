@@ -56,17 +56,33 @@ export interface ChainSearch {
  */
 export function findChain(e: NormalizedEvent, ctx: RuleContext): ChainSearch {
   const related = relatedEvents(e, ctx);
+  // Single forward pass: for each index, the most recent NOAS contact strictly before it.
+  // Keeps the search O(R) per step-3 event instead of O(K·R).
+  const lastS1Before: number[] = new Array<number>(related.length);
+  let lastS1 = -1;
+  for (let i = 0; i < related.length; i++) {
+    lastS1Before[i] = lastS1;
+    if (isNoasContact(related[i]!, ctx)) lastS1 = i;
+  }
   let latestS2: NormalizedEvent | undefined;
   for (let i = related.length - 1; i >= 0; i--) {
     const s2 = related[i]!;
     if (!isStep2(s2, ctx)) continue;
     latestS2 ??= s2;
-    for (let j = i - 1; j >= 0; j--) {
-      const s1 = related[j]!;
-      if (isNoasContact(s1, ctx)) return { s1, s2 };
-    }
+    const j = lastS1Before[i]!;
+    if (j >= 0) return { s1: related[j]!, s2 };
   }
   return latestS2 ? { s2: latestS2 } : {};
+}
+
+/**
+ * True when the step-1 host is the page's own top-level host. The documented NOAS servers are
+ * third-party ad infrastructure; a first-party "/getAd" is more likely a spoof or an unrelated
+ * endpoint, so chain rules downgrade severity in that case.
+ */
+export function isFirstPartyStep(s: NormalizedEvent): boolean {
+  const top = s.frameContext.topHostname ?? s.frameContext.documentHostname;
+  return top !== undefined && top === s.destination.hostname;
 }
 
 export function secondsBetween(a: NormalizedEvent, b: NormalizedEvent): number {

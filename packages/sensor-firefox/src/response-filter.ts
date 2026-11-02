@@ -164,7 +164,8 @@ export function attachPassThroughInspector(filter: StreamFilterLike, opts: Attac
 
   filter.onstop = () => {
     const t0 = now();
-    release("disconnect");
+    // All data has been written through; close() is the documented end-of-stream call.
+    release("close");
     passThroughMs += now() - t0;
     finish();
   };

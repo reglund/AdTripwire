@@ -298,12 +298,18 @@ export class DetectionEngine {
       opts.exposure ??
       (snapshot.exposure ? MemoryExposureStore.fromJSON(snapshot.exposure) : undefined);
     const engine = new DetectionEngine({ ...opts, ...(exposure ? { exposure } : {}) });
-    if (snapshot && snapshot.version === 1) {
+    // A snapshot from a different ruleset is discarded: dedup keys and rule ids may not match.
+    if (snapshot && snapshot.version === 1 && snapshot.rulesetVersion === engine.rulesetVersion) {
       for (const e of Array.isArray(snapshot.events) ? snapshot.events : []) {
         if (isEventLike(e)) engine.#window.add(e);
       }
       for (const d of Array.isArray(snapshot.dedup) ? snapshot.dedup : []) {
-        if (d && typeof d.key === "string" && typeof d.firstFired === "number" && d.detection) {
+        if (
+          d &&
+          typeof d.key === "string" &&
+          typeof d.firstFired === "number" &&
+          isDetectionLike(d.detection)
+        ) {
           engine.#dedup.set(d.key, { firstFired: d.firstFired, detection: d.detection });
         }
       }
@@ -315,6 +321,24 @@ export class DetectionEngine {
 
 function structuredCloneSafe<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
+}
+
+const SEVERITIES = new Set(["informational", "suspicious", "elevated", "high_priority"]);
+
+function isDetectionLike(d: unknown): d is Detection {
+  if (!d || typeof d !== "object") return false;
+  const o = d as Record<string, unknown>;
+  return (
+    typeof o.detectionId === "string" &&
+    typeof o.ruleId === "string" &&
+    typeof o.dedupKey === "string" &&
+    typeof o.timestamp === "number" &&
+    typeof o.occurrenceCount === "number" &&
+    SEVERITIES.has(o.severity as string) &&
+    Array.isArray(o.eventIds) &&
+    o.eventIds.every((x) => typeof x === "string") &&
+    Array.isArray(o.subjectHostnames)
+  );
 }
 
 function isEventLike(e: unknown): e is NormalizedEvent {

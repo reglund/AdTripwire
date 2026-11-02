@@ -48,25 +48,27 @@ const log = (level: "info" | "warn" | "error", msg: string) => {
 
 class Background {
   private store = new LocalStore();
-  private matcher!: IndicatorMatcher;
-  private sets: IndicatorSet[] = [];
-  private engine!: DetectionEngine;
-  private capabilities!: SensorCapabilities;
-  private sensor: WebRequestSensor | undefined;
+  private readonly matcher: IndicatorMatcher;
+  private readonly sets: IndicatorSet[] = [];
+  private engine: DetectionEngine | undefined;
+  private capabilities: SensorCapabilities = {
+    browser: "firefox",
+    capabilities: [],
+    notes: ["capabilities not yet detected"],
+  };
+  private readonly sensor: WebRequestSensor;
   private exposure = new MemoryExposureStore();
   private metrics: Metrics = { ...EMPTY_METRICS };
   private snapshotTimer: ReturnType<typeof setTimeout> | undefined;
-  private ready: Promise<void>;
+  private readonly ready: Promise<void>;
+  private isReady = false;
+  private deleting = false;
+  /** Events observed before async init finished; drained into the engine on ready. */
+  private readonly preReady: NormalizedEvent[] = [];
+  private static readonly PRE_READY_MAX = 500;
 
   constructor() {
-    this.ready = this.init();
-  }
-
-  private async init(): Promise<void> {
-    await this.store.load();
-    this.metrics = await this.store.getMetrics();
-    this.capabilities = await detectCapabilities();
-
+    // Everything needed to register listeners is synchronous: indicator sets are bundled.
     this.sets = [...BUNDLED_INDICATOR_SETS];
     if (__ADTRIPWIRE_DEV__) {
       const v = validateIndicatorSet(syntheticSet);
@@ -76,6 +78,51 @@ class Background {
       } else log("error", `synthetic set invalid: ${v.errors.join("; ")}`);
     }
     this.matcher = new IndicatorMatcher(this.sets);
+
+    const patterns = buildInspectionMatchPatterns(this.sets);
+    if (__ADTRIPWIRE_DEV__) {
+      const extra = new Set<string>(patterns);
+      for (const s of this.sets)
+        if (s.meta.synthetic) for (const r of s.indicators) addIndicatorPatterns(extra, r);
+      patterns.splice(0, patterns.length, ...extra);
+    }
+
+    // Event pages: listeners must be registered synchronously at top level so Firefox can
+    // wake the page for them. Callbacks consult current state lazily.
+    this.sensor = new WebRequestSensor({
+      browserName: "firefox",
+      inspectionMatchPatterns: patterns,
+      shouldObserve: (ev) => this.shouldObserve(ev),
+      shouldInspect: (ev) =>
+        this.isReady &&
+        this.store.getSettings().monitoring.responseInspectionEnabled &&
+        (this.matcher.match(ev.destination.hostname, ev.destination.pathPattern).length > 0 ||
+          isNoasPath(ev.destination.pathPattern)),
+      analyzer: (text) => analyzeJavaScript(text),
+      maxInspectBytes: () => this.store.getSettings().monitoring.responseInspectionMaxBytes,
+      excludeIncognito: () => this.store.getSettings().monitoring.excludeIncognito,
+      enabled: () => this.store.getSettings().monitoring.enabled && !this.deleting,
+      onEvent: (ev) => this.onEvent(ev),
+      onLog: log,
+      onMetrics: (m) => {
+        this.metrics.inspections++;
+        this.metrics.inspectedBytes += m.bytes;
+        this.metrics.passThroughMsTotal += m.passThroughMs;
+        this.metrics.analysisMsTotal += m.analysisMs;
+      },
+    });
+    this.sensor.register();
+    browser.alarms.onAlarm.addListener((a) => {
+      if (a.name === ALARM_RETENTION) void this.ready.then(() => this.runRetention());
+    });
+
+    this.ready = this.init();
+  }
+
+  private async init(): Promise<void> {
+    await this.store.load();
+    this.metrics = await this.store.getMetrics();
+    this.capabilities = await detectCapabilities();
 
     let exposure = new MemoryExposureStore();
     const expSnap = await this.store.getExposureSnapshot();
@@ -102,45 +149,14 @@ class Background {
     }
     if (!restored) this.engine = new DetectionEngine(engineOpts);
 
-    const patterns = buildInspectionMatchPatterns(this.sets);
-    if (__ADTRIPWIRE_DEV__) {
-      const extra = new Set<string>(patterns);
-      for (const s of this.sets)
-        if (s.meta.synthetic) for (const r of s.indicators) addIndicatorPatterns(extra, r);
-      patterns.splice(0, patterns.length, ...extra);
-    }
-
-    this.sensor = new WebRequestSensor({
-      browserName: this.capabilities.browser,
-      inspectionMatchPatterns: patterns,
-      shouldObserve: (ev) => this.shouldObserve(ev),
-      shouldInspect: (ev) =>
-        this.store.getSettings().monitoring.responseInspectionEnabled &&
-        (this.matcher.match(ev.destination.hostname, ev.destination.pathPattern).length > 0 ||
-          isNoasPath(ev.destination.pathPattern)),
-      analyzer: (text) => analyzeJavaScript(text),
-      maxInspectBytes: () => this.store.getSettings().monitoring.responseInspectionMaxBytes,
-      excludeIncognito: () => this.store.getSettings().monitoring.excludeIncognito,
-      enabled: () => this.store.getSettings().monitoring.enabled,
-      onEvent: (ev) => this.onEvent(ev),
-      onLog: log,
-      onMetrics: (m) => {
-        this.metrics.inspections++;
-        this.metrics.inspectedBytes += m.bytes;
-        this.metrics.passThroughMsTotal += m.passThroughMs;
-        this.metrics.analysisMsTotal += m.analysisMs;
-      },
-    });
-    this.sensor.register();
-
     browser.alarms.create(ALARM_RETENTION, { periodInMinutes: 60 });
-    browser.alarms.onAlarm.addListener((a) => {
-      if (a.name === ALARM_RETENTION) this.runRetention();
-    });
     this.runRetention();
+    this.isReady = true;
+    const queued = this.preReady.splice(0);
+    for (const ev of queued) this.onEvent(ev);
     log(
       "info",
-      `ready: ${this.matcher.size} indicators, ruleset ${this.engine.rulesetVersion}, caps=${this.capabilities.capabilities.join(",")}`,
+      `ready: ${this.matcher.size} indicators, ruleset ${this.eng.rulesetVersion}, caps=${this.capabilities.capabilities.join(",")}${queued.length ? `, replayed ${queued.length} early events` : ""}`,
     );
   }
 
@@ -159,9 +175,15 @@ class Background {
   }
 
   private onEvent(ev: NormalizedEvent): void {
+    if (this.deleting) return;
+    if (!this.isReady || !this.engine) {
+      if (this.preReady.length < Background.PRE_READY_MAX) this.preReady.push(ev);
+      return;
+    }
+    const engine = this.engine;
     const t0 = performance.now();
     try {
-      const { detections, updated } = this.engine.ingest(ev);
+      const { detections, updated } = engine.ingest(ev);
       this.metrics.eventsIngested++;
       for (const d of detections) {
         const supporting = this.eventsById(d.eventIds);
@@ -188,7 +210,13 @@ class Background {
 
   private eventsById(ids: string[]): NormalizedEvent[] {
     const want = new Set(ids);
-    return this.engine.window.recent().filter((e) => want.has(e.eventId));
+    return this.engine ? this.engine.window.recent().filter((e) => want.has(e.eventId)) : [];
+  }
+
+  /** The engine after `ready`; message handlers await `ready` first. */
+  private get eng(): DetectionEngine {
+    if (!this.engine) throw new Error("engine not initialised");
+    return this.engine;
   }
 
   private engineOptions(settings: MonitoringSettings) {
@@ -205,6 +233,7 @@ class Background {
     if (this.snapshotTimer) return;
     this.snapshotTimer = setTimeout(() => {
       this.snapshotTimer = undefined;
+      if (!this.engine) return;
       this.engine.pruneWindow();
       browser.storage.session
         .set({ [SESSION_KEY_ENGINE]: this.engine.snapshot() })
@@ -251,7 +280,7 @@ class Background {
       capabilities: this.capabilities,
       counts,
       indicatorSets: this.sets.map((x) => x.meta),
-      rulesetVersion: this.engine.rulesetVersion,
+      rulesetVersion: this.eng.rulesetVersion,
       productVersion: __ADTRIPWIRE_VERSION__,
     };
     if (significant) {
@@ -290,7 +319,7 @@ class Background {
         const s = await this.store.updateSettings(req.patch);
         // Settings affect capability gating and window size: rebuild from the current snapshot.
         this.engine = DetectionEngine.restore(
-          this.engine.snapshot(),
+          this.eng.snapshot(),
           this.engineOptions(s.monitoring),
         );
         return s;
@@ -305,7 +334,7 @@ class Background {
         const exp = buildEvidenceExport({
           productVersion: __ADTRIPWIRE_VERSION__,
           browser: this.capabilities,
-          rulesetVersion: this.engine.rulesetVersion,
+          rulesetVersion: this.eng.rulesetVersion,
           indicatorSets: this.sets.map((x) => x.meta),
           detections,
           events,
@@ -317,10 +346,22 @@ class Background {
         };
       }
       case "delete_all_data": {
-        await this.store.deleteAll();
-        this.exposure = new MemoryExposureStore();
-        this.engine = new DetectionEngine(this.engineOptions(this.store.getSettings().monitoring));
-        this.metrics = { ...EMPTY_METRICS, startedAt: Date.now() };
+        // Stop ingesting first so nothing lands in the store between clear and swap.
+        this.deleting = true;
+        try {
+          this.exposure = new MemoryExposureStore();
+          this.engine = new DetectionEngine(
+            this.engineOptions(this.store.getSettings().monitoring),
+          );
+          if (this.snapshotTimer) {
+            clearTimeout(this.snapshotTimer);
+            this.snapshotTimer = undefined;
+          }
+          await this.store.deleteAll();
+          this.metrics = { ...EMPTY_METRICS, startedAt: Date.now() };
+        } finally {
+          this.deleting = false;
+        }
         return { deleted: true };
       }
       case "request_host_permission": {
@@ -328,7 +369,7 @@ class Background {
         return { granted };
       }
       case "list_rules":
-        return this.engine.listRules();
+        return this.eng.listRules();
     }
   }
 }

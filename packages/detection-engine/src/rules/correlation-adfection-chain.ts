@@ -8,6 +8,7 @@ import {
   isStep3,
   linkEvidence,
   step2Description,
+  isFirstPartyStep,
 } from "./correlation-common.js";
 
 export const definition: RuleDefinition = {
@@ -43,11 +44,17 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   const malicious = ctx
     .indicatorMatches(event)
     .filter((m) => m.indicator.classification === "malicious");
+  // The documented NOAS servers are third-party ad infrastructure. When step 1 is the page's
+  // own host, the pattern is more likely an unrelated endpoint or a page trying to trigger
+  // alerts, so the priority is lowered while the evidence is still recorded.
+  const firstPartyStart = isFirstPartyStep(s1);
   return [
     buildDetection(definition, ctx, {
       subject: `${event.tabId ?? event.correlationId ?? ""}|${host}`,
-      confidenceRationale:
-        "All three steps were observed directly and occurred in the documented order. The relationships between them are partly inferred from tab and timing; temporal proximity does not prove causation, and nothing here shows that spyware executed.",
+      ...(firstPartyStart ? { severity: "elevated" as const, confidence: "low" as const } : {}),
+      confidenceRationale: firstPartyStart
+        ? "The three steps occurred in the documented order, but the ad-selection request went to the page's own host rather than third-party ad infrastructure; this weakens the match to the documented chain and could be deliberately staged by a page."
+        : "All three steps were observed directly and occurred in the documented order. The relationships between them are partly inferred from tab and timing; temporal proximity does not prove causation, and nothing here shows that spyware executed.",
       summary:
         "A sequence of events consistent with the documented AdFection delivery chain was observed: ad-selection request, then a script response, then contact with infrastructure documented as malicious.",
       significance:

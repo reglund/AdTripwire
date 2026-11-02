@@ -3,10 +3,11 @@ import type { IndicatorRecord, IndicatorSet } from "@adtripwire/shared";
 /** NOAS/getAd path segments documented by Citizen Lab (Appendix C). Case-sensitive. */
 export const NOAS_PATH_PATTERNS = ["/getAd", "/cplatform/getAd"] as const;
 
+/** Exact NOAS segments with an optional trailing slash; mirrors the engine's predicate. */
 export function isNoasPath(pathPattern: string): boolean {
-  for (const p of NOAS_PATH_PATTERNS) {
-    if (pathPattern === p || pathPattern.startsWith(p + "/")) return true;
-  }
+  const p =
+    pathPattern.length > 1 && pathPattern.endsWith("/") ? pathPattern.slice(0, -1) : pathPattern;
+  for (const n of NOAS_PATH_PATTERNS) if (p === n) return true;
   return false;
 }
 
@@ -19,8 +20,9 @@ export function buildInspectionMatchPatterns(sets: IndicatorSet[]): string[] {
   const patterns = new Set<string>();
   for (const p of NOAS_PATH_PATTERNS) {
     patterns.add(`*://*${p}`);
-    patterns.add(`*://*${p}/*`);
     patterns.add(`*://*${p}?*`);
+    patterns.add(`*://*${p}/`);
+    patterns.add(`*://*${p}/?*`);
   }
   for (const set of sets) {
     if (set.meta.synthetic) continue; // synthetic sets are only wired in explicitly by tests/dev builds

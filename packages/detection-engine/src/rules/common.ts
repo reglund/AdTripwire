@@ -48,6 +48,8 @@ const LIMITATION_TEXT: Record<ObservationLimitation, string> = {
   incognito_excluded: "Private-browsing activity is excluded from observation.",
   sensor_restarted_during_request:
     "The sensor restarted during this request; earlier stages may be missing.",
+  response_body_skipped_budget:
+    "The response body was not inspected because too many inspections were already in progress (memory budget).",
 };
 
 const CAPABILITY_TEXT: Record<SensorCapability, string> = {

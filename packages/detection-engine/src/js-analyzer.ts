@@ -232,7 +232,9 @@ export function analyzeJavaScript(text: string, opts?: { maxChars?: number }): J
   const iframeCreate = /createElement\s*\(\s*["'`]iframe["'`]\s*\)/i.test(src);
   add("js.iframe_create", iframeCreate);
 
-  const cssOnePx = /width\s*:\s*1px\s*;?\s*height\s*:\s*1px/i.test(src);
+  // Bounded separator between the two declarations: adjacent unbounded `\s*` groups around an
+  // optional `;` backtrack quadratically on long whitespace runs (ReDoS).
+  const cssOnePx = /width\s*:\s*1px[\s;]{0,8}height\s*:\s*1px/i.test(src);
   const w1 = /width["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/i.test(src);
   const h1 = /height["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/i.test(src);
   add("js.iframe_1x1", cssOnePx || (w1 && h1 && lower.includes("iframe")));

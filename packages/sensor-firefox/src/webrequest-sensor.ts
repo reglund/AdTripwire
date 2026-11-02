@@ -7,7 +7,7 @@ import {
   type JsAnalyzer,
   type StreamFilterLike,
 } from "./response-filter.js";
-import { INSPECTABLE_TYPES, isInspectableContentType, isNoasPath, mediaTypeOf } from "./scope.js";
+import { INSPECTABLE_TYPES, isInspectableContentType, mediaTypeOf } from "./scope.js";
 
 export interface SensorOptions {
   browserName: BrowserName;
@@ -37,6 +37,9 @@ interface Pending {
 
 const PENDING_TTL_MS = 60_000;
 const PENDING_MAX = 5000;
+/** Total buffered inspection memory allowed across concurrent filters. */
+const INSPECTION_BUDGET_BYTES = 32 * 1024 * 1024;
+const INSPECTION_MIN_CONCURRENT = 2;
 
 /**
  * Firefox webRequest sensor. Registers:
@@ -46,6 +49,8 @@ const PENDING_MAX = 5000;
  */
 export class WebRequestSensor {
   private readonly pending = new Map<string, Pending>();
+  private activeFilters = 0;
+  private skippedForBudget = 0;
   private registered = false;
   private sweepTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -101,6 +106,15 @@ export class WebRequestSensor {
     this.sweepTimer = setInterval(() => this.sweep(Date.now()), 15_000);
   }
 
+  /** Diagnostics for the dashboard and tests. */
+  get stats(): { pending: number; activeFilters: number; skippedForBudget: number } {
+    return {
+      pending: this.pending.size,
+      activeFilters: this.activeFilters,
+      skippedForBudget: this.skippedForBudget,
+    };
+  }
+
   dispose(): void {
     if (this.sweepTimer) clearInterval(this.sweepTimer);
   }
@@ -116,6 +130,13 @@ export class WebRequestSensor {
     const ev = buildEvent(this.opts.browserName, "started", d);
     if (!ev) return;
     if (!this.opts.shouldObserve(ev)) return;
+    const existing = this.pending.get(d.requestId);
+    if (existing) {
+      // Same requestId seen again (redirect or listener ordering): keep inspection state,
+      // do not emit a duplicate start.
+      existing.started = ev;
+      return;
+    }
     if (this.pending.size >= PENDING_MAX) this.sweep(Date.now(), true);
     this.pending.set(d.requestId, { started: ev, inspecting: false, createdAt: Date.now() });
     this.opts.onEvent(ev);
@@ -133,21 +154,40 @@ export class WebRequestSensor {
       const started = p?.started ?? buildEvent(this.opts.browserName, "started", d);
       if (!started) return undefined;
       if (!INSPECTABLE_TYPES.has(started.resourceType ?? "other")) return undefined;
-      if (!this.opts.shouldInspect(started) && !isNoasPath(started.destination.pathPattern))
-        return undefined;
+      // shouldInspect is the single gate (it already covers NOAS paths and the user's
+      // "response inspection" setting); nothing bypasses it.
+      if (!this.opts.shouldInspect(started)) return undefined;
       const entry: Pending = p ?? { started, inspecting: false, createdAt: Date.now() };
       if (!p) {
         this.pending.set(d.requestId, entry);
         if (this.opts.shouldObserve(started)) this.opts.onEvent(started);
       }
+      if (entry.inspecting) return undefined; // a filter is already attached to this request
+      const maxBytes = this.opts.maxInspectBytes();
+      const maxConcurrent = Math.max(
+        INSPECTION_MIN_CONCURRENT,
+        Math.floor(INSPECTION_BUDGET_BYTES / Math.max(1, maxBytes)),
+      );
+      if (this.activeFilters >= maxConcurrent) {
+        this.skippedForBudget++;
+        entry.started.observationLimitations.push("response_body_skipped_budget");
+        if (this.skippedForBudget % 50 === 1)
+          this.opts.onLog?.(
+            "warn",
+            `inspection skipped: ${this.activeFilters} filters active (budget)`,
+          );
+        return undefined;
+      }
       entry.inspecting = true;
+      this.activeFilters++;
       const filter = filterApi(d.requestId);
       const requestId = d.requestId;
       attachPassThroughInspector(filter, {
-        maxBytes: this.opts.maxInspectBytes(),
+        maxBytes,
         analyzer: this.opts.analyzer,
         onLog: (lvl, msg) => this.opts.onLog?.(lvl, `[${requestId}] ${msg}`),
         onResult: (result) => {
+          this.activeFilters = Math.max(0, this.activeFilters - 1);
           const cur = this.pending.get(requestId);
           this.opts.onMetrics?.({
             passThroughMs: result.passThroughMs,

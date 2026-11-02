@@ -121,6 +121,7 @@ export type EventType =
 export type ObservationLimitation =
   | "no_response_body_access"
   | "response_body_truncated"
+  | "response_body_skipped_budget"
   | "response_body_unsupported_encoding"
   | "frame_ancestry_unavailable"
   | "url_classification_unavailable"

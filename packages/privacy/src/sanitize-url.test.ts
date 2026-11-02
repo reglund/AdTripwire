@@ -122,7 +122,7 @@ describe("secrets are dropped", () => {
     expect(r.redacted).toBe(true);
   });
   it("truncates long non-token names to 40 chars and marks redacted", () => {
-    const name = "utm.source.campaign.medium.content.term.extra";
+    const name = "utm.source_campaign_medium_content_term_extra";
     const r = must(`https://a.example/p?${name}=1`);
     expect(r.queryParamNames).toEqual([name.slice(0, 40)]);
     expect(r.redacted).toBe(true);
@@ -188,9 +188,9 @@ describe("pathPattern", () => {
   it("replaces segments longer than 32 chars", () => {
     const seg = "word-".repeat(8) + "w"; // 41 chars, has hyphens, not hex
     expect(must(`https://a.example/${seg}/x`).pathPattern).toMatch(/^\/\{(seg|id)\}\/x$/);
-    const dotted33 = "ab.".repeat(11); // dots keep it out of the base64url token class
+    const dotted33 = "ab.".repeat(11); // dotted multi-part tokens of this length are ids
     const dotted32 = "ab.".repeat(10) + "ab";
-    expect(must(`https://a.example/${dotted33}`).pathPattern).toBe("/{seg}");
+    expect(must(`https://a.example/${dotted33}`).pathPattern).toMatch(/^\/\{(seg|id)\}$/);
     expect(must(`https://a.example/${dotted32}`).pathPattern).toBe(`/${dotted32}`);
     expect(must(`https://a.example/${"a".repeat(33)}`).pathPattern).toBe("/{id}");
   });
@@ -309,5 +309,19 @@ describe("token-like parameter names", () => {
   it("keeps ordinary short names", () => {
     const u = sanitizeUrl("https://x.synthetic.test/p?w=300&h=250&slot=top")!;
     expect(u.queryParamNames).toEqual(["h", "slot", "w"]);
+  });
+});
+
+describe("sanitizer hardening (review L1)", () => {
+  it("masks contact-like and JWT-like parameter names", () => {
+    const u = sanitizeUrl(
+      "https://x.synthetic.test/p?user@example.com&eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c&ok=1",
+    )!;
+    expect(u.queryParamNames).toEqual(["ok", "{token}"]);
+    expect(JSON.stringify(u)).not.toMatch(/example\.com|eyJ/);
+  });
+  it("replaces long mixed letter+digit path slugs but keeps file-like names", () => {
+    const u = sanitizeUrl("https://x.synthetic.test/u/user2024report/static/jquery-3.7.1.min.js")!;
+    expect(u.pathPattern).toBe("/u/{id}/static/jquery-3.7.1.min.js");
   });
 });

@@ -29,6 +29,23 @@ function isTokenLike(segment: string): boolean {
   }
   // Key=value style path parameters (e.g. ";jsessionid=...") carry values.
   if (segment.includes("=")) return true;
+  // Contact-like or dotted tokens (emails, JWT-style "a.b.c") are never safe to keep.
+  if (segment.includes("@")) return true;
+  // File-like names ("jquery-3.7.1.min.js") keep their identity; the checks below target slugs.
+  const fileLike = /\.[a-z0-9]{1,5}$/i.test(segment);
+  if (segment.length >= 12 && !fileLike) {
+    // Long mixed letter+digit slugs (session ids, usernames with numbers) are treated as ids.
+    let letters = 0;
+    let digits = 0;
+    for (let i = 0; i < segment.length; i++) {
+      const c = segment.charCodeAt(i);
+      if (c >= 48 && c <= 57) digits++;
+      else if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) letters++;
+    }
+    if (letters > 0 && digits >= 2) return true;
+  }
+  // Dotted multi-part tokens (JWT-like "a.b.c") are ids unless they look like file names.
+  if (segment.length >= 20 && !fileLike && segment.split(".").length >= 3) return true;
   return false;
 }
 
