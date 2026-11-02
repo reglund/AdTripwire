@@ -6,7 +6,7 @@
  *   node scripts/release-package.mjs --check    additionally rebuild and verify byte-identity
  *
  * Output in dist-release/: adtripwire-<browser>[-assist]-<version>.zip, adtripwire-source-<version>.zip
- * (git archive of HEAD), sbom.cdx.json, SHA256SUMS. Zips use the deterministic writer in zip.mjs
+ * (the committed tree), sbom.cdx.json, SHA256SUMS. All zips use the deterministic writer in zip.mjs
  * (sorted entries, fixed timestamps), so the same commit yields the same bytes on any machine
  * with the same Node and esbuild versions (pinned by the lockfile).
  */
@@ -57,16 +57,21 @@ function packageAll() {
       artifacts.set(name, buildVariant(app, assist));
     }
   }
-  // Source archive for store review: exactly the committed tree.
+  // Source archive for store review: exactly the committed tree, written with the same
+  // deterministic zip writer (git archive's zip output varies between git/zlib versions).
+  if (execFileSync("git", ["status", "--porcelain"], { cwd: root }).toString().trim() !== "")
+    throw new Error("working tree is not clean; the source archive must match the commit");
+  const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root })
+    .toString()
+    .split("\0")
+    .filter((f) => f.length > 0);
   artifacts.set(
     `adtripwire-source-${version}.zip`,
-    execFileSync(
-      "git",
-      ["archive", "--format=zip", "-9", `--prefix=adtripwire-${version}/`, "HEAD"],
-      {
-        cwd: root,
-        maxBuffer: 256 * 1024 * 1024,
-      },
+    buildZip(
+      tracked.map((f) => ({
+        path: `adtripwire-${version}/${f}`,
+        data: readFileSync(join(root, f)),
+      })),
     ),
   );
   artifacts.set("sbom.cdx.json", Buffer.from(JSON.stringify(buildSbom(root), null, 2) + "\n"));

@@ -12,7 +12,8 @@ sorted entries and fixed timestamps (`scripts/zip.mjs`) instead of relying on fi
    twice, verifies byte-identity, then writes `dist-release/`:
    - `adtripwire-firefox-<v>.zip`, `adtripwire-chromium-<v>.zip`
    - `adtripwire-firefox-assist-<v>.zip`, `adtripwire-chromium-assist-<v>.zip`
-   - `adtripwire-source-<v>.zip` (git archive of HEAD, for store source review)
+   - `adtripwire-source-<v>.zip` (the committed tree, for store source review; the packager
+     refuses to run on a dirty tree)
    - `sbom.cdx.json` (CycloneDX 1.5: product, bundled data, build toolchain; zero runtime deps)
    - `SHA256SUMS`
 3. Commit, tag `v<version>`, push the tag. The `Release` workflow repeats every check, runs
@@ -38,5 +39,8 @@ sorted entries and fixed timestamps (`scripts/zip.mjs`) instead of relying on fi
 ## Not done in this repository
 
 Store accounts, signing credentials and the actual uploads belong to the maintainer; none of
-this has been executed here. The release workflow has not been exercised on GitHub yet (no
-tag pushed); it runs the same commands as `pnpm release:check` locally.
+this has been executed here. The release workflow first ran for v0.2.0 on 2026-11-02: all
+four extension zips and the SBOM matched the local `SHA256SUMS` byte for byte. The v0.2.0
+source archive was still produced with `git archive`, whose zip output differs between git
+versions, so only its contents, not its hash, match; from the next tag the source archive is
+written with the deterministic writer as well.
