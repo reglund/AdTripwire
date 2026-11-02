@@ -33,7 +33,17 @@ for (const f of readdirSync(DIR)
     runs.push({
       file: f,
       ...j,
-      variant: `${j.browser}${j.device ? ` / ${j.device}` : j.mobile ? " / mobile" : ""}`,
+      variant:
+        `${j.browser}${j.device ? ` / ${j.device}` : j.mobile ? " / mobile" : ""}` +
+        `${j.etpOff ? " / ETP off" : ""}` +
+        `${
+          j.sites && !/exposure-sites\.txt$/.test(j.sites)
+            ? ` / ${String(j.sites)
+                .split("/")
+                .pop()
+                .replace(/\.txt$/, "")}`
+            : ""
+        }`,
     });
   } catch {
     /* skip unreadable files */

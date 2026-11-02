@@ -45,6 +45,9 @@ const DEVICE_SLUG = DEVICE.toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "");
 const HEADED = flag("headed");
+// --etp-off: Firefox only; disables Enhanced Tracking Protection (tracking-content blocking and
+// third-party cookie partitioning) to see what the default protection hides.
+const ETP_OFF = flag("etp-off");
 const PROFILE = arg(
   "profile",
   join(SNAP_COMMON, `adtripwire-exposure-profile${MOBILE ? `-${DEVICE_SLUG}` : ""}`),
@@ -240,6 +243,17 @@ async function launch() {
     extraPrefsFirefox: {
       "intl.accept_languages": ACCEPT_LANGUAGE,
       "intl.locale.requested": "nb-NO",
+      ...(ETP_OFF
+        ? {
+            "browser.contentblocking.category": "custom",
+            "privacy.trackingprotection.enabled": false,
+            "privacy.trackingprotection.pbmode.enabled": false,
+            "privacy.trackingprotection.socialtracking.enabled": false,
+            "privacy.trackingprotection.cryptomining.enabled": false,
+            "privacy.trackingprotection.fingerprinting.enabled": false,
+            "network.cookie.cookieBehavior": 0,
+          }
+        : {}),
     },
   });
   initialPages = await browser.pages();
@@ -510,6 +524,8 @@ async function main() {
           date: today,
           browser: BROWSER,
           device: DEVICE || null,
+          sites: SITES_PATH,
+          etpOff: ETP_OFF,
           seconds: SECONDS,
           totals,
           results,

@@ -1,0 +1,16 @@
+# Russian-language publishers that commonly carry the Yandex Advertising Network. Follow-up list
+# for the 2026-11-02 observation of a Yandex ad frame cookie-syncing with events.myweb3id.io
+# (Discover-Tech infrastructure) on ria.ru. Mainstream sites only; used to test whether the
+# contact repeats and whether Firefox's tracking protection suppresses it.
+https://ria.ru/
+https://lenta.ru/
+https://www.gazeta.ru/
+https://www.rbc.ru/
+https://www.kp.ru/
+https://www.mk.ru/
+https://iz.ru/
+https://www.sports.ru/
+https://www.championat.com/
+https://www.kinopoisk.ru/
+https://habr.com/ru/
+https://www.drom.ru/
