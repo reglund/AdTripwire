@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "id": "synthetic-test",
+    "name": "AdTripwire synthetic test indicators",
+    "version": "1.0.0",
+    "asOf": "2026-11-02",
+    "license": "Apache-2.0",
+    "synthetic": true,
+    "sources": [
+      {
+        "name": "AdTripwire test fixtures",
+        "url": "https://github.com/reglund/AdTripwire",
+        "published": "2026-11-02"
+      }
+    ],
+    "description": "Reserved-TLD names (.test, .invalid) for automated and manual verification. Never ship enabled in production."
+  },
+  "indicators": [
+    {
+      "id": "syn-0001",
+      "indicator": "c2.synthetic-adfection.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "malicious",
+      "confidence": "high",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "c2",
+      "notes": "Synthetic C2 host."
+    },
+    {
+      "id": "syn-0002",
+      "indicator": "validator.synthetic-adfection.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "malicious",
+      "confidence": "high",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "validator",
+      "notes": "Synthetic validator host."
+    },
+    {
+      "id": "syn-0003",
+      "indicator": "noas.synthetic-adfection.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "surveillance",
+      "confidence": "high",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "noas",
+      "notes": "Synthetic NOAS/getAd host."
+    },
+    {
+      "id": "syn-0004",
+      "indicator": "synthetic-dsp.test",
+      "indicatorType": "domain",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "surveillance",
+      "confidence": "medium",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "operator-infrastructure",
+      "notes": "Synthetic apex domain; matches all subdomains."
+    },
+    {
+      "id": "syn-0005",
+      "indicator": "sync.synthetic-tracking.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "surveillance",
+      "confidence": "high",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "tracking",
+      "notes": "Synthetic cookie-sync host."
+    },
+    {
+      "id": "syn-0006",
+      "indicator": "corp.synthetic-vendor.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "contextual",
+      "confidence": "medium",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": true,
+      "role": "corporate",
+      "notes": "Synthetic contextual lead."
+    },
+    {
+      "id": "syn-0007",
+      "indicator": "disabled.synthetic-adfection.test",
+      "indicatorType": "hostname",
+      "source": "AdTripwire fixtures",
+      "sourceUrl": "https://github.com/reglund/AdTripwire",
+      "campaign": "synthetic",
+      "classification": "malicious",
+      "confidence": "high",
+      "firstReported": "2026-11-02",
+      "lastReviewed": "2026-11-02",
+      "enabled": false,
+      "role": "c2",
+      "notes": "Disabled entry; must never match."
+    }
+  ]
+}

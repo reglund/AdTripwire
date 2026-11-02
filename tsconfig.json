@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/indicators" },
+    { "path": "packages/privacy" },
+    { "path": "packages/detection-engine" },
+    { "path": "packages/sensor-firefox" },
+    { "path": "apps/extension-firefox" }
+  ]
+}

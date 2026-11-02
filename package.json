@@ -1,0 +1,40 @@
+{
+  "name": "adtripwire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Detect the threat behind the ad. Privacy-preserving browser sensor for advertising-based surveillance and spyware delivery.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './packages/**' run build && pnpm --filter @adtripwire/extension-firefox run build",
+    "typecheck": "tsc -b tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:perf": "vitest run --config vitest.perf.config.ts",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "ext:lint": "pnpm --filter @adtripwire/extension-firefox run ext:lint",
+    "ext:run": "pnpm --filter @adtripwire/extension-firefox run ext:run",
+    "ext:package": "pnpm --filter @adtripwire/extension-firefox run ext:package",
+    "indicators:validate": "node scripts/validate-indicators.mjs",
+    "audit": "pnpm audit --prod",
+    "docs:rules": "esbuild scripts/dump-rules.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/dump-rules.mjs --log-level=warning --alias:@adtripwire/detection-engine=./packages/detection-engine/src/index.ts --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts --alias:@adtripwire/privacy=./packages/privacy/src/index.ts && node node_modules/.cache/adtripwire/dump-rules.mjs",
+    "e2e:firefox": "node scripts/e2e-firefox.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/firefox-webext-browser": "^143.0.1",
+    "@types/node": "^20.19.43",
+    "esbuild": "~0.25.12",
+    "eslint": "^10.14.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^3.2.7",
+    "web-ext": "^8.10.0"
+  }
+}

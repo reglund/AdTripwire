@@ -1,0 +1,7 @@
+dist
+node_modules
+web-ext-artifacts
+pnpm-lock.yaml
+prompt.md
+packages/indicators/upstream/
+LICENSE

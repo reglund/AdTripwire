@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "AdTripwire",
+  "version": "0.1.0",
+  "description": "Detect the threat behind the ad. Passive, local-only detection of advertising-based surveillance and spyware-delivery infrastructure. Observation and evidence only; no blocking.",
+  "homepage_url": "https://github.com/reglund/AdTripwire",
+  "author": "AdTripwire contributors",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "adtripwire@reglund.github.io",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  },
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "webRequestFilterResponse",
+    "storage",
+    "alarms",
+    "unlimitedStorage"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "action": {
+    "default_title": "AdTripwire",
+    "default_popup": "popup.html",
+    "default_icon": { "48": "icons/icon-48.svg", "96": "icons/icon-96.svg" }
+  },
+  "icons": { "48": "icons/icon-48.svg", "96": "icons/icon-96.svg" },
+  "options_ui": { "page": "dashboard.html#settings", "open_in_tab": true },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src 'none'; img-src 'self' data:; style-src 'self'"
+  }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>AdTripwire – Investigation dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="dashboard">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="dash-header">
+      <div class="dash-brand">
+        <img src="icons/icon-48.svg" alt="" width="32" height="32" />
+        <div>
+          <h1>AdTripwire</h1>
+          <p class="tagline">Detect the threat behind the ad</p>
+        </div>
+      </div>
+      <nav aria-label="Dashboard sections">
+        <div id="tabs" role="tablist" aria-label="Dashboard sections"></div>
+      </nav>
+    </header>
+    <main id="main" role="tabpanel" tabindex="-1" aria-live="polite"></main>
+    <script src="dashboard.js" defer></script>
+  </body>
+</html>

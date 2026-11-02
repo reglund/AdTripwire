@@ -1,0 +1,19 @@
+{
+  "name": "@adtripwire/extension-firefox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "ext:lint": "web-ext lint -s dist",
+    "ext:run": "web-ext run -s dist",
+    "ext:package": "web-ext build -s dist --overwrite-dest"
+  },
+  "dependencies": {
+    "@adtripwire/shared": "workspace:*",
+    "@adtripwire/indicators": "workspace:*",
+    "@adtripwire/privacy": "workspace:*",
+    "@adtripwire/detection-engine": "workspace:*",
+    "@adtripwire/sensor-firefox": "workspace:*"
+  }
+}
