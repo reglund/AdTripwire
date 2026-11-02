@@ -108,8 +108,11 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/limitations.md` – known gaps
 - `docs/testing.md` – automated and manual verification
 - `docs/indicator-updates.md` – design for signed, optional indicator updates
+- `docs/store-listing.md` – store texts and permission justifications
+- `docs/exposure-session.md` – how to look for real exposure in your own browsing
 - `docs/roadmap.md` – phases and gates
 - `docs/phase-1-report.md` – Phase 1 deliverables and status
+- `docs/phase-3-report.md` – Phase 3 (Chromium) deliverables and status
 
 ## Indicators and attribution
 

@@ -233,6 +233,47 @@ for (const [indicator, tier, confidence, source] of rows) {
   });
 }
 
+// Manually curated path-scoped indicators from the Citizen Lab report body (not in the
+// Zero Breach list, which is hostname-only). Contextual leads: they show Discover-Tech
+// cookie-sync or creative hosting on shared platforms, so the HOST alone must never match.
+const MANUAL = [
+  {
+    indicator: "an.yandex.ru",
+    indicatorType: "hostname_path",
+    pathPattern: "/mapuid/discovertechis",
+    source: SOURCES["citizenlab-adfection-2026"].name,
+    sourceUrl: SOURCES["citizenlab-adfection-2026"].url,
+    campaign: "adfection",
+    classification: "contextual",
+    confidence: "high",
+    firstReported: "2026-10-15",
+    lastReviewed: "2026-11-02",
+    validFrom: "2026-10-15",
+    enabled: true,
+    role: "cookie-sync-partner",
+    notes:
+      "Yandex user-id sync endpoint dedicated to Discover-Tech ('discovertechis'). Contact means a Yandex-served ad slot synced the browser's id with Discover-Tech; this is exposure to the operator's audience pipeline, not targeting.",
+  },
+  {
+    indicator: "cloud-images.s3.eu-west-1.amazonaws.com",
+    indicatorType: "hostname_path",
+    pathPattern: "/MyDSP_Beeswax/",
+    source: SOURCES["citizenlab-adfection-2026"].name,
+    sourceUrl: SOURCES["citizenlab-adfection-2026"].url,
+    campaign: "adfection",
+    classification: "contextual",
+    confidence: "medium",
+    firstReported: "2026-10-15",
+    lastReviewed: "2026-11-02",
+    validFrom: "2026-10-15",
+    enabled: true,
+    role: "creative-hosting",
+    notes:
+      "S3 bucket path used for MyDSP creatives served through Beeswax. The bucket host is shared infrastructure; only this path prefix is an indicator.",
+  },
+];
+out.push(...MANUAL);
+
 // Deterministic order and ids.
 out.sort((a, b) => a.indicator.localeCompare(b.indicator));
 const seen = new Set();

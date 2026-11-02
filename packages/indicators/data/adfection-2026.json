@@ -129,6 +129,23 @@
     },
     {
       "id": "adf-0007",
+      "indicator": "an.yandex.ru",
+      "indicatorType": "hostname_path",
+      "pathPattern": "/mapuid/discovertechis",
+      "source": "The Citizen Lab — Exposing AdFection",
+      "sourceUrl": "https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/",
+      "campaign": "adfection",
+      "classification": "contextual",
+      "confidence": "high",
+      "firstReported": "2026-10-15",
+      "lastReviewed": "2026-11-02",
+      "validFrom": "2026-10-15",
+      "enabled": true,
+      "role": "cookie-sync-partner",
+      "notes": "Yandex user-id sync endpoint dedicated to Discover-Tech ('discovertechis'). Contact means a Yandex-served ad slot synced the browser's id with Discover-Tech; this is exposure to the operator's audience pipeline, not targeting."
+    },
+    {
+      "id": "adf-0008",
       "indicator": "antperspective.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -144,7 +161,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0008",
+      "id": "adf-0009",
       "indicator": "aperturebelt.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -160,7 +177,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0009",
+      "id": "adf-0010",
       "indicator": "archer.westeurope.cloudapp.azure.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -176,7 +193,7 @@
       "notes": "Bindecy command-and-control on shared cloud hosting; hostname is specific but the platform is not."
     },
     {
-      "id": "adf-0010",
+      "id": "adf-0011",
       "indicator": "asknapkin.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -192,7 +209,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0011",
+      "id": "adf-0012",
       "indicator": "barnsecret.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -208,7 +225,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0012",
+      "id": "adf-0013",
       "indicator": "baseagriculture.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -224,7 +241,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0013",
+      "id": "adf-0014",
       "indicator": "basicstraw.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -240,7 +257,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0014",
+      "id": "adf-0015",
       "indicator": "basinapposite.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -256,7 +273,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0015",
+      "id": "adf-0016",
       "indicator": "bd-mainserver.herokuapp.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -272,7 +289,7 @@
       "notes": "Bindecy command-and-control on shared cloud hosting; hostname is specific but the platform is not."
     },
     {
-      "id": "adf-0016",
+      "id": "adf-0017",
       "indicator": "beneathbreadth.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -288,7 +305,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0017",
+      "id": "adf-0018",
       "indicator": "bizarreclassify.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -304,7 +321,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0018",
+      "id": "adf-0019",
       "indicator": "blockroster.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -320,7 +337,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0019",
+      "id": "adf-0020",
       "indicator": "bondmuscle.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -336,7 +353,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0020",
+      "id": "adf-0021",
       "indicator": "breadgroomer.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -352,7 +369,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0021",
+      "id": "adf-0022",
       "indicator": "bronzemonth.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -368,7 +385,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0022",
+      "id": "adf-0023",
       "indicator": "browniebell.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -384,7 +401,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0023",
+      "id": "adf-0024",
       "indicator": "bypassbirch.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -400,7 +417,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0024",
+      "id": "adf-0025",
       "indicator": "bypasscalculate.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -416,7 +433,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0025",
+      "id": "adf-0026",
       "indicator": "bypasscommerce.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -432,7 +449,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0026",
+      "id": "adf-0027",
       "indicator": "calmbase.org",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -448,7 +465,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0027",
+      "id": "adf-0028",
       "indicator": "cartoondrop.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -464,7 +481,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0028",
+      "id": "adf-0029",
       "indicator": "cdnmobile.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -480,7 +497,7 @@
       "notes": "Historical Discover-Tech domain named in the 2026 report; may be lapsed or re-registered."
     },
     {
-      "id": "adf-0029",
+      "id": "adf-0030",
       "indicator": "checkmyimp.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -496,7 +513,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0030",
+      "id": "adf-0031",
       "indicator": "chickenstrawberry.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -512,7 +529,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0031",
+      "id": "adf-0032",
       "indicator": "citecivilization.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -528,7 +545,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0032",
+      "id": "adf-0033",
       "indicator": "closetmeat.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -544,7 +561,24 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0033",
+      "id": "adf-0034",
+      "indicator": "cloud-images.s3.eu-west-1.amazonaws.com",
+      "indicatorType": "hostname_path",
+      "pathPattern": "/MyDSP_Beeswax/",
+      "source": "The Citizen Lab — Exposing AdFection",
+      "sourceUrl": "https://citizenlab.ca/research/how-discover-tech-turned-targeted-ads-into-a-pipeline-for-spyware/",
+      "campaign": "adfection",
+      "classification": "contextual",
+      "confidence": "medium",
+      "firstReported": "2026-10-15",
+      "lastReviewed": "2026-11-02",
+      "validFrom": "2026-10-15",
+      "enabled": true,
+      "role": "creative-hosting",
+      "notes": "S3 bucket path used for MyDSP creatives served through Beeswax. The bucket host is shared infrastructure; only this path prefix is an indicator."
+    },
+    {
+      "id": "adf-0035",
       "indicator": "commonclever.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -560,7 +594,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0034",
+      "id": "adf-0036",
       "indicator": "concretebottle.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -576,7 +610,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0035",
+      "id": "adf-0037",
       "indicator": "conquerconfess.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -592,7 +626,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0036",
+      "id": "adf-0038",
       "indicator": "containsnow.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -608,7 +642,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0037",
+      "id": "adf-0039",
       "indicator": "contradictionblindness.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -624,7 +658,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0038",
+      "id": "adf-0040",
       "indicator": "controlium.net",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -640,7 +674,7 @@
       "notes": "Apex of Discover-Tech / Controlium operational infrastructure (Citizen Lab Appendix C). Matches all subdomains."
     },
     {
-      "id": "adf-0039",
+      "id": "adf-0041",
       "indicator": "convincechaotic.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -656,7 +690,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0040",
+      "id": "adf-0042",
       "indicator": "cookie-sync.xyz",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -672,7 +706,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0041",
+      "id": "adf-0043",
       "indicator": "cookiesurfer.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -688,7 +722,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0042",
+      "id": "adf-0044",
       "indicator": "cooperatedisinfect.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -704,7 +738,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0043",
+      "id": "adf-0045",
       "indicator": "cottonbread.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -720,7 +754,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0044",
+      "id": "adf-0046",
       "indicator": "cranberrybear.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -736,7 +770,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0045",
+      "id": "adf-0047",
       "indicator": "cropcritique.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -752,7 +786,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0046",
+      "id": "adf-0048",
       "indicator": "crossoverdue.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -768,7 +802,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0047",
+      "id": "adf-0049",
       "indicator": "d147nolwbekx2b.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -785,7 +819,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0048",
+      "id": "adf-0050",
       "indicator": "d19oo8r6k9oumb.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -802,7 +836,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0049",
+      "id": "adf-0051",
       "indicator": "d1fcoizt7mje85.cloudfront.net",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -819,7 +853,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0050",
+      "id": "adf-0052",
       "indicator": "d1fzw0miu1r9rc.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -836,7 +870,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0051",
+      "id": "adf-0053",
       "indicator": "d1x4e580sn23dn.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -853,7 +887,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0052",
+      "id": "adf-0054",
       "indicator": "d23625plpxg1yn.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -870,7 +904,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0053",
+      "id": "adf-0055",
       "indicator": "d2epnp0vokbtl7.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -887,7 +921,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0054",
+      "id": "adf-0056",
       "indicator": "d2f4zpg1mgzwov.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -904,7 +938,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0055",
+      "id": "adf-0057",
       "indicator": "d39619tdxn6mhj.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -921,7 +955,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0056",
+      "id": "adf-0058",
       "indicator": "d8lmy5wyiokrq.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -938,7 +972,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0057",
+      "id": "adf-0059",
       "indicator": "damageconsider.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -954,7 +988,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0058",
+      "id": "adf-0060",
       "indicator": "dcv2rnj2ograe.cloudfront.net",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -971,7 +1005,7 @@
       "notes": "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned."
     },
     {
-      "id": "adf-0059",
+      "id": "adf-0061",
       "indicator": "deardrill.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -987,7 +1021,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0060",
+      "id": "adf-0062",
       "indicator": "dediccatedconsideration.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1003,7 +1037,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0061",
+      "id": "adf-0063",
       "indicator": "deducedefend.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1019,7 +1053,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0062",
+      "id": "adf-0064",
       "indicator": "deliverconcern.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1035,7 +1069,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0063",
+      "id": "adf-0065",
       "indicator": "densefoot.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1051,7 +1085,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0064",
+      "id": "adf-0066",
       "indicator": "desireeclipse.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1067,7 +1101,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0065",
+      "id": "adf-0067",
       "indicator": "detaincharity.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1083,7 +1117,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0066",
+      "id": "adf-0068",
       "indicator": "deterdiffusion.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1099,7 +1133,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0067",
+      "id": "adf-0069",
       "indicator": "devotionbelief.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1115,7 +1149,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0068",
+      "id": "adf-0070",
       "indicator": "discover-tech.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1131,7 +1165,7 @@
       "notes": "Operator-linked corporate, consumer-app, or hosting name. Contact is a lead for analysts, not a finding."
     },
     {
-      "id": "adf-0069",
+      "id": "adf-0071",
       "indicator": "discovertech-alb-100966113.us-east-1.elb.amazonaws.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1147,7 +1181,7 @@
       "notes": "Operator-linked corporate, consumer-app, or hosting name. Contact is a lead for analysts, not a finding."
     },
     {
-      "id": "adf-0070",
+      "id": "adf-0072",
       "indicator": "distractionfar.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1163,7 +1197,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0071",
+      "id": "adf-0073",
       "indicator": "drivesplash.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1179,7 +1213,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0072",
+      "id": "adf-0074",
       "indicator": "drummerjourney.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1195,7 +1229,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0073",
+      "id": "adf-0075",
       "indicator": "dtech.adtimizer.co",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1211,7 +1245,7 @@
       "notes": "Delivery / logging host named in the report body."
     },
     {
-      "id": "adf-0074",
+      "id": "adf-0076",
       "indicator": "dtech.mtrtb.com",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -1227,7 +1261,7 @@
       "notes": "Delivery / logging host named in the report body."
     },
     {
-      "id": "adf-0075",
+      "id": "adf-0077",
       "indicator": "dumplingbell.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1243,7 +1277,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0076",
+      "id": "adf-0078",
       "indicator": "electric-prime.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1259,7 +1293,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0077",
+      "id": "adf-0079",
       "indicator": "elifluousscintillam.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1275,7 +1309,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0078",
+      "id": "adf-0080",
       "indicator": "eminententwine.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1291,7 +1325,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0079",
+      "id": "adf-0081",
       "indicator": "events.myweb3id.io",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1307,7 +1341,7 @@
       "notes": "Delivery / logging host named in the report body."
     },
     {
-      "id": "adf-0080",
+      "id": "adf-0082",
       "indicator": "events.platc-tester.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1323,7 +1357,7 @@
       "notes": "Delivery / logging host named in the report body."
     },
     {
-      "id": "adf-0081",
+      "id": "adf-0083",
       "indicator": "exhibitexpanse.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1339,7 +1373,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0082",
+      "id": "adf-0084",
       "indicator": "fallaciousessential.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1355,7 +1389,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0083",
+      "id": "adf-0085",
       "indicator": "fearevolve.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1371,7 +1405,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0084",
+      "id": "adf-0086",
       "indicator": "fileswaper.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1387,7 +1421,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0085",
+      "id": "adf-0087",
       "indicator": "finalsalami.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1403,7 +1437,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0086",
+      "id": "adf-0088",
       "indicator": "flexibleelevator.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1419,7 +1453,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0087",
+      "id": "adf-0089",
       "indicator": "foamdirection.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1435,7 +1469,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0088",
+      "id": "adf-0090",
       "indicator": "forecastgarden.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1451,7 +1485,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0089",
+      "id": "adf-0091",
       "indicator": "goatsandals.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1467,7 +1501,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0090",
+      "id": "adf-0092",
       "indicator": "golfconcert.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1483,7 +1517,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0091",
+      "id": "adf-0093",
       "indicator": "groundbreakinginitative.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1499,7 +1533,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0092",
+      "id": "adf-0094",
       "indicator": "guitarcalculate.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1515,7 +1549,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0093",
+      "id": "adf-0095",
       "indicator": "hostilefauna.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1531,7 +1565,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0094",
+      "id": "adf-0096",
       "indicator": "infinoas.mtrtb.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1547,7 +1581,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0095",
+      "id": "adf-0097",
       "indicator": "insightenterprisells.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1563,7 +1597,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0096",
+      "id": "adf-0098",
       "indicator": "isolatelecture.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1579,7 +1613,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0097",
+      "id": "adf-0099",
       "indicator": "jellybat.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1595,7 +1629,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0098",
+      "id": "adf-0100",
       "indicator": "jobmarcher.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1611,7 +1645,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0099",
+      "id": "adf-0101",
       "indicator": "journeyjest.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1627,7 +1661,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0100",
+      "id": "adf-0102",
       "indicator": "kartingrumble.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1643,7 +1677,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0101",
+      "id": "adf-0103",
       "indicator": "keyadapter.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1659,7 +1693,7 @@
       "notes": "Candiru validator / target-selection server (Fingerprint V1). Only 2 of 305 validator domains are public."
     },
     {
-      "id": "adf-0102",
+      "id": "adf-0104",
       "indicator": "labyrinthextravagance.org",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1675,7 +1709,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0103",
+      "id": "adf-0105",
       "indicator": "leafconfuse.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1691,7 +1725,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0104",
+      "id": "adf-0106",
       "indicator": "lessonhandle.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1707,7 +1741,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0105",
+      "id": "adf-0107",
       "indicator": "macrodrop.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1723,7 +1757,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0106",
+      "id": "adf-0108",
       "indicator": "macromint.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1739,7 +1773,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0107",
+      "id": "adf-0109",
       "indicator": "maturitygenesis.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1755,7 +1789,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0108",
+      "id": "adf-0110",
       "indicator": "measurecabin.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1771,7 +1805,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0109",
+      "id": "adf-0111",
       "indicator": "msstore.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1787,7 +1821,7 @@
       "notes": "Historical Discover-Tech domain named in the 2026 report; may be lapsed or re-registered."
     },
     {
-      "id": "adf-0110",
+      "id": "adf-0112",
       "indicator": "mtrtb.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1803,7 +1837,7 @@
       "notes": "Apex of Discover-Tech / Controlium operational infrastructure (Citizen Lab Appendix C). Matches all subdomains."
     },
     {
-      "id": "adf-0111",
+      "id": "adf-0113",
       "indicator": "mushroompalm.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1819,7 +1853,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0112",
+      "id": "adf-0114",
       "indicator": "mydsp.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1835,7 +1869,7 @@
       "notes": "Operator-linked corporate, consumer-app, or hosting name. Contact is a lead for analysts, not a finding."
     },
     {
-      "id": "adf-0113",
+      "id": "adf-0115",
       "indicator": "myipinfo.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1851,7 +1885,7 @@
       "notes": "Operator-linked corporate, consumer-app, or hosting name. Contact is a lead for analysts, not a finding."
     },
     {
-      "id": "adf-0114",
+      "id": "adf-0116",
       "indicator": "myweb3id.io",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1867,7 +1901,7 @@
       "notes": "Apex of Discover-Tech / Controlium operational infrastructure (Citizen Lab Appendix C). Matches all subdomains."
     },
     {
-      "id": "adf-0115",
+      "id": "adf-0117",
       "indicator": "noas.adtimizer.co",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1883,7 +1917,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0116",
+      "id": "adf-0118",
       "indicator": "noas.impchkdsp.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1899,7 +1933,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0117",
+      "id": "adf-0119",
       "indicator": "noas.mtrtb.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1915,7 +1949,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0118",
+      "id": "adf-0120",
       "indicator": "noas.powerium.net",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1931,7 +1965,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0119",
+      "id": "adf-0121",
       "indicator": "noas.trakking.co",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1947,7 +1981,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0120",
+      "id": "adf-0122",
       "indicator": "notableexam.org",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1963,7 +1997,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0121",
+      "id": "adf-0123",
       "indicator": "notionnowadays.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -1979,7 +2013,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0122",
+      "id": "adf-0124",
       "indicator": "nutralove.co",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -1995,7 +2029,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0123",
+      "id": "adf-0125",
       "indicator": "outdooutcome.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2011,7 +2045,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0124",
+      "id": "adf-0126",
       "indicator": "pagead.trustlayersdk.com",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -2027,7 +2061,7 @@
       "notes": "Confiant: command endpoint for the ad-embedded SDK that polls for and executes operator-pushed code."
     },
     {
-      "id": "adf-0125",
+      "id": "adf-0127",
       "indicator": "parkourbus.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2043,7 +2077,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0126",
+      "id": "adf-0128",
       "indicator": "patternperiod.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2059,7 +2093,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0127",
+      "id": "adf-0129",
       "indicator": "penslice.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2075,7 +2109,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0128",
+      "id": "adf-0130",
       "indicator": "pepperdominate.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2091,7 +2125,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0129",
+      "id": "adf-0131",
       "indicator": "plasticbells.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2107,7 +2141,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0130",
+      "id": "adf-0132",
       "indicator": "platc-tester.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2123,7 +2157,7 @@
       "notes": "Apex of Discover-Tech / Controlium operational infrastructure (Citizen Lab Appendix C). Matches all subdomains."
     },
     {
-      "id": "adf-0131",
+      "id": "adf-0133",
       "indicator": "powerium.net",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2139,7 +2173,7 @@
       "notes": "Apex of Discover-Tech / Controlium operational infrastructure (Citizen Lab Appendix C). Matches all subdomains."
     },
     {
-      "id": "adf-0132",
+      "id": "adf-0134",
       "indicator": "ppv2.mtrtb.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2155,7 +2189,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0133",
+      "id": "adf-0135",
       "indicator": "pqv2.mtrtb.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2171,7 +2205,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0134",
+      "id": "adf-0136",
       "indicator": "prawnbasket.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2187,7 +2221,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0135",
+      "id": "adf-0137",
       "indicator": "predictproper.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2203,7 +2237,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0136",
+      "id": "adf-0138",
       "indicator": "pressaviation.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2219,7 +2253,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0137",
+      "id": "adf-0139",
       "indicator": "profligatecensure.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2235,7 +2269,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0138",
+      "id": "adf-0140",
       "indicator": "qa-noas.powerium.net",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2251,7 +2285,7 @@
       "notes": "NOAS / getAd ad-serving endpoint: decides server-side which devices receive JavaScript. Most responses are empty; contact alone indicates exposure, not selection."
     },
     {
-      "id": "adf-0139",
+      "id": "adf-0141",
       "indicator": "rollstrech.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2267,7 +2301,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0140",
+      "id": "adf-0142",
       "indicator": "romancedrum.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2283,7 +2317,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0141",
+      "id": "adf-0143",
       "indicator": "sacrificeprincipal.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2299,7 +2333,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0142",
+      "id": "adf-0144",
       "indicator": "salmonpride.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2315,7 +2349,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0143",
+      "id": "adf-0145",
       "indicator": "scoreparade.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2331,7 +2365,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0144",
+      "id": "adf-0146",
       "indicator": "selectedpazzle.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2347,7 +2381,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0145",
+      "id": "adf-0147",
       "indicator": "shareitwork.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2363,7 +2397,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0146",
+      "id": "adf-0148",
       "indicator": "sharethere.net",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2379,7 +2413,7 @@
       "notes": "Candiru validator / target-selection server (Fingerprint V1). Only 2 of 305 validator domains are public."
     },
     {
-      "id": "adf-0147",
+      "id": "adf-0149",
       "indicator": "signifyslight.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2395,7 +2429,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0148",
+      "id": "adf-0150",
       "indicator": "sincereaccertain.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2411,7 +2445,7 @@
       "notes": "Citizen Lab associates this host with Candiru-linked profiling (?qq= loader pattern)."
     },
     {
-      "id": "adf-0149",
+      "id": "adf-0151",
       "indicator": "spongefruit.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2427,7 +2461,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0150",
+      "id": "adf-0152",
       "indicator": "stablesurface.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2443,7 +2477,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0151",
+      "id": "adf-0153",
       "indicator": "strangegarden.org",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2459,7 +2493,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0152",
+      "id": "adf-0154",
       "indicator": "stylebrakedown.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2475,7 +2509,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0153",
+      "id": "adf-0155",
       "indicator": "suggestutterly.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2491,7 +2525,7 @@
       "notes": "Candiru command-and-control (Citizen Lab Fingerprint C1)."
     },
     {
-      "id": "adf-0154",
+      "id": "adf-0156",
       "indicator": "sunsetpotential.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2507,7 +2541,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0155",
+      "id": "adf-0157",
       "indicator": "tacticscheap.net",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2523,7 +2557,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0156",
+      "id": "adf-0158",
       "indicator": "tekma.adtimizer.co",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",
@@ -2539,7 +2573,7 @@
       "notes": "Delivery / logging host named in the report body."
     },
     {
-      "id": "adf-0157",
+      "id": "adf-0159",
       "indicator": "tidalscreen.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2555,7 +2589,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0158",
+      "id": "adf-0160",
       "indicator": "tracker.mtrtb.com",
       "indicatorType": "hostname",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2571,7 +2605,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0159",
+      "id": "adf-0161",
       "indicator": "tracookiepixel.xyz",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2587,7 +2621,7 @@
       "notes": "Discover-Tech cookie-sync / impression tracking. Very high volume; exposure is common and is not evidence of targeting."
     },
     {
-      "id": "adf-0160",
+      "id": "adf-0162",
       "indicator": "tubeshape.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2603,7 +2637,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0161",
+      "id": "adf-0163",
       "indicator": "ultimatematter.info",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2619,7 +2653,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0162",
+      "id": "adf-0164",
       "indicator": "velvetpremier.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2635,7 +2669,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0163",
+      "id": "adf-0165",
       "indicator": "volasim.com",
       "indicatorType": "domain",
       "source": "The Citizen Lab — Exposing AdFection",
@@ -2651,7 +2685,7 @@
       "notes": "Operator-linked corporate, consumer-app, or hosting name. Contact is a lead for analysts, not a finding."
     },
     {
-      "id": "adf-0164",
+      "id": "adf-0166",
       "indicator": "windomination.com",
       "indicatorType": "domain",
       "source": "Recorded Future / Insikt Group — Tracking Candiru's DevilsTongue Spyware (CTA-2025-0805)",
@@ -2667,7 +2701,7 @@
       "notes": "Candiru-attributed infrastructure from Recorded Future 2025 appendix; role (C2 vs operator) unspecified; may have lapsed."
     },
     {
-      "id": "adf-0165",
+      "id": "adf-0167",
       "indicator": "www.discover-tech.io",
       "indicatorType": "hostname",
       "source": "Confiant — ADINT: Weaponized Ad Tech for Zero-Click Spyware and Mass Identity Vacuuming",

@@ -3,14 +3,10 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist-types",
-    "types": [
-      "firefox-webext-browser"
-    ],
+    "types": ["firefox-webext-browser"],
     "composite": true
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
     {
       "path": "../../packages/shared"

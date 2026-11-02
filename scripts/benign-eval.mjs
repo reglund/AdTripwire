@@ -11,7 +11,7 @@
  */
 import { spawn, execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 const arg = (k, d) =>
@@ -27,7 +27,8 @@ const today = new Date().toISOString().slice(0, 10);
 const OUT = arg("out", `docs/evaluations/${today}-benign.md`);
 const sitesFile = arg("sites", "tests/fixtures/benign-sites.txt");
 // Snap-packaged Firefox can only read extension sources under $HOME; allow overriding the dir.
-const DIST = arg("dist", "apps/extension-firefox/dist");
+const CHROMIUM = process.argv.includes("--chromium");
+const DIST = arg("dist", CHROMIUM ? "apps/extension-chromium/dist" : "apps/extension-firefox/dist");
 const SKIP_BUILD = process.argv.includes("--no-build");
 const sites = readFileSync(sitesFile, "utf8")
   .split("\n")
@@ -35,14 +36,40 @@ const sites = readFileSync(sitesFile, "utf8")
   .filter((l) => l && !l.startsWith("#"));
 
 if (!SKIP_BUILD) {
-  console.log("building production bundle…");
-  execFileSync("node", ["apps/extension-firefox/build.mjs"], { stdio: "inherit" });
+  console.log(`building production bundle (${CHROMIUM ? "chromium" : "firefox"})…`);
+  execFileSync(
+    "node",
+    [CHROMIUM ? "apps/extension-chromium/build.mjs" : "apps/extension-firefox/build.mjs"],
+    {
+      stdio: "inherit",
+    },
+  );
 }
+// Chromium: branded Google Chrome ignores --load-extension; prefer Chromium builds. Headless
+// Chromium accepts one start URL, so --chromium forces batches of one site.
+const chromeBin = CHROMIUM
+  ? (process.env.CHROME_BIN ??
+    ["chromium", "chromium-browser", "chrome-for-testing"].find((b) => {
+      try {
+        execFileSync("which", [b], { stdio: "ignore" });
+        return true;
+      } catch {
+        return false;
+      }
+    }))
+  : undefined;
+if (CHROMIUM && !chromeBin) throw new Error("no Chromium binary found; set CHROME_BIN");
+const EFFECTIVE_BATCH = CHROMIUM ? 1 : BATCH;
 
 const snapCommon = join(homedir(), "snap", "firefox", "common");
-const profileBase = existsSync(snapCommon)
-  ? join(snapCommon, "adtripwire-benign-profile")
-  : join(homedir(), ".cache", "adtripwire-benign-profile");
+const snapChromium = join(homedir(), "snap", "chromium", "common");
+const profileBase = CHROMIUM
+  ? existsSync(snapChromium)
+    ? join(snapChromium, "adtripwire-benign-profile")
+    : join(homedir(), ".cache", "adtripwire-benign-chromium-profile")
+  : existsSync(snapCommon)
+    ? join(snapCommon, "adtripwire-benign-profile")
+    : join(homedir(), ".cache", "adtripwire-benign-profile");
 
 const children = new Set();
 function killGroup(child, signal) {
@@ -69,30 +96,48 @@ process.on("SIGINT", () => {
 process.on("exit", cleanup);
 
 const logs = [];
-for (let i = 0; i < sites.length; i += BATCH) {
-  const batch = sites.slice(i, i + BATCH);
-  console.log(`batch ${i / BATCH + 1}: ${batch.join(", ")}`);
+for (let i = 0; i < sites.length; i += EFFECTIVE_BATCH) {
+  const batch = sites.slice(i, i + EFFECTIVE_BATCH);
+  console.log(`batch ${i / EFFECTIVE_BATCH + 1}: ${batch.join(", ")}`);
   // Fresh profile per batch: a reused profile can be locked by a lingering instance.
-  const profile = `${profileBase}-${i / BATCH + 1}`;
+  const profile = `${profileBase}-${i / EFFECTIVE_BATCH + 1}`;
   rmSync(profile, { recursive: true, force: true });
   mkdirSync(profile, { recursive: true });
-  const args = [
-    "exec",
-    "web-ext",
-    "run",
-    "-s",
-    DIST,
-    "--no-input",
-    "--verbose",
-    "--arg=-headless",
-    `--firefox-profile=${profile}`,
-    "--profile-create-if-missing",
-    "--keep-profile-changes",
-    "--pref",
-    "devtools.console.stdout.content=true",
-    ...batch.flatMap((u) => ["--start-url", u]),
-  ];
-  const ff = spawn("pnpm", args, { stdio: ["ignore", "pipe", "pipe"], detached: true });
+  const args = CHROMIUM
+    ? [
+        "--headless=new",
+        `--user-data-dir=${profile}`,
+        `--load-extension=${resolve(DIST)}`,
+        "--enable-logging=stderr",
+        "--v=0",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-sync",
+        "--metrics-recording-only",
+        ...batch,
+      ]
+    : [
+        "exec",
+        "web-ext",
+        "run",
+        "-s",
+        DIST,
+        "--no-input",
+        "--verbose",
+        "--arg=-headless",
+        `--firefox-profile=${profile}`,
+        "--profile-create-if-missing",
+        "--keep-profile-changes",
+        "--pref",
+        "devtools.console.stdout.content=true",
+        ...batch.flatMap((u) => ["--start-url", u]),
+      ];
+  const ff = spawn(CHROMIUM ? chromeBin : "pnpm", args, {
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
+  });
   children.add(ff);
   let log = "";
   ff.stdout.on("data", (d) => (log += d.toString()));
@@ -115,14 +160,21 @@ for (let i = 0; i < sites.length; i += BATCH) {
  * allow-list of severities, rule ids restricted to the engine's id grammar, no free text
  * reproduced in the report, and a cross-check against the extension's own `stats:` counters.
  */
-const PREFIX = /^(?:.*Firefox stdout: )?console\.(?:info|warn|error): "\[AdTripwire\] /;
+const PREFIX = CHROMIUM
+  ? /^.*:INFO:CONSOLE:\d+\] "\[AdTripwire\] /
+  : /^(?:.*Firefox stdout: )?console\.(?:info|warn|error): "\[AdTripwire\] /;
 const RULE_ID = /^[a-z_]+\.[a-z_]+$/;
 const SEVERITIES = new Set(["informational", "suspicious", "elevated", "high_priority"]);
 const parsed = logs.flatMap(({ batch, log }) =>
   log
     .split("\n")
     .filter((l) => PREFIX.test(l))
-    .map((l) => l.replace(PREFIX, "").replace(/"$/, ""))
+    .map((l) =>
+      l
+        .replace(PREFIX, "")
+        .replace(/", source: .*$/, "")
+        .replace(/"$/, ""),
+    )
     .map((line) => ({ batch, line })),
 );
 const detections = [];
@@ -185,7 +237,7 @@ const statsSummary = statsLines.length
 const md = `# Benign-browsing evaluation — ${today}
 
 Protocol: \`tests/fixtures/benign-browsing.md\`. Production build (real indicator set only),
-headless Firefox, ${sites.length} sites in batches of ${BATCH}, ${SECONDS} s per batch, default settings,
+headless ${CHROMIUM ? "Chromium" : "Firefox"}, ${sites.length} sites in batches of ${EFFECTIVE_BATCH}, ${SECONDS} s per batch, default settings,
 Enhanced Tracking Protection at its default. Script: \`scripts/benign-eval.mjs\`.
 
 Extension ready lines observed: ${ready} of ${logs.length} batches.

@@ -353,6 +353,8 @@ export class ChromiumWebRequestSensor {
     const p = this.pending.get(d.requestId);
     if (!p) return;
     this.pending.delete(d.requestId);
+    // Monitoring may have been disabled while the request was in flight.
+    if (!this.opts.enabled()) return;
     const ev = this.build("completed", d);
     if (ev) this.opts.onEvent(ev);
   }
@@ -361,6 +363,8 @@ export class ChromiumWebRequestSensor {
     const p = this.pending.get(d.requestId);
     if (!p) return;
     this.pending.delete(d.requestId);
+    // Monitoring may have been disabled while the request was in flight.
+    if (!this.opts.enabled()) return;
     const ev = this.build("error", d);
     if (ev) this.opts.onEvent(ev);
   }

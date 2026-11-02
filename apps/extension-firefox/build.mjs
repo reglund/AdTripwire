@@ -63,12 +63,17 @@ if (watch) {
 } else {
   await build(common);
   await build(pageSensor);
-  // Guard: the production bundle must not contain eval/new Function or reserved test TLD names.
-  const bg = readFileSync(join(dist, "background.js"), "utf8");
+  // Guard: no bundle may contain eval/new Function, and production bundles no reserved test
+  // TLD names. Quoted spans are stripped first so string literals do not trigger it.
   const bad = [];
-  if (/\beval\s*\(/.test(bg.replace(/["'`][^"'`]*["'`]/g, ""))) bad.push("eval(");
-  if (!dev && /synthetic-adfection\.test/.test(bg))
-    bad.push("synthetic indicators in production bundle");
+  for (const name of ["background.js", "popup.js", "dashboard.js", "page-sensor.js"]) {
+    const code = readFileSync(join(dist, name), "utf8");
+    const unquoted = code.replace(/["'`][^"'`]*["'`]/g, "");
+    if (/\beval\s*\(/.test(unquoted)) bad.push(`${name}: eval(`);
+    if (/\bnew\s+Function\s*\(/.test(unquoted)) bad.push(`${name}: new Function(`);
+    if (!dev && /synthetic-adfection\.test/.test(code))
+      bad.push(`${name}: synthetic indicators in production bundle`);
+  }
   if (bad.length) {
     console.error("Build guard failed:", bad.join(", "));
     process.exit(1);

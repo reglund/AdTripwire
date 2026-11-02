@@ -10,7 +10,7 @@
  *   CHROME_BIN=/path/to/chrome pnpm e2e:chromium
  */
 import { spawn, execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir, homedir } from "node:os";
 
@@ -71,20 +71,21 @@ if (fixture.exitCode !== null || /EADDRINUSE/.test(fixtureErr)) {
   process.exit(2);
 }
 
-// Snap-packaged Chromium can only read profiles and extensions under $HOME.
+// Snap-packaged Chromium can only read profiles and extensions under $HOME. Use a fresh
+// unpredictable directory (mkdtemp) and remove it on exit.
 const snapCommon = join(homedir(), "snap", "chromium", "common");
-const profile = existsSync(snapCommon)
-  ? join(snapCommon, "adtripwire-chromium-e2e-profile")
-  : join(tmpdir(), "adtripwire-chromium-e2e-profile");
-rmSync(profile, { recursive: true, force: true });
-mkdirSync(profile, { recursive: true });
+const profileParent = existsSync(snapCommon) ? snapCommon : tmpdir();
+mkdirSync(profileParent, { recursive: true });
+const profile = mkdtempSync(join(profileParent, "adtripwire-chromium-e2e-"));
 // Headless Chrome supports a single start URL; /all embeds the four scenarios as iframes.
 const urls = [`http://publisher.synthetic-site.test:${PORT}/all`];
 const args = [
   ...(headed ? [] : ["--headless=new"]),
   `--user-data-dir=${profile}`,
   `--load-extension=${dist}`,
-  `--host-resolver-rules=${DOMAINS.map((d) => `MAP ${d} 127.0.0.1`).join(", ")}`,
+  // Fail closed: only the six reserved names resolve (to the local fixture); everything else
+  // is NXDOMAIN, so the run can make no outbound requests.
+  `--host-resolver-rules=${[...DOMAINS.map((d) => `MAP ${d} 127.0.0.1`), "MAP * ~NOTFOUND", "EXCLUDE localhost"].join(", ")}`,
   "--enable-logging=stderr",
   "--v=0",
   "--no-first-run",
@@ -93,7 +94,6 @@ const args = [
   "--disable-component-update",
   "--disable-sync",
   "--metrics-recording-only",
-  "--remote-debugging-port=0",
   ...urls,
 ];
 console.log(`launching ${chromeBin} for ${RUN_SECONDS}s…`);
@@ -117,7 +117,20 @@ process.on("SIGINT", () => {
   fixture.kill("SIGTERM");
   process.exit(130);
 });
-process.on("exit", () => killGroup("SIGKILL"));
+chrome.on("error", (e) => {
+  console.error(`could not start ${chromeBin}: ${String(e)}`);
+  fixture.kill("SIGTERM");
+  process.exit(2);
+});
+process.on("exit", () => {
+  killGroup("SIGKILL");
+  try {
+    fixture.kill("SIGKILL");
+  } catch {
+    /* gone */
+  }
+  rmSync(profile, { recursive: true, force: true });
+});
 await new Promise((r) => setTimeout(r, RUN_SECONDS * 1000));
 killGroup("SIGTERM");
 setTimeout(() => killGroup("SIGKILL"), 3000).unref();

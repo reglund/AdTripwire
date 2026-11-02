@@ -1,0 +1,69 @@
+# Interactive exposure session: ad-heavy sites likely to run programmatic ads through the
+# exchanges named in the AdFection reports (Google Authorized Buyers, Yandex, Eskimi,
+# Beeswax/FreeWheel, Xandr). These are ordinary publishers, not threat infrastructure.
+# Exposure is probabilistic and per-device; visiting them proves nothing by itself.
+# One URL per line. Group headings are comments.
+
+# -- Norway: high programmatic volume
+https://www.vg.no/
+https://www.dagbladet.no/
+https://www.nettavisen.no/
+https://www.tv2.no/
+https://www.finn.no/
+https://www.seher.no/
+https://www.kk.no/
+https://www.dinside.no/
+https://www.klikk.no/
+
+# -- International tabloids and news (Google AdX / Xandr heavy)
+https://www.dailymail.co.uk/
+https://www.thesun.co.uk/
+https://www.mirror.co.uk/
+https://nypost.com/
+https://www.foxnews.com/
+https://www.independent.co.uk/
+https://www.express.co.uk/
+
+# -- Sports and live scores (very dense ad stacks)
+https://www.flashscore.com/
+https://www.sofascore.com/
+https://www.livescore.com/
+https://www.goal.com/
+https://www.espn.com/
+
+# -- Lyrics, utilities and converters (aggressive ad networks)
+https://www.azlyrics.com/
+https://genius.com/
+https://www.speedtest.net/
+https://www.ilovepdf.com/
+https://convertio.co/
+https://www.online-convert.com/
+https://www.timeanddate.com/
+
+# -- Free games and casual content
+https://poki.com/
+https://www.crazygames.com/
+https://www.boredpanda.com/
+https://9gag.com/
+
+# -- Yandex Advertising Network reach (the report documents a Yandex id-sync for Discover-Tech)
+https://lenta.ru/
+https://ria.ru/
+https://www.gazeta.ru/
+https://www.kp.ru/
+https://www.sports.ru/
+
+# -- Regions and markets mentioned around the campaign (Balkans, Middle East, Africa; Eskimi reach)
+https://www.blic.rs/
+https://www.kurir.rs/
+https://www.b92.net/
+https://www.youm7.com/
+https://www.masrawy.com/
+https://www.aljazeera.net/
+https://www.alarabiya.net/
+https://www.hurriyet.com.tr/
+https://www.sozcu.com.tr/
+https://punchng.com/
+https://www.vanguardngr.com/
+https://www.ndtv.com/
+https://www.indiatimes.com/

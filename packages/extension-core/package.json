@@ -12,7 +12,10 @@
     "./ui/dashboard": "./src/ui/dashboard.ts",
     "./page-sensor": "./src/page-sensor/page-sensor.ts"
   },
-  "scripts": { "build": "tsc -b", "test": "vitest run --root ../.. --dir ." },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --root ../.. --dir ."
+  },
   "dependencies": {
     "@adtripwire/shared": "workspace:*",
     "@adtripwire/indicators": "workspace:*",

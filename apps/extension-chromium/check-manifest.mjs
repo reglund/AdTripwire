@@ -5,6 +5,16 @@ import { join } from "node:path";
 const dist = join(new URL(".", import.meta.url).pathname, "dist");
 const m = JSON.parse(readFileSync(join(dist, "manifest.json"), "utf8"));
 const errors = [];
+const ALLOWED_PERMISSIONS = [
+  "webRequest",
+  "webNavigation",
+  "storage",
+  "alarms",
+  "unlimitedStorage",
+  "scripting",
+];
+for (const p of m.permissions ?? [])
+  if (!ALLOWED_PERMISSIONS.includes(p)) errors.push(`permission not in allowlist: ${p}`);
 if (m.manifest_version !== 3) errors.push("manifest_version must be 3");
 if (!m.background?.service_worker) errors.push("background.service_worker missing");
 for (const p of ["webRequestBlocking", "webRequestFilterResponse"])

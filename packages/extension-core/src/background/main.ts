@@ -571,7 +571,9 @@ export function startBackground(adapter: SensorAdapter): void {
       }
       bg.handle(req)
         .then((data) => sendResponse(ok(data)))
-        .catch((e: unknown) => sendResponse(fail(e instanceof Error ? e.message : "internal error")));
+        .catch((e: unknown) =>
+          sendResponse(fail(e instanceof Error ? e.message : "internal error")),
+        );
       return true;
     },
   );
