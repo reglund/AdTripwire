@@ -13,6 +13,7 @@ import {
   type Severity,
 } from "@adtripwire/shared";
 import type { RuleContext } from "./types.js";
+import { registrableDomain } from "@adtripwire/indicators";
 
 export const RULE_VERSION = "1.0.0";
 
@@ -32,6 +33,7 @@ export const ALL_CAPABILITIES: readonly SensorCapability[] = [
   "response_headers",
   "response_body_inspection",
   "response_size",
+  "page_signals",
 ];
 
 const LIMITATION_TEXT: Record<ObservationLimitation, string> = {
@@ -48,11 +50,15 @@ const LIMITATION_TEXT: Record<ObservationLimitation, string> = {
   incognito_excluded: "Private-browsing activity is excluded from observation.",
   sensor_restarted_during_request:
     "The sensor restarted during this request; earlier stages may be missing.",
+  page_sensor_disabled:
+    "The optional page sensor was disabled, so in-page signals (hidden frame insertion, SDK messages) were not observed.",
   response_body_skipped_budget:
     "The response body was not inspected because too many inspections were already in progress (memory budget).",
 };
 
 const CAPABILITY_TEXT: Record<SensorCapability, string> = {
+  page_signals:
+    "In-page signals from sub-frames (hidden iframe insertion, SDK messages) are not observed because the opt-in page sensor is off.",
   request_metadata: "Basic request metadata is not available from this browser sensor.",
   redirect_chain: "Redirect chains are not visible to this browser sensor.",
   frame_ancestry:
@@ -71,9 +77,11 @@ export const BASELINE_MISSING_VISIBILITY =
 export function missingVisibilityFor(
   events: readonly NormalizedEvent[],
   capabilities: readonly SensorCapability[],
+  extra: readonly ObservationLimitation[] = [],
 ): string[] {
   const out = new Set<string>();
   for (const e of events) for (const l of e.observationLimitations) out.add(LIMITATION_TEXT[l]);
+  for (const l of extra) out.add(LIMITATION_TEXT[l]);
   for (const c of ALL_CAPABILITIES) if (!capabilities.includes(c)) out.add(CAPABILITY_TEXT[c]);
   out.add(BASELINE_MISSING_VISIBILITY);
   return [...out];
@@ -154,8 +162,13 @@ const MULTI_PART_SUFFIXES = new Set([
   "com.sg",
   "com.hk",
 ]);
-/** Approximate registrable domain without a public-suffix list (documented limitation). */
+/**
+ * Registrable domain (eTLD+1) via the bundled Public Suffix List; falls back to a small
+ * multi-part suffix heuristic when the PSL yields nothing (IPs, single labels, unknown TLDs).
+ */
 export function approxRegistrableDomain(hostname: string): string {
+  const psl = registrableDomain(hostname);
+  if (psl) return psl;
   const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
   if (labels.length <= 2) return labels.join(".");
   if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return hostname;
@@ -167,7 +180,12 @@ export function approxRegistrableDomain(hostname: string): string {
 /** True when this event is the first sighting of its request (request_started, or no earlier event for the id). */
 export function isFirstObservation(e: NormalizedEvent, ctx: RuleContext): boolean {
   if (e.eventType === "request_started") return true;
-  if (e.eventType === "response_inspected" || e.eventType === "frame_navigated") return false;
+  if (
+    e.eventType === "response_inspected" ||
+    e.eventType === "frame_navigated" ||
+    e.eventType === "page_signal"
+  )
+    return false;
   if (e.requestId === undefined) return true;
   return ctx.window.byRequestId(e.requestId).length === 0;
 }
@@ -215,6 +233,8 @@ export interface DetectionArgs {
   recommendedActions?: string[];
   limitations?: string[];
   references?: DetectionReference[];
+  /** Additional observation limitations to describe in missingVisibility (e.g. frame ancestry). */
+  extraLimitations?: ObservationLimitation[];
 }
 
 export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: DetectionArgs): Detection {
@@ -240,7 +260,7 @@ export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: Detecti
     evidence: a.evidence,
     eventIds,
     matchedIndicatorIds: [...new Set(a.matchedIndicatorIds ?? [])],
-    missingVisibility: missingVisibilityFor(events, ctx.capabilities),
+    missingVisibility: missingVisibilityFor(events, ctx.capabilities, a.extraLimitations),
     alternativeExplanations: a.alternativeExplanations,
     recommendedActions: a.recommendedActions ?? DEFAULT_ACTIONS,
     limitations: a.limitations ?? def.limitations,
@@ -250,6 +270,23 @@ export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: Detecti
     subjectHostnames: [...new Set(a.subjectHostnames)],
     ...(tabId !== undefined ? { tabId } : {}),
   };
+}
+
+const SEVERITY_ORDER: readonly Severity[] = [
+  "informational",
+  "suspicious",
+  "elevated",
+  "high_priority",
+];
+/** One severity level lower (informational stays informational). */
+export function lowerSeverity(s: Severity): Severity {
+  return SEVERITY_ORDER[Math.max(0, SEVERITY_RANK[s] - 1)]!;
+}
+
+const CONFIDENCE_ORDER: readonly Confidence[] = ["low", "medium", "high"];
+/** One confidence step lower (low stays low). */
+export function lowerConfidence(c: Confidence): Confidence {
+  return CONFIDENCE_ORDER[Math.max(0, CONFIDENCE_ORDER.indexOf(c) - 1)]!;
 }
 
 export function maxConfidence(a: Confidence, b: Confidence): Confidence {

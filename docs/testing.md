@@ -46,8 +46,10 @@ Snap-packaged Firefox cannot read profiles under `/tmp`, so the script uses a pr
 under `~/snap/firefox/common/`. The full log is written to
 `node_modules/.cache/adtripwire/e2e-firefox.log`.
 
-Verified on 2026-11-02 with Firefox 157.0.1 (snap) on Ubuntu 24.04: ready line with all
-eight capabilities, NOAS contact (elevated), NOAS request (suspicious), empty NOAS
+Verified on 2026-11-02 with Firefox 157.0.1 (snap) on Ubuntu 24.04 (Phase 2 build): ready
+line with all capabilities, page sensor registered and reporting `script_inserted` /
+`hidden_iframe_inserted` from the creative frame, `page.hidden_iframe_after_load` elevated
+through frame-lineage anchoring, `page.late_third_party_script` suspicious, NOAS contact (elevated), NOAS request (suspicious), empty NOAS
 response (informational), hidden-iframe markers (suspicious), escalation of the NOAS
 response to elevated once the body was inspected, nested frame to indicator (elevated),
 malicious contact (elevated), and `correlation.adfection_chain` (high priority). The
@@ -88,10 +90,17 @@ they remain a manual check. Console lines are prefixed `[AdTripwire]`.
 Two separate evaluations are maintained and must not be conflated:
 
 1. **Synthetic coverage** – the scenarios above and the integration suite.
-2. **Real-world false positives** – a benign browsing run (see
-   `tests/fixtures/benign-browsing.md` for the session protocol) with the production
-   build, recording every detection and its category. Phase 1 has **not** yet produced a
-   benign-browsing measurement; this is a Phase 2 deliverable.
+2. **Real-world false positives** – a benign browsing run (protocol in
+   `tests/fixtures/benign-browsing.md`) with the production build, recording every
+   detection by rule and severity. Automated variant:
+   ```bash
+   pnpm eval:benign            # headless Firefox over tests/fixtures/benign-sites.txt
+   ```
+   `scripts/benign-eval.mjs` builds the production bundle, opens the site list in batches,
+   captures the extension console and writes `docs/evaluations/<date>-benign.md`. Results
+   are recorded per run under `docs/evaluations/`. Headless runs under-count ads (no
+   consent clicks, no scrolling), so they are a lower bound on exposure and should be
+   complemented by an interactive session following the protocol.
 
 Scenarios that cannot be tested without genuine samples: real NOAS selection, real
 validator and C2 traffic, exploit delivery. These remain unverified by design.

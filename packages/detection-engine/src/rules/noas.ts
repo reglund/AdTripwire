@@ -12,7 +12,7 @@ export function isNoasPattern(e: NormalizedEvent): boolean {
 
 /** NOAS pattern, or contact with a surveillance indicator whose role is "noas". */
 export function isNoasContact(e: NormalizedEvent, ctx: RuleContext): boolean {
-  if (e.eventType === "response_inspected") return false;
+  if (e.eventType === "response_inspected" || e.eventType === "page_signal") return false;
   if (isNoasPattern(e)) return true;
   return ctx
     .indicatorMatches(e)

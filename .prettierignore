@@ -5,3 +5,5 @@ pnpm-lock.yaml
 prompt.md
 packages/indicators/upstream/
 LICENSE
+packages/indicators/data/public-suffix-list.json
+docs/evaluations/

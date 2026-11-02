@@ -39,6 +39,13 @@ export interface IndicatorRecord {
   notes?: string;
   /** Free-form role tag from the source (e.g. "c2", "validator", "noas", "tracking"). */
   role?: string;
+  /**
+   * Validity window (ISO dates). Outside it the indicator still matches but is reported as
+   * `expired`/`not_yet_valid`, and rules lower confidence. Time-bounded infrastructure such as
+   * rotated CloudFront distributions should carry `validTo`.
+   */
+  validFrom?: string;
+  validTo?: string;
 }
 
 export interface IndicatorSetMeta {
@@ -65,4 +72,6 @@ export interface IndicatorMatch {
   setId: string;
   /** How the match was made. */
   matchKind: "exact_hostname" | "domain_suffix" | "hostname_path" | "url_path";
+  /** Validity relative to the evaluation time; "current" when no window is declared. */
+  validity: "current" | "expired" | "not_yet_valid";
 }

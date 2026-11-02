@@ -9,7 +9,9 @@
     "gecko": {
       "id": "adtripwire@reglund.github.io",
       "strict_min_version": "128.0",
-      "data_collection_permissions": { "required": ["none"] }
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "permissions": [
@@ -18,7 +20,9 @@
     "webRequestFilterResponse",
     "storage",
     "alarms",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "scripting",
+    "webNavigation"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -28,10 +32,19 @@
   "action": {
     "default_title": "AdTripwire",
     "default_popup": "popup.html",
-    "default_icon": { "48": "icons/icon-48.svg", "96": "icons/icon-96.svg" }
+    "default_icon": {
+      "48": "icons/icon-48.svg",
+      "96": "icons/icon-96.svg"
+    }
   },
-  "icons": { "48": "icons/icon-48.svg", "96": "icons/icon-96.svg" },
-  "options_ui": { "page": "dashboard.html#settings", "open_in_tab": true },
+  "icons": {
+    "48": "icons/icon-48.svg",
+    "96": "icons/icon-96.svg"
+  },
+  "options_ui": {
+    "page": "dashboard.html#settings",
+    "open_in_tab": true
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src 'none'; img-src 'self' data:; style-src 'self'"
   }

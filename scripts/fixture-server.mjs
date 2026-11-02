@@ -24,7 +24,15 @@ const H = {
   staging: `staging.synthetic-dsp.test:${port}`,
 };
 
-const page = (title, body) => `<!doctype html><meta charset="utf-8"><title>${title}</title>
+// Scenario pages reload themselves every 30 s so that a sensor registered after the first
+// load (e.g. the opt-in page sensor, registered once the extension finishes initialising)
+// observes a later load. Creative and helper pages do not refresh.
+const page = (
+  title,
+  body,
+  refresh = false,
+) => `<!doctype html><meta charset="utf-8"><title>${title}</title>
+${refresh ? '<meta http-equiv="refresh" content="30">' : ""}
 <h1>${title}</h1><p>Synthetic AdTripwire fixture. No real infrastructure is contacted.</p>${body}`;
 
 const adFrame = (inner) =>

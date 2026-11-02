@@ -1,21 +1,16 @@
 import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH, MDN_URL_CLASSIFICATION } from "./references.js";
-import {
-  RULE_VERSION,
-  buildDetection,
-  hasAnyFlag,
-  isFirstObservation,
-  relatedEvents,
-} from "./common.js";
+import { buildDetection, hasAnyFlag, isFirstObservation, relatedEvents } from "./common.js";
 import { isNoasContact } from "./noas.js";
+import { lineageRelation } from "./correlation-common.js";
 
 export const definition: RuleDefinition = {
   id: "profiling.fingerprinting_classified_in_ad_context",
   name: "Fingerprinting-classified request near documented ad infrastructure",
-  version: RULE_VERSION,
+  version: "1.1.0",
   description:
-    "Firefox classified a request as fingerprinting, and the same tab contacted NOAS/getAd-pattern or documented infrastructure within the correlation window.",
+    "Firefox classified a request as fingerprinting, and the same frame lineage (preferred) or tab contacted NOAS/getAd-pattern or documented infrastructure within the correlation window.",
   category: "profiling",
   severity: "suspicious",
   confidence: "low",
@@ -38,24 +33,28 @@ export const definition: RuleDefinition = {
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
   if (!hasAnyFlag(event, "fingerprinting")) return [];
   if (!isFirstObservation(event, ctx) || event.eventType === "request_error") return [];
-  const anchor = relatedEvents(event, ctx).find(
-    (e) =>
-      isNoasContact(e, ctx) ||
-      ctx
-        .indicatorMatches(e)
-        .some(
-          (m) =>
-            m.indicator.classification === "malicious" ||
-            m.indicator.classification === "surveillance",
-        ),
-  );
+  const isAnchor = (e: NormalizedEvent): boolean =>
+    isNoasContact(e, ctx) ||
+    ctx
+      .indicatorMatches(e)
+      .some(
+        (m) =>
+          m.indicator.classification === "malicious" ||
+          m.indicator.classification === "surveillance",
+      );
+  const prior = relatedEvents(event, ctx);
+  // Prefer an anchor in the same frame lineage; fall back to the tab.
+  let anchor = prior.find((e) => isAnchor(e) && lineageRelation(e, event) === "related");
+  const lineage = anchor !== undefined;
+  anchor ??= prior.find(isAnchor);
   if (!anchor) return [];
   const host = event.destination.hostname;
   return [
     buildDetection(definition, ctx, {
       subject: `${host}|${event.tabId ?? event.correlationId ?? ""}`,
-      confidenceRationale:
-        "Both observations are direct, but the link between them is inferred from tab and time only.",
+      confidenceRationale: lineage
+        ? "Both observations are direct and occurred in the same frame lineage, but the link between them is inferred from lineage and time only."
+        : "Both observations are direct, but the link between them is inferred from tab and time only (not the same frame lineage).",
       summary:
         "A fingerprinting-classified request occurred in the same tab as contact with documented ad-selection infrastructure.",
       significance:
@@ -73,8 +72,9 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         },
         {
           eventIds: [anchor.eventId, event.eventId],
-          observed:
-            "The two requests are assumed related only because they share a tab and time window.",
+          observed: lineage
+            ? "The two requests are assumed related because they share a frame lineage and time window."
+            : "The two requests are assumed related only because they share a tab and time window; they were not in the same frame lineage, or lineage was unavailable.",
           kind: "inferred",
         },
       ],

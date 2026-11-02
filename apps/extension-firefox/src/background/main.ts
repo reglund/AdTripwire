@@ -12,6 +12,7 @@ import type {
   MonitoringStatus,
   NormalizedEvent,
   SensorCapabilities,
+  SensorCapability,
   UiRequest,
 } from "@adtripwire/shared";
 import {
@@ -34,10 +35,13 @@ import {
   isNoasPath,
 } from "@adtripwire/sensor-firefox";
 import { LocalStore, EMPTY_METRICS, type Metrics } from "./storage.js";
-import { fail, isTrustedSender, ok, parseUiRequest } from "./messages.js";
+import { fail, isPageSensorSender, isTrustedSender, ok, parseUiRequest } from "./messages.js";
+import { buildPageSignalEvent, pageSignalAllowed } from "./page-signals.js";
+import { hostnameOf } from "@adtripwire/privacy";
 import syntheticSet from "../../../../tests/fixtures/indicators/synthetic.json";
 
 const SESSION_KEY_ENGINE = "engineSnapshot";
+const PAGE_SENSOR_ID = "adtripwire-page-sensor";
 const ALARM_RETENTION = "adtripwire-retention";
 const log = (level: "info" | "warn" | "error", msg: string) => {
   const line = `[AdTripwire] ${msg}`;
@@ -121,8 +125,13 @@ class Background {
 
   private async init(): Promise<void> {
     await this.store.load();
+    if (__ADTRIPWIRE_DEV__ && !(await browser.storage.local.get("settings")).settings) {
+      // DEV builds (never shipped) enable the page sensor so the browser-level test covers it.
+      await this.store.updateSettings({ pageSensorEnabled: true });
+    }
     this.metrics = await this.store.getMetrics();
     this.capabilities = await detectCapabilities();
+    await this.applyPageSensorSetting();
 
     let exposure = new MemoryExposureStore();
     const expSnap = await this.store.getExposureSnapshot();
@@ -151,6 +160,15 @@ class Background {
 
     browser.alarms.create(ALARM_RETENTION, { periodInMinutes: 60 });
     this.runRetention();
+    // Periodic aggregate line (counts only, no URLs) so evaluation runs can confirm the sensor
+    // is seeing traffic even when nothing is detected.
+    setInterval(() => {
+      const m = this.metrics;
+      log(
+        "info",
+        `stats: observed=${m.eventsObserved} ingested=${m.eventsIngested} inspections=${m.inspections} detections=${this.store.listDetections().length}`,
+      );
+    }, 60_000);
     this.isReady = true;
     const queued = this.preReady.splice(0);
     for (const ev of queued) this.onEvent(ev);
@@ -160,6 +178,110 @@ class Background {
     );
   }
 
+  /** Registers or unregisters the opt-in page sensor content script and updates capabilities. */
+  private async applyPageSensorSetting(): Promise<void> {
+    const enabled = this.store.getSettings().monitoring.pageSensorEnabled;
+    const caps = new Set<SensorCapability>(
+      this.capabilities.capabilities.filter((c) => c !== "page_signals"),
+    );
+    const notes = this.capabilities.notes.filter((n) => !n.startsWith("Page sensor"));
+    try {
+      const existing = await browser.scripting.getRegisteredContentScripts({
+        ids: [PAGE_SENSOR_ID],
+      });
+      if (enabled) {
+        if (existing.length === 0) {
+          await browser.scripting.registerContentScripts([
+            {
+              id: PAGE_SENSOR_ID,
+              js: ["page-sensor.js"],
+              matches: ["http://*/*", "https://*/*"],
+              allFrames: true,
+              matchOriginAsFallback: true,
+              runAt: "document_start",
+              persistAcrossSessions: false,
+            },
+          ]);
+        }
+        caps.add("page_signals");
+        log("info", "page sensor registered (sub-frames only)");
+        notes.push(
+          "Page sensor enabled by the user: an isolated content script in sub-frames reports structural signals (hidden iframe insertion, late third-party inserts, SDK messages). No page text or cookies.",
+        );
+      } else {
+        if (existing.length > 0)
+          await browser.scripting.unregisterContentScripts({ ids: [PAGE_SENSOR_ID] });
+        notes.push(
+          "Page sensor disabled (default): in-page insertions and messages are not observed.",
+        );
+      }
+    } catch (e) {
+      log("warn", `page sensor registration failed: ${String(e)}`);
+      notes.push("Page sensor unavailable: content-script registration failed.");
+    }
+    this.capabilities = { ...this.capabilities, capabilities: Array.from(caps), notes };
+    if (this.engine) {
+      this.engine = DetectionEngine.restore(
+        this.engine.snapshot(),
+        this.engineOptions(this.store.getSettings().monitoring),
+      );
+    }
+  }
+
+  /** Entry point for validated page-sensor messages. */
+  handlePageSignal(raw: unknown, sender: browser.runtime.MessageSender): void {
+    if (!this.store.getSettings().monitoring.pageSensorEnabled) return;
+    const tabId = sender.tab?.id ?? -1;
+    const frameId = sender.frameId ?? -1;
+    const now = Date.now();
+    if (!pageSignalAllowed(tabId, now)) return;
+    if (sender.tab?.incognito && this.store.getSettings().monitoring.excludeIncognito) return;
+    void this.frameAncestry(tabId, frameId).then((ancestry) => {
+      const ev = buildPageSignalEvent(
+        raw,
+        { tabId, frameId, ...(sender.url ? { frameUrl: sender.url } : {}) },
+        now,
+        ancestry,
+      );
+      if (ev) {
+        if (__ADTRIPWIRE_DEV__)
+          log("info", `page signal ${ev.pageSignal?.kind ?? "?"} (frame ${frameId})`);
+        this.onEvent(ev);
+      }
+    });
+  }
+
+  /**
+   * Frame ancestry from the browser (webNavigation), never from the page. Returns undefined
+   * when unavailable so the event carries the frame_ancestry_unavailable limitation.
+   */
+  private async frameAncestry(
+    tabId: number,
+    frameId: number,
+  ): Promise<{ frameIds: number[]; hostnames: string[] } | undefined> {
+    if (tabId < 0 || frameId <= 0) return undefined;
+    const frameIds: number[] = [];
+    const hostnames: string[] = [];
+    let current = frameId;
+    try {
+      for (let depth = 0; depth < 12; depth++) {
+        const f = await browser.webNavigation.getFrame({ tabId, frameId: current });
+        if (!f) return undefined;
+        if (f.parentFrameId < 0) break;
+        const parent = await browser.webNavigation.getFrame({ tabId, frameId: f.parentFrameId });
+        if (!parent) return undefined;
+        const h = hostnameOf(parent.url);
+        frameIds.push(f.parentFrameId);
+        hostnames.push(h ?? "unknown.invalid");
+        current = f.parentFrameId;
+        if (f.parentFrameId === 0) break;
+      }
+    } catch {
+      return undefined;
+    }
+    return { frameIds, hostnames };
+  }
+
   /**
    * Privacy policy for what enters the correlation window at all: third-party or framed
    * requests, indicator matches, and NOAS-pattern paths. First-party, top-level browsing
@@ -167,6 +289,7 @@ class Background {
    */
   private shouldObserve(ev: NormalizedEvent): boolean {
     this.metrics.eventsObserved++;
+    if (ev.eventType === "page_signal") return true;
     if (ev.resourceType === "main_frame") return false;
     if (ev.frameContext.thirdParty === true) return true;
     if (ev.frameContext.depth > 0) return true;
@@ -283,6 +406,19 @@ class Background {
       rulesetVersion: this.eng.rulesetVersion,
       productVersion: __ADTRIPWIRE_VERSION__,
     };
+    const m = this.metrics;
+    const stats = this.sensor.stats;
+    s.metrics = {
+      eventsObserved: m.eventsObserved,
+      eventsIngested: m.eventsIngested,
+      inspections: m.inspections,
+      inspectedBytes: m.inspectedBytes,
+      passThroughMsMean: m.inspections ? m.passThroughMsTotal / m.inspections : 0,
+      analysisMsMean: m.inspections ? m.analysisMsTotal / m.inspections : 0,
+      ingestMsMean: m.eventsIngested ? m.ingestMsTotal / m.eventsIngested : 0,
+      inspectionsSkippedForBudget: stats.skippedForBudget,
+      since: m.startedAt,
+    };
     if (significant) {
       s.lastSignificant = {
         detectionId: significant.detectionId,
@@ -322,6 +458,7 @@ class Background {
           this.eng.snapshot(),
           this.engineOptions(s.monitoring),
         );
+        if ("pageSensorEnabled" in req.patch) await this.applyPageSensorSetting();
         return s;
       }
       case "export_evidence": {
@@ -378,6 +515,11 @@ const bg = new Background();
 const baseUrl = browser.runtime.getURL("");
 
 browser.runtime.onMessage.addListener((raw: unknown, sender) => {
+  // Optional page sensor: fire-and-forget signals from our own content script in sub-frames.
+  if (raw && typeof raw === "object" && (raw as { type?: unknown }).type === "page_signal") {
+    if (isPageSensorSender(sender)) bg.handlePageSignal(raw, sender);
+    return undefined;
+  }
   if (!isTrustedSender(sender, baseUrl)) return Promise.resolve(fail("untrusted sender"));
   const req = parseUiRequest(raw);
   if (!req) return Promise.resolve(fail("invalid request"));

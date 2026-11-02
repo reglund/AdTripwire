@@ -21,6 +21,10 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
   NOAS-pattern paths, capped in size, and only _marker identifiers_ (e.g.
   `js.new_function`) and bounded statistics are kept, never source text.
 - **Private windows excluded** by default.
+- **Page sensor is opt-in and structural.** Off by default. When enabled, an isolated content
+  script runs only inside embedded sub-frames and reports hidden-iframe insertion, late
+  third-party script/image insertion and a documented SDK message type. It never reads page
+  text, form values, cookies or full URLs. See `docs/threat-model.md` → Page sensor.
 - **Retention.** 7 days by default, with caps on detections and events; configurable.
   "Delete all collected data" clears `storage.local` and `storage.session`.
 - **Exports are redacted.** The default profile keeps sanitized hostnames; the strict

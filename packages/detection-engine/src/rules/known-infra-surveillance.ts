@@ -1,9 +1,11 @@
 import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
-import { RULE_VERSION, buildDetection, classMatches } from "./common.js";
+import { buildDetection, classMatches, lowerConfidence } from "./common.js";
 import {
+  EXPIRED_LIMITATION,
   INFRA_FALSE_POSITIVES,
+  allExpired,
   INFRA_LIMITATIONS,
   contactMatches,
   describeMatch,
@@ -13,14 +15,14 @@ import {
 export const definition: RuleDefinition = {
   id: "known_infra.surveillance_contact",
   name: "Contact with documented surveillance-associated ad infrastructure",
-  version: RULE_VERSION,
+  version: "1.1.0",
   description:
     "A request was made to advertising or tracking infrastructure that published research associates with the AdFection surveillance operation. Selection-server (NOAS) contact is rated higher than tracking contact.",
   category: "known_infrastructure",
   severity: "suspicious",
   confidence: "high",
   confidenceBasis:
-    "Confidence is inherited from the indicator record and reflects the infrastructure attribution only. Contact with this kind of infrastructure is common exposure and is low-confidence evidence of personal targeting.",
+    "Confidence is inherited from the indicator record (one step lower when every match is past its documented validity window) and reflects the infrastructure attribution only. Expired indicators never raise severity above suspicious. Contact with this kind of infrastructure is common exposure and is low-confidence evidence of personal targeting.",
   requiredEvidence: [
     "Request destination hostname matching an enabled indicator classified 'surveillance'.",
   ],
@@ -40,7 +42,9 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   const top = matches[0];
   if (!top) return [];
   const host = event.destination.hostname;
-  const isNoas = matches.some((m) => m.indicator.role === "noas");
+  const expired = allExpired(matches);
+  // An expired NOAS indicator does not raise severity: the host may have been reassigned.
+  const isNoas = matches.some((m) => m.indicator.role === "noas" && m.validity !== "expired");
   const isTracking = !isNoas && matches.some((m) => m.indicator.role === "tracking");
   const severity = isNoas ? "elevated" : "suspicious";
   const summary = isNoas
@@ -57,8 +61,9 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
     buildDetection(definition, ctx, {
       subject: host,
       severity,
-      confidence: top.indicator.confidence,
-      confidenceRationale: `Indicator ${top.indicator.id} is rated ${top.indicator.confidence} confidence by its source. That is confidence in the infrastructure attribution; as evidence of personal targeting this contact is low confidence${isTracking ? " (very common exposure)" : ""}.`,
+      confidence: expired ? lowerConfidence(top.indicator.confidence) : top.indicator.confidence,
+      ...(expired ? { limitations: [...definition.limitations, EXPIRED_LIMITATION] } : {}),
+      confidenceRationale: `Indicator ${top.indicator.id} is rated ${top.indicator.confidence} confidence by its source${expired ? ", lowered one step here because it is past its documented validity window" : ""}. That is confidence in the infrastructure attribution; as evidence of personal targeting this contact is low confidence${isTracking ? " (very common exposure)" : ""}.`,
       summary,
       significance,
       evidence: matches.map((m) => ({

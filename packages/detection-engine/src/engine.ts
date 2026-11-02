@@ -95,9 +95,12 @@ export class DetectionEngine {
       Math.max(1, opts.maxWindowEvents ?? DEFAULT_MAX_WINDOW_EVENTS),
       opts.settings.correlationWindowMs,
     );
-    // Response inspection disabled in settings means the capability is effectively unavailable.
+    // A capability disabled in settings is effectively unavailable (response inspection, and
+    // the opt-in page sensor).
     this.#effectiveCaps = opts.capabilities.capabilities.filter(
-      (c) => c !== "response_body_inspection" || opts.settings.responseInspectionEnabled,
+      (c) =>
+        (c !== "response_body_inspection" || opts.settings.responseInspectionEnabled) &&
+        (c !== "page_signals" || opts.settings.pageSensorEnabled === true),
     );
   }
 
@@ -145,16 +148,20 @@ export class DetectionEngine {
     return missing;
   }
 
-  #indicatorMatches = (e: NormalizedEvent): IndicatorMatch[] => {
-    const key = `${e.destination.hostname}|${e.destination.pathPattern}`;
+  /**
+   * Indicator matches at evaluation time `now`. Validity windows are whole UTC days, so the
+   * cache key includes the UTC day and a cached validity can never be stale.
+   */
+  #indicatorMatches(e: NormalizedEvent, now: number): IndicatorMatch[] {
+    const key = `${e.destination.hostname}|${e.destination.pathPattern}|${Math.floor(now / 86_400_000)}`;
     let m = this.#matchCache.get(key);
     if (m === undefined) {
-      m = this.#matcher.match(e.destination.hostname, e.destination.pathPattern);
+      m = this.#matcher.match(e.destination.hostname, e.destination.pathPattern, now);
       if (this.#matchCache.size >= MATCH_CACHE_MAX) this.#matchCache.clear();
       this.#matchCache.set(key, m);
     }
     return m;
-  };
+  }
 
   ingest(input: NormalizedEvent): IngestResult {
     const now = this.#now();
@@ -162,7 +169,7 @@ export class DetectionEngine {
     this.pruneWindow(reference);
 
     const correlationId = deriveCorrelationId(input);
-    const matches = this.#indicatorMatches(input);
+    const matches = this.#indicatorMatches(input, now);
     const event: NormalizedEvent = {
       ...input,
       destination: {
@@ -172,6 +179,9 @@ export class DetectionEngine {
       frameContext: {
         ...input.frameContext,
         ancestorHostnames: [...input.frameContext.ancestorHostnames],
+        ...(input.frameContext.ancestorFrameIds
+          ? { ancestorFrameIds: [...input.frameContext.ancestorFrameIds] }
+          : {}),
         ...(input.frameContext.urlClassification
           ? {
               urlClassification: {
@@ -182,6 +192,7 @@ export class DetectionEngine {
           : {}),
       },
       observationLimitations: [...input.observationLimitations],
+      ...(input.pageSignal ? { pageSignal: { ...input.pageSignal } } : {}),
       ...(input.responseInspection
         ? {
             responseInspection: {
@@ -205,7 +216,7 @@ export class DetectionEngine {
       now,
       window: this.#window,
       exposure: this.#exposure,
-      indicatorMatches: this.#indicatorMatches,
+      indicatorMatches: (e) => this.#indicatorMatches(e, now),
     };
 
     const detections: Detection[] = [];

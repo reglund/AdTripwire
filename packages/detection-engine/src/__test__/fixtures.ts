@@ -11,6 +11,7 @@ import type {
   MonitoringSettings,
   NormalizedEvent,
   ObservationLimitation,
+  PageSignal,
   ResourceType,
   ResponseInspection,
   SensorCapability,
@@ -74,6 +75,7 @@ export const SYNTHETIC_SET: IndicatorSet = {
   ],
 };
 
+/** Every capability except the opt-in page sensor (see PAGE_CAPS). */
 export const ALL_CAPS: SensorCapability[] = [
   "request_metadata",
   "redirect_chain",
@@ -85,12 +87,15 @@ export const ALL_CAPS: SensorCapability[] = [
   "response_size",
 ];
 
+export const PAGE_CAPS: SensorCapability[] = [...ALL_CAPS, "page_signals"];
+
 export const T0 = Date.UTC(2026, 10, 2, 12, 0, 0);
 export const WINDOW_MS = 5 * 60 * 1000;
 
 export function settings(over: Partial<MonitoringSettings> = {}): MonitoringSettings {
   return {
     enabled: true,
+    pageSensorEnabled: false,
     responseInspectionEnabled: true,
     responseInspectionMaxBytes: 512 * 1024,
     excludeIncognito: true,
@@ -120,9 +125,19 @@ export interface EvOpts {
   redirectHost?: string;
   limitations?: ObservationLimitation[];
   correlationId?: string;
+  /** Frame id (default: depth). */
+  frameId?: number;
+  /** Parent frame id (default: frameId - 1). */
+  parentFrameId?: number;
+  /**
+   * Ancestor frame ids. Default is Firefox-like: [] at depth 0, else [depth-1, ..., 0].
+   * `null` omits the field (Chromium-like sensor without frame ancestry).
+   */
+  ancestors?: number[] | null;
 }
 
 const STATUS: Record<EventType, NormalizedEvent["requestStatus"]> = {
+  page_signal: "unknown",
   request_started: "started",
   request_redirected: "redirected",
   request_headers_received: "headers_received",
@@ -136,6 +151,11 @@ export function ev(o: EvOpts): NormalizedEvent {
   seq++;
   const eventType = o.eventType ?? "request_started";
   const depth = o.depth ?? 0;
+  const frameId = o.frameId ?? depth;
+  const ancestors =
+    o.ancestors === null
+      ? undefined
+      : (o.ancestors ?? Array.from({ length: depth }, (_, i) => depth - 1 - i));
   const e: NormalizedEvent = {
     eventId: `evt-${seq}`,
     timestamp: o.t ?? T0,
@@ -154,9 +174,10 @@ export function ev(o: EvOpts): NormalizedEvent {
     resourceType: o.type ?? "script",
     method: "GET",
     frameContext: {
-      frameId: depth,
-      parentFrameId: depth - 1,
+      frameId,
+      parentFrameId: o.parentFrameId ?? frameId - 1,
       ancestorHostnames: [],
+      ...(ancestors !== undefined ? { ancestorFrameIds: ancestors } : {}),
       depth,
       thirdParty: o.thirdParty ?? true,
       topHostname: o.topHost ?? "news.synthetic-publisher.test",
@@ -173,6 +194,7 @@ export function ev(o: EvOpts): NormalizedEvent {
     ...(o.redirectHost !== undefined ? { redirectHostname: o.redirectHost } : {}),
     ...(o.correlationId !== undefined ? { correlationId: o.correlationId } : {}),
   };
+  if (eventType === "page_signal") e.sensor = "page";
   if (eventType === "response_inspected") {
     e.responseInspection = {
       observedBytes: 4096,
@@ -237,13 +259,22 @@ export class Harness {
       caps?: SensorCapability[];
       windowMs?: number;
       rules?: readonly Rule[];
+      /** Enable the opt-in page sensor (capability + setting). */
+      pageSensor?: boolean;
     } = {},
   ) {
-    const { caps, windowMs, ...rest } = over;
+    const { caps, windowMs, pageSensor, ...rest } = over;
     this.engine = new DetectionEngine({
       matcher: new IndicatorMatcher([SYNTHETIC_SET]),
-      capabilities: { browser: "firefox", capabilities: caps ?? ALL_CAPS, notes: [] },
-      settings: settings(windowMs !== undefined ? { correlationWindowMs: windowMs } : {}),
+      capabilities: {
+        browser: "firefox",
+        capabilities: caps ?? (pageSensor ? PAGE_CAPS : ALL_CAPS),
+        notes: [],
+      },
+      settings: settings({
+        ...(windowMs !== undefined ? { correlationWindowMs: windowMs } : {}),
+        ...(pageSensor ? { pageSensorEnabled: true } : {}),
+      }),
       now: () => this.clock,
       ...rest,
     });
@@ -261,3 +292,28 @@ export class Harness {
 }
 
 export const ids = (ds: Detection[]): string[] => ds.map((d) => d.ruleId).sort();
+
+/** A page-sensor signal in the given frame (Firefox-like lineage by default). */
+export function sig(
+  kind: PageSignal["kind"],
+  o: Partial<EvOpts> & { target?: string; crossOrigin?: boolean; msSinceLoad?: number } = {},
+): NormalizedEvent {
+  const { target, crossOrigin, msSinceLoad, ...rest } = o;
+  const e = ev({
+    host: "ad.synthetic-exchange.test",
+    type: "other",
+    depth: 1,
+    ...rest,
+    eventType: "page_signal",
+  });
+  delete e.requestId;
+  delete e.resourceType;
+  delete e.method;
+  e.pageSignal = {
+    kind,
+    ...(target !== undefined ? { targetHostname: target } : {}),
+    ...(crossOrigin !== undefined ? { crossOrigin } : {}),
+    ...(msSinceLoad !== undefined ? { msSinceLoad } : {}),
+  };
+  return e;
+}

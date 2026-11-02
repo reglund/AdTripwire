@@ -47,12 +47,22 @@ const common = {
   },
 };
 
+// The optional page sensor is a content script: classic script (IIFE), separate bundle.
+const pageSensor = {
+  ...common,
+  format: "iife",
+  entryPoints: { "page-sensor": join(here, "src/page-sensor/page-sensor.ts") },
+};
+
 if (watch) {
   const ctx = await context(common);
   await ctx.watch();
+  const ctx2 = await context(pageSensor);
+  await ctx2.watch();
   console.log("watching…");
 } else {
   await build(common);
+  await build(pageSensor);
   // Guard: the production bundle must not contain eval/new Function or reserved test TLD names.
   const bg = readFileSync(join(dist, "background.js"), "utf8");
   const bad = [];

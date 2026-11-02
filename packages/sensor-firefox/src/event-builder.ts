@@ -61,10 +61,14 @@ export function buildFrameContext(
 ): FrameContext {
   const ancestors = d.frameAncestors;
   const ancestorHostnames: string[] = [];
+  const ancestorFrameIds: number[] = [];
   if (ancestors) {
     for (const a of ancestors) {
       const h = hostnameOf(a.url);
-      if (h) ancestorHostnames.push(h);
+      if (h) {
+        ancestorHostnames.push(h);
+        ancestorFrameIds.push(a.frameId);
+      }
     }
   } else {
     limitations.push("frame_ancestry_unavailable");
@@ -75,6 +79,7 @@ export function buildFrameContext(
     ancestorHostnames,
     depth: ancestors ? ancestors.length : d.frameId === 0 ? 0 : 1,
   };
+  if (ancestors) ctx.ancestorFrameIds = ancestorFrameIds;
   const docHost = d.documentUrl ? hostnameOf(d.documentUrl) : null;
   if (docHost) ctx.documentHostname = docHost;
   const top =

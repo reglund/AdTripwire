@@ -13,7 +13,8 @@ export type SensorCapability =
   | "url_classification" // Firefox Tracking Protection flags
   | "response_headers"
   | "response_body_inspection" // Firefox filterResponseData
-  | "response_size";
+  | "response_size"
+  | "page_signals"; // opt-in page sensor active
 
 export interface SensorCapabilities {
   browser: BrowserName;

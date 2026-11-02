@@ -1,13 +1,19 @@
 import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
-import { RULE_VERSION, buildDetection, classMatches } from "./common.js";
-import { contactMatches, describeMatch, indicatorReferences } from "./known-infra-common.js";
+import { buildDetection, classMatches } from "./common.js";
+import {
+  EXPIRED_LIMITATION,
+  allExpired,
+  contactMatches,
+  describeMatch,
+  indicatorReferences,
+} from "./known-infra-common.js";
 
 export const definition: RuleDefinition = {
   id: "known_infra.contextual_contact",
   name: "Contact with a contextual (attribution-related) host",
-  version: RULE_VERSION,
+  version: "1.1.0",
   description:
     "A request was made to a corporate or attribution-related host named in research. This is a lead for an analyst, not a finding.",
   category: "known_infrastructure",
@@ -37,6 +43,9 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   return [
     buildDetection(definition, ctx, {
       subject: host,
+      ...(allExpired(matches)
+        ? { limitations: [...definition.limitations, EXPIRED_LIMITATION] }
+        : {}),
       confidenceRationale:
         "Contextual leads are named in research for background or attribution only; contact carries no implication of targeting.",
       summary:

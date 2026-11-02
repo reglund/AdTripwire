@@ -343,7 +343,9 @@ describe("DetectionEngine scenarios", () => {
         ev({
           host: "cdn.synthetic-benign.test",
           eventType: "response_inspected",
-          inspection: { markers: ["js.cookie_read", "js.cookie_tilde_join"] },
+          inspection: {
+            markers: ["js.colocated_cookie_exfil", "js.cookie_read", "js.cookie_tilde_join"],
+          },
         }),
       );
       const { detections } = h.ingest(ev({ host: "c2.synthetic-adfection.test", t: T0 + 3000 }));
@@ -398,7 +400,9 @@ describe("DetectionEngine scenarios", () => {
     const caps = ALL_CAPS.filter((c) => c !== "response_body_inspection");
     const h = new Harness({ caps });
     const status = h.engine.listRules();
-    const jsRules = status.filter((s) => s.definition.category === "javascript_technique");
+    const jsRules = status.filter(
+      (s) => s.definition.category === "javascript_technique" && s.definition.id.startsWith("js."),
+    );
     expect(jsRules.length).toBeGreaterThanOrEqual(6);
     for (const s of jsRules) {
       expect(s.evaluable).toBe(false);
@@ -442,7 +446,7 @@ describe("DetectionEngine scenarios", () => {
     expect(
       engine
         .listRules()
-        .filter((s) => s.definition.category === "javascript_technique")
+        .filter((s) => s.definition.id.startsWith("js."))
         .every((s) => !s.evaluable),
     ).toBe(true);
   });
@@ -543,7 +547,7 @@ describe("DetectionEngine scenarios", () => {
 
   it("rulesetVersion format", () => {
     const h = new Harness();
-    expect(h.engine.rulesetVersion).toMatch(/^19r-[0-9a-f]{8}$/);
+    expect(h.engine.rulesetVersion).toMatch(/^22r-[0-9a-f]{8}$/);
   });
 
   it("13. language guard sanity: the guard rejects forbidden words", async () => {

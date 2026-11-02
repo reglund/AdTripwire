@@ -38,7 +38,7 @@ describe("12. rule metadata completeness", () => {
       );
       expect(typeof r.evaluate).toBe("function");
     }
-    expect(ALL_RULES.length).toBe(19);
+    expect(ALL_RULES.length).toBe(22);
   });
 });
 
@@ -59,7 +59,11 @@ describe("helpers", () => {
   it("jsGrade", () => {
     expect(jsGrade([])).toBeNull();
     expect(jsGrade(["js.error_stack_trap"])).toBe("informational");
-    expect(jsGrade(["js.cookie_read", "js.image_beacon"])).toBe("elevated");
+    expect(jsGrade(["js.cookie_read", "js.image_beacon", "js.colocated_cookie_exfil"])).toBe(
+      "elevated",
+    );
+    // Not co-located: the combination no longer grades.
+    expect(jsGrade(["js.cookie_read", "js.image_beacon"])).toBeNull();
   });
 });
 
@@ -251,14 +255,20 @@ describe("individual rules", () => {
     const run = (markers: string[], host: string) =>
       h.ingest(ev({ host, eventType: "response_inspected", inspection: { markers } })).detections;
     const dyn = run(
-      ["js.new_function", "js.timer_polling", "js.aes_cbc"],
+      ["js.new_function", "js.timer_polling", "js.aes_cbc", "js.colocated_dynamic_transport"],
       "d1.synthetic-benign.test",
     );
+    expect(
+      run(["js.new_function", "js.timer_polling", "js.aes_cbc"], "d1b.synthetic-benign.test"),
+    ).toEqual([]);
     expect(dyn.find((d) => d.ruleId === "js.dynamic_code_with_transport")!.severity).toBe(
       "suspicious",
     );
     expect(run(["js.new_function", "js.websocket"], "d2.synthetic-benign.test")).toEqual([]);
-    const cookie = run(["js.cookie_read", "js.cookie_tilde_join"], "d3.synthetic-benign.test");
+    const cookie = run(
+      ["js.cookie_read", "js.cookie_tilde_join", "js.colocated_cookie_exfil"],
+      "d3.synthetic-benign.test",
+    );
     expect(cookie.find((d) => d.ruleId === "js.cookie_exfil_pattern")!.severity).toBe("elevated");
     const doh = run(["js.doh_cloudflare", "js.raw_ip_fetch"], "d4.synthetic-benign.test");
     expect(doh.find((d) => d.ruleId === "js.doh_then_raw_ip")!.confidence).toBe("medium");

@@ -7,6 +7,9 @@ import type {
   Confidence,
   MonitoringStatus,
   DetectionCategory,
+  PageSignal,
+  PageSignalKind,
+  SensorName,
   SanitizedUrl,
   SensorCapabilities,
   SensorCapability,
@@ -56,6 +59,7 @@ export const CATEGORY_ORDER: readonly DetectionCategory[] = [
 ];
 
 export const CAPABILITY_LABELS: Record<SensorCapability, string> = {
+  page_signals: "Page signals (opt-in sensor)",
   request_metadata: "Request metadata",
   redirect_chain: "Redirect chains",
   frame_ancestry: "Frame ancestry",
@@ -78,9 +82,13 @@ const CAPABILITY_CAN_SEE: Record<SensorCapability, string> = {
   response_body_inspection:
     "Technique markers in a bounded prefix of selected script responses (marker names only, never source text).",
   response_size: "Response size, when the server states it.",
+  page_signals:
+    "Structural in-page signals from sub-frames (hidden iframe insertion, SDK messages), when the opt-in page sensor is enabled.",
 };
 
 const CAPABILITY_CANNOT_SEE: Record<SensorCapability, string> = {
+  page_signals:
+    "The opt-in page sensor is off, so in-page insertions and messages are not observed.",
   request_metadata: "Request metadata is not available, so most rules cannot run.",
   redirect_chain: "Redirect chains are not observable in this browser.",
   frame_ancestry:
@@ -254,4 +262,84 @@ export function monitoringPill(
 ): PillState {
   if (!status.hostPermissionGranted) return "permission";
   return status.monitoring ? "active" : "paused";
+}
+
+export const PAGE_SIGNAL_LABELS: Record<PageSignalKind, string> = {
+  postmessage_sdk_ready: "SDK-ready message",
+  postmessage_wildcard_like: "Cross-origin typed message",
+  hidden_iframe_inserted: "Hidden iframe inserted",
+  script_inserted: "Late third-party script inserted",
+  beacon_image_inserted: "Late 1x1 image inserted",
+};
+
+export function pageSignalLabel(kind: string): string {
+  return (PAGE_SIGNAL_LABELS as Record<string, string | undefined>)[kind] ?? humanize(kind);
+}
+
+export const SENSOR_LABELS: Record<SensorName, string> = {
+  webrequest: "Web request",
+  "response-filter": "Response filter",
+  navigation: "Navigation",
+  page: "Page (opt-in)",
+  synthetic: "Synthetic",
+};
+
+export function sensorLabel(sensor: string): string {
+  return (SENSOR_LABELS as Record<string, string | undefined>)[sensor] ?? humanize(sensor);
+}
+
+/** Milliseconds as "123 ms" or "1.5 s". Invalid input yields "unknown". */
+export function formatMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "unknown";
+  if (ms < 1000) return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
+
+export interface PageSignalView {
+  label: string;
+  targetHostname: string | null;
+  crossOrigin: boolean;
+  /** "123 ms after load", or null when not reported. */
+  timing: string | null;
+}
+
+/** Presentation facts for a page_signal event; omitted fields are never invented. */
+export function describePageSignal(signal: PageSignal): PageSignalView {
+  return {
+    label: pageSignalLabel(signal.kind),
+    targetHostname: signal.targetHostname ?? null,
+    crossOrigin: signal.crossOrigin === true,
+    timing:
+      signal.msSinceLoad !== undefined && Number.isFinite(signal.msSinceLoad)
+        ? `${formatMs(signal.msSinceLoad)} after load`
+        : null,
+  };
+}
+
+/** Text for a rule that cannot be evaluated. Page-sensor-only gaps point at Settings. */
+export function missingCapabilitiesText(missing: readonly string[]): string {
+  if (missing.length === 1 && missing[0] === "page_signals") {
+    return "Requires the optional page sensor (Settings).";
+  }
+  return `Not evaluable in this browser (missing: ${missing.map(capabilityLabel).join(", ") || "unspecified"}).`;
+}
+
+export interface MetricRow {
+  label: string;
+  value: string;
+}
+
+/** Rows for the Runtime metrics card. Counts use locale grouping; means are in milliseconds. */
+export function metricRows(m: NonNullable<MonitoringStatus["metrics"]>): MetricRow[] {
+  const count = (n: number): string => (Number.isFinite(n) ? n.toLocaleString("en-US") : "unknown");
+  return [
+    { label: "Events observed", value: count(m.eventsObserved) },
+    { label: "Events ingested", value: count(m.eventsIngested) },
+    { label: "Response inspections", value: count(m.inspections) },
+    { label: "Bytes inspected", value: formatBytes(m.inspectedBytes) },
+    { label: "Mean pass-through time", value: formatMs(m.passThroughMsMean) },
+    { label: "Mean analysis time", value: formatMs(m.analysisMsMean) },
+    { label: "Mean ingest time", value: formatMs(m.ingestMsMean) },
+    { label: "Inspections skipped for budget", value: count(m.inspectionsSkippedForBudget) },
+  ];
 }

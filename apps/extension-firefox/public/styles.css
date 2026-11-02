@@ -675,3 +675,11 @@ details.rule[open] {
     transition: background-color 0.1s;
   }
 }
+
+/* Optional page sensor consent */
+.page-sensor .notice-warn {
+  margin-bottom: 0.75rem;
+}
+.page-sensor .notice-warn h4 {
+  margin-top: 0;
+}

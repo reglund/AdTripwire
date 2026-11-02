@@ -2,6 +2,14 @@ import type { IndicatorMatch, NormalizedEvent } from "@adtripwire/shared";
 import type { RuleContext } from "./types.js";
 import { isFirstObservation } from "./common.js";
 
+export const EXPIRED_LIMITATION =
+  "Indicator past its documented validity window; the host may have been reassigned.";
+
+/** True when there is at least one match and every match is past its validity window. */
+export function allExpired(matches: readonly IndicatorMatch[]): boolean {
+  return matches.length > 0 && matches.every((m) => m.validity === "expired");
+}
+
 export const INFRA_LIMITATIONS = [
   "Indicator lists reflect what researchers published at a point in time; infrastructure changes hands and may be reused or retired.",
   "A hostname match says nothing about what was delivered, or whether anything executed.",
@@ -29,7 +37,13 @@ export function describeMatch(m: IndicatorMatch): string {
         : m.matchKind === "hostname_path"
           ? "documented hostname and path"
           : "documented path";
-  return `Destination matched indicator ${m.indicator.id} (${m.indicator.classification}${m.indicator.role ? `, role ${m.indicator.role}` : ""}; ${kind}) from ${m.indicator.source}.`;
+  const validity =
+    m.validity === "expired"
+      ? " The indicator is past its documented validity window."
+      : m.validity === "not_yet_valid"
+        ? " The indicator's documented validity window has not started yet."
+        : "";
+  return `Destination matched indicator ${m.indicator.id} (${m.indicator.classification}${m.indicator.role ? `, role ${m.indicator.role}` : ""}; ${kind}) from ${m.indicator.source}.${validity}`;
 }
 
 export function indicatorReferences(

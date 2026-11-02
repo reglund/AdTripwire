@@ -11,12 +11,14 @@ import {
 import {
   categoryLabel,
   confidenceLabel,
+  describePageSignal,
   formatBytes,
   formatSanitizedUrl,
   formatTimeMs,
   formatTimestamp,
   humanize,
   pluralize,
+  sensorLabel,
   severityLabel,
 } from "../format.js";
 import { rpc } from "../rpc.js";
@@ -29,12 +31,15 @@ function eventRowId(detectionId: string, eventId: string): string {
 }
 
 function eventStatus(ev: NormalizedEvent): string {
+  if (ev.pageSignal) return "not applicable";
   const base = humanize(ev.requestStatus);
   return ev.statusCode !== undefined ? `${base} (${ev.statusCode})` : base;
 }
 
 function eventNotes(ev: NormalizedEvent): string {
   const parts: string[] = ev.observationLimitations.map((l) => humanize(l));
+  const ps = ev.pageSignal ? describePageSignal(ev.pageSignal) : null;
+  if (ps?.timing) parts.push(ps.timing);
   const ri = ev.responseInspection;
   if (ri) {
     parts.push(
@@ -43,6 +48,35 @@ function eventNotes(ev: NormalizedEvent): string {
     );
   }
   return parts.length > 0 ? parts.join("; ") : "None";
+}
+
+function eventCell(ev: NormalizedEvent): HTMLElement {
+  const ps = ev.pageSignal ? describePageSignal(ev.pageSignal) : null;
+  return h(
+    "td",
+    null,
+    ps ? `Page signal: ${ps.label}` : humanize(ev.eventType),
+    h("div", { class: "muted small" }, `Sensor: ${sensorLabel(ev.sensor)}`),
+  );
+}
+
+function destinationCell(ev: NormalizedEvent): HTMLElement {
+  if (!ev.pageSignal) {
+    return h(
+      "td",
+      { class: "mono wrap", title: "Query parameter names only; values are never stored." },
+      formatSanitizedUrl(ev.destination),
+    );
+  }
+  const ps = describePageSignal(ev.pageSignal);
+  return h(
+    "td",
+    { class: "wrap" },
+    ps.targetHostname !== null
+      ? h("span", { class: "mono" }, ps.targetHostname)
+      : h("span", { class: "muted" }, "No target hostname"),
+    ps.crossOrigin ? [" ", h("span", { class: "badge kind" }, "cross-origin")] : null,
+  );
 }
 
 function eventTable(detectionId: string, events: NormalizedEvent[]): HTMLElement {
@@ -65,13 +99,9 @@ function eventTable(detectionId: string, events: NormalizedEvent[]): HTMLElement
         { class: "nowrap", title: formatTimestamp(ev.timestamp) },
         formatTimeMs(ev.timestamp),
       ),
-      h("td", null, humanize(ev.eventType)),
-      h("td", null, ev.resourceType ?? "unknown"),
-      h(
-        "td",
-        { class: "mono wrap", title: "Query parameter names only; values are never stored." },
-        formatSanitizedUrl(ev.destination),
-      ),
+      eventCell(ev),
+      h("td", null, ev.pageSignal ? "not applicable" : (ev.resourceType ?? "unknown")),
+      destinationCell(ev),
       h("td", null, ev.frameContext.depth < 0 ? "unknown" : String(ev.frameContext.depth)),
       h("td", null, eventStatus(ev)),
       h(

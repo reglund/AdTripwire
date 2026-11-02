@@ -21,6 +21,21 @@ export interface MonitoringStatus {
     eventsStored: number;
   };
   lastSignificant?: Pick<Detection, "detectionId" | "timestamp" | "severity" | "summary">;
+  /** Aggregate, privacy-safe runtime metrics (no URLs). */
+  metrics?: {
+    eventsObserved: number;
+    eventsIngested: number;
+    inspections: number;
+    inspectedBytes: number;
+    /** Mean milliseconds spent inside StreamFilter callbacks per inspected response. */
+    passThroughMsMean: number;
+    /** Mean milliseconds of deferred analysis per inspected response. */
+    analysisMsMean: number;
+    /** Mean milliseconds per engine ingest. */
+    ingestMsMean: number;
+    inspectionsSkippedForBudget: number;
+    since: number;
+  };
   indicatorSets: IndicatorSetMeta[];
   rulesetVersion: string;
   productVersion: string;

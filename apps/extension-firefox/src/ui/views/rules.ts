@@ -2,9 +2,9 @@ import type { RuleDefinition } from "@adtripwire/shared";
 import { externalLink, h, severityBadge } from "../dom.js";
 import {
   CATEGORY_ORDER,
-  capabilityLabel,
   categoryLabel,
   confidenceLabel,
+  missingCapabilitiesText,
   pluralize,
   severityLabel,
 } from "../format.js";
@@ -38,7 +38,7 @@ function ruleItem(entry: RuleEntry): HTMLElement {
       { class: entry.evaluable ? "muted" : "notice-warn" },
       entry.evaluable
         ? "Evaluable in this browser."
-        : `Not evaluable in this browser (missing: ${entry.missingCapabilities.map(capabilityLabel).join(", ") || "unspecified"}).`,
+        : missingCapabilitiesText(entry.missingCapabilities),
     ),
     h(
       "p",

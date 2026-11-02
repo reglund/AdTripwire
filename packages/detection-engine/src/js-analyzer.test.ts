@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { JS_MARKER_DESCRIPTIONS, analyzeJavaScript } from "./js-analyzer.js";
+import {
+  JS_COLOCATION_MAX_CHARS,
+  JS_MARKER_DESCRIPTIONS,
+  analyzeJavaScript,
+  buildCodeView,
+} from "./js-analyzer.js";
 
 const POSITIVE: Record<string, string> = {
   "js.new_function": 'var f = new Function("return (" + code + ")");',
@@ -139,8 +144,9 @@ describe("analyzeJavaScript", () => {
     const code = `document.cookie = "${sentinel}"; new Function("${sentinel}"); fetch("https://" + ${sentinel} + "/json");`;
     const r = analyzeJavaScript(code);
     expect(JSON.stringify(r)).not.toContain(sentinel);
-    expect(Object.keys(r).sort()).toEqual(["markers", "stats"]);
+    expect(Object.keys(r).sort()).toEqual(["markers", "proximity", "stats"]);
     for (const m of r.markers) expect(m).toMatch(/^js\.[a-z0-9_]+$/);
+    for (const v of Object.values(r.proximity)) expect(typeof v).toBe("number");
   });
 
   it("stays fast on adversarial input", () => {
@@ -166,6 +172,20 @@ describe("ReDoS resistance (review H1)", () => {
       '"'.repeat(262_000),
       "\\x41".repeat(60_000),
       "a ".repeat(131_000),
+      // Phase 2 regexes and scanners
+      "fetch(" + " ".repeat(262_000) + "x",
+      "document[" + " ".repeat(262_000) + "x",
+      "getExtension(" + " ".repeat(262_000) + "x",
+      "__defineGetter__(" + " ".repeat(262_000) + "x",
+      "width=1" + " ".repeat(262_000) + "x",
+      "width=1;".repeat(30_000),
+      "setInterval(f," + "(".repeat(100_000),
+      "setInterval(".repeat(20_000),
+      "/".repeat(262_000),
+      "/[".repeat(130_000),
+      "`${".repeat(80_000),
+      "'webdriver'".repeat(20_000),
+      "/*" + "x".repeat(2_000) + ".min.js" + " ".repeat(200_000),
     ];
     for (const input of cases) {
       const t0 = performance.now();
@@ -173,5 +193,128 @@ describe("ReDoS resistance (review H1)", () => {
       const ms = performance.now() - t0;
       expect(ms, `input starting ${input.slice(0, 12)} took ${ms.toFixed(0)} ms`).toBeLessThan(300);
     }
+  });
+});
+
+describe("context-aware analysis (Phase 2)", () => {
+  it("code view blanks comments and literal contents while keeping offsets", () => {
+    const src = `a(1); // eval(x)\nvar s = "new Function(";/* WebSocket */ var t = \`x\${eval(y)}z\`; var r = /eval(/;`;
+    const code = buildCodeView(src);
+    expect(code.length).toBe(src.length);
+    expect(code).not.toContain("// eval");
+    expect(code).not.toContain("new Function");
+    expect(code).not.toContain("WebSocket");
+    expect(code).toContain('"'); // delimiters kept
+    expect(code).toContain("eval(y)"); // template substitution is code
+    expect(code.indexOf("var t")).toBe(src.indexOf("var t"));
+    expect(code.slice(code.indexOf("var r"))).not.toContain("eval");
+  });
+
+  it("markers inside comments and strings no longer fire; real code still does", () => {
+    expect(analyzeJavaScript("// eval(x)\nvar a = 1;").markers).not.toContain("js.eval");
+    expect(analyzeJavaScript("/* eval(x) */ var a = 1;").markers).not.toContain("js.eval");
+    expect(analyzeJavaScript('var msg = "new Function(x)";').markers).not.toContain(
+      "js.new_function",
+    );
+    expect(analyzeJavaScript("var doc = 'new WebSocket(u)';").markers).not.toContain(
+      "js.websocket",
+    );
+    expect(analyzeJavaScript("// setInterval(f, 10)").markers).not.toContain("js.timer_polling");
+    expect(analyzeJavaScript('log("document.cookie")').markers).not.toContain("js.cookie_read");
+    expect(analyzeJavaScript("// document.createElement('iframe')").markers).not.toContain(
+      "js.iframe_create",
+    );
+    expect(analyzeJavaScript("// navigator.webdriver").markers).not.toContain("js.webdriver_probe");
+    expect(analyzeJavaScript("eval(x)").markers).toContain("js.eval");
+    expect(analyzeJavaScript('var f = new Function("a", "return a");').markers).toContain(
+      "js.new_function",
+    );
+    expect(analyzeJavaScript('if ("webdriver" in navigator) {}').markers).toContain(
+      "js.webdriver_probe",
+    );
+    expect(analyzeJavaScript('var c = document["cookie"];').markers).toContain("js.cookie_read");
+    expect(analyzeJavaScript("var t = `a${eval(x)}b`;").markers).toContain("js.eval");
+  });
+
+  it("string-content markers still read literal text", () => {
+    const r = analyzeJavaScript(
+      "parent.postMessage({type:'analytics_sdk_ready'}, '*'); var u = 'sdk.js?script_tok=' + t; x.join('~~~');",
+    );
+    expect(r.markers).toEqual(
+      expect.arrayContaining([
+        "js.adfection_sdk_ready",
+        "js.adfection_script_tok",
+        "js.cookie_tilde_join",
+        "js.postmessage_wildcard",
+      ]),
+    );
+    expect(analyzeJavaScript("// postMessage(m, '*')").markers).not.toContain(
+      "js.postmessage_wildcard",
+    );
+  });
+
+  it("records the first offset of each marker", () => {
+    const src = "var a = 1;\neval(x);\neval(y);\nnew WebSocket(u);";
+    const r = analyzeJavaScript(src);
+    expect(r.proximity["js.websocket"]).toBe(src.indexOf("WebSocket"));
+    expect(Math.abs(r.proximity["js.eval"]! - src.indexOf("eval(x)"))).toBeLessThanOrEqual(1);
+  });
+
+  it("co-location: dynamic code + transport + crypto only combine within the threshold", () => {
+    const near = "var k = crypto.subtle; var s = new WebSocket(u); var f = new Function(p);";
+    expect(analyzeJavaScript(near).markers).toContain("js.colocated_dynamic_transport");
+    const far =
+      "var k = crypto.subtle;" +
+      " ".repeat(JS_COLOCATION_MAX_CHARS + 100) +
+      "var s = new WebSocket(u); var f = new Function(p);";
+    const r = analyzeJavaScript(far);
+    expect(r.markers).toEqual(
+      expect.arrayContaining(["js.crypto_subtle", "js.websocket", "js.new_function"]),
+    );
+    expect(r.markers).not.toContain("js.colocated_dynamic_transport");
+  });
+
+  it("co-location: cookie read and beacon", () => {
+    const near = "var c = document.cookie; var i = new Image(); i.src = u + c;";
+    expect(analyzeJavaScript(near).markers).toContain("js.colocated_cookie_exfil");
+    const far = "var c = document.cookie;" + ";".repeat(5000) + "var i = new Image(); i.src = u;";
+    expect(analyzeJavaScript(far).markers).not.toContain("js.colocated_cookie_exfil");
+  });
+
+  it("minified-bundle baseline suppresses short identifiers unless other obfuscation is present", () => {
+    const body = Array.from({ length: 120 }, (_, i) => `a${i % 10}=b(c);`).join("");
+    expect(analyzeJavaScript(body).markers).toContain("js.obfuscation_short_identifiers");
+    for (const banner of ["/*! lib v1 | MIT */\n", "/* lib.min.js */\n"]) {
+      expect(analyzeJavaScript(banner + body).markers).not.toContain(
+        "js.obfuscation_short_identifiers",
+      );
+    }
+    expect(analyzeJavaScript(body + "\n//# sourceMappingURL=app.js.map").markers).not.toContain(
+      "js.obfuscation_short_identifiers",
+    );
+    expect(analyzeJavaScript("/*! lib */\n" + body + "var z=!![];").markers).toEqual(
+      expect.arrayContaining(["js.obfuscation_short_identifiers", "js.obfuscation_bang_bracket"]),
+    );
+  });
+
+  it("timer_polling reads the interval of the setInterval call itself", () => {
+    expect(analyzeJavaScript("setInterval(function(){ g(a, 5); }, 60000)").markers).not.toContain(
+      "js.timer_polling",
+    );
+    expect(analyzeJavaScript("setInterval(tick, 60000); h(x, 100)").markers).not.toContain(
+      "js.timer_polling",
+    );
+    expect(analyzeJavaScript("setInterval(function(){ g(a, 50000); }, 500)").markers).toContain(
+      "js.timer_polling",
+    );
+    expect(analyzeJavaScript('setInterval(f, 1000, "a,b)")').markers).toContain("js.timer_polling");
+    expect(analyzeJavaScript("setInterval(f, delay)").markers).not.toContain("js.timer_polling");
+  });
+
+  it("iframe_1x1 property form requires 'iframe' within 600 chars", () => {
+    const near = "var f = document.createElement('iframe'); f.width = 1; f.height = 1;";
+    expect(analyzeJavaScript(near).markers).toContain("js.iframe_1x1");
+    const far = "img.width = 1; img.height = 1;" + " ".repeat(700) + "var t = 'iframe';";
+    expect(analyzeJavaScript(far).markers).not.toContain("js.iframe_1x1");
   });
 });

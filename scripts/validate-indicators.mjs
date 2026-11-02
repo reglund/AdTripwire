@@ -100,6 +100,10 @@ function validateSet(set, errors, label) {
     if (!CONFIDENCES.includes(r.confidence)) e("bad confidence");
     if (!isDate(r.firstReported)) e("firstReported must be YYYY-MM-DD");
     if (!isDate(r.lastReviewed)) e("lastReviewed must be YYYY-MM-DD");
+    for (const k of ["validFrom", "validTo"])
+      if (r[k] !== undefined && !isDate(r[k])) e(`${k} must be YYYY-MM-DD when present`);
+    if (isDate(r.validFrom) && isDate(r.validTo) && r.validFrom > r.validTo)
+      e("validFrom must not be after validTo");
     if (typeof r.enabled !== "boolean") e("enabled must be boolean");
     if (typeof r.indicator !== "string" || r.indicator.length === 0) return e("indicator required");
     if (r.indicatorType === "url_path") {

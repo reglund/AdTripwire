@@ -2,6 +2,7 @@ import type { Detection, MonitoringStatus } from "@adtripwire/shared";
 import { h } from "../dom.js";
 import {
   capabilityLabel,
+  metricRows,
   NO_DETECTIONS_NOTICE,
   severityLabel,
   summarizeVisibility,
@@ -64,6 +65,18 @@ export const renderOverview: View = async () => {
         ["Detections stored", String(status.counts.detectionsTotal)],
       ]),
     ),
+    status.metrics
+      ? card(
+          "Runtime metrics",
+          kv(metricRows(status.metrics).map((r) => [r.label, r.value])),
+          h("p", { class: "muted small" }, "Counting since ", timeEl(status.metrics.since), "."),
+          h(
+            "p",
+            { class: "muted small" },
+            "These are aggregate counters only. No URLs are stored in them.",
+          ),
+        )
+      : null,
     card(
       "Browser and sensor capabilities",
       kv([

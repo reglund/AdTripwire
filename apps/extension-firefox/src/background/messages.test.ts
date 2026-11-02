@@ -78,3 +78,45 @@ describe("parseUiRequest", () => {
     expect(parseUiRequest(raw)).toBeNull();
   });
 });
+
+describe("isPageSensorSender", () => {
+  const tab = {
+    id: 4,
+    index: 0,
+    highlighted: false,
+    active: true,
+    pinned: false,
+    incognito: false,
+  };
+  it("accepts our content script in an http(s) sub-frame of a tab", async () => {
+    const { isPageSensorSender } = await import("./messages.js");
+    expect(
+      isPageSensorSender({
+        id: "adtripwire@test",
+        tab,
+        frameId: 9,
+        url: "https://ad.synthetic-exchange.test/c.html",
+      }),
+    ).toBe(true);
+  });
+  it("rejects top frames, other extensions, non-tab senders and non-http frames", async () => {
+    const { isPageSensorSender } = await import("./messages.js");
+    expect(
+      isPageSensorSender({ id: "adtripwire@test", tab, frameId: 0, url: "https://x.test/" }),
+    ).toBe(false);
+    expect(isPageSensorSender({ id: "other@ext", tab, frameId: 9, url: "https://x.test/" })).toBe(
+      false,
+    );
+    expect(isPageSensorSender({ id: "adtripwire@test", frameId: 9, url: "https://x.test/" })).toBe(
+      false,
+    );
+    expect(
+      isPageSensorSender({
+        id: "adtripwire@test",
+        tab,
+        frameId: 9,
+        url: "moz-extension://abc/popup.html",
+      }),
+    ).toBe(false);
+  });
+});

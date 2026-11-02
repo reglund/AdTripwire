@@ -6,7 +6,15 @@ import type {
   Severity,
 } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
-import { JS_MARKER_DESCRIPTIONS } from "../js-analyzer.js";
+import { JS_COLOCATION_MAX_CHARS, JS_MARKER_DESCRIPTIONS } from "../js-analyzer.js";
+
+/**
+ * Co-location threshold for the dynamic-code and cookie-exfiltration combinations: the analyser
+ * emits "js.colocated_dynamic_transport" / "js.colocated_cookie_exfil" only when one marker of
+ * each required group has its first occurrence within this many characters of the others.
+ * Markers scattered across an unrelated bundle therefore no longer combine.
+ */
+export const COLOCATION_MAX_CHARS = JS_COLOCATION_MAX_CHARS;
 import { SEVERITY_RANK, buildDetection } from "./common.js";
 
 export interface JsOutcome {
@@ -37,10 +45,11 @@ export const COMBOS: Record<string, JsCombo> = {
     const transport = any(m, ["js.websocket", "js.webrtc", "js.webtransport", "js.timer_polling"]);
     const crypto = any(m, CRYPTO_MARKERS);
     if (!dyn.length || !transport.length || !crypto.length) return null;
+    if (!m.has("js.colocated_dynamic_transport")) return null;
     return {
       severity: "suspicious",
       confidence: "medium",
-      matched: [...dyn, ...transport, ...crypto],
+      matched: [...dyn, ...transport, ...crypto, "js.colocated_dynamic_transport"],
     };
   },
   "js.hidden_iframe_injection": (m) => {
@@ -55,7 +64,12 @@ export const COMBOS: Record<string, JsCombo> = {
   "js.cookie_exfil_pattern": (m) => {
     const out = any(m, ["js.cookie_tilde_join", "js.image_beacon"]);
     if (!m.has("js.cookie_read") || !out.length) return null;
-    return { severity: "elevated", confidence: "medium", matched: ["js.cookie_read", ...out] };
+    if (!m.has("js.colocated_cookie_exfil")) return null;
+    return {
+      severity: "elevated",
+      confidence: "medium",
+      matched: ["js.cookie_read", ...out, "js.colocated_cookie_exfil"],
+    };
   },
   "js.adfection_sdk_markers": (m) => {
     const hit = any(m, SDK_MARKERS);
@@ -151,11 +165,12 @@ export function makeJsRule(definition: RuleDefinition, texts: JsRuleTexts): Rule
 export function jsDefinition(
   d: Omit<RuleDefinition, "category" | "requiredCapabilities" | "version" | "limitations"> & {
     limitations?: string[];
+    version?: string;
   },
 ): RuleDefinition {
   return {
     ...d,
-    version: "1.0.0",
+    version: d.version ?? "1.0.0",
     category: "javascript_technique",
     requiredCapabilities: ["request_metadata", "response_body_inspection"],
     limitations: [...JS_LIMITATIONS, ...(d.limitations ?? [])],

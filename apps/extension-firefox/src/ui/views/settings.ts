@@ -139,6 +139,129 @@ function deleteControls(): HTMLElement {
   return wrap;
 }
 
+function pageSensorControls(initial: boolean): HTMLElement {
+  const id = uid("psensor");
+  let enabled = initial;
+  const wrap = h("div", { class: "page-sensor" });
+  const status = h("p", { class: "muted", role: "status" });
+
+  const refocus = (): void => document.getElementById(id)?.focus();
+
+  const save = async (value: boolean): Promise<void> => {
+    status.textContent = "Saving…";
+    try {
+      await rpc<unknown>({ type: "update_settings", patch: { pageSensorEnabled: value } });
+      enabled = value;
+      render();
+      refocus();
+      status.textContent = value ? "Page sensor enabled." : "Page sensor disabled.";
+    } catch (err) {
+      render();
+      refocus();
+      status.textContent = `Saving failed: ${errorMessage(err)}`;
+    }
+  };
+
+  const explanation = (): HTMLElement =>
+    h(
+      "div",
+      { class: "notice-warn", id: `${id}-consent`, role: "group", "aria-labelledby": `${id}-ch` },
+      h("h4", { id: `${id}-ch` }, "Before you enable the page sensor"),
+      h("p", null, h("strong", null, "What it does")),
+      h(
+        "ul",
+        { class: "bullets" },
+        [
+          "An isolated content script runs only inside embedded sub-frames (iframes).",
+          "It reports structural facts: a hidden iframe inserted after load, a third-party script or image inserted late, and one documented SDK postMessage type.",
+        ].map((t) => h("li", null, t)),
+      ),
+      h("p", null, h("strong", null, "What it never does")),
+      h(
+        "ul",
+        { class: "bullets" },
+        [
+          "It never reads page text or form values.",
+          "It never reads cookies.",
+          "It records no URLs beyond hostnames.",
+          "It never runs in top-level documents.",
+          "It never runs in private windows.",
+        ].map((t) => h("li", null, t)),
+      ),
+      h(
+        "p",
+        null,
+        "You can turn it off at any time with one click. See Threat model → Page sensor in the project documentation.",
+      ),
+    );
+
+  function render(): void {
+    const toggle = h("input", {
+      type: "checkbox",
+      id,
+      "aria-describedby": `${id}-h`,
+      checked: enabled,
+      onchange: () => {
+        if (toggle.checked) {
+          // Enabling needs an explicit second click on the consent panel.
+          toggle.checked = false;
+          showConsent();
+        } else {
+          toggle.disabled = true;
+          void save(false);
+        }
+      },
+    });
+    wrap.replaceChildren(
+      h(
+        "div",
+        { class: "field field-check" },
+        h("label", { for: id }, toggle, "Page sensor enabled"),
+        h(
+          "p",
+          { id: `${id}-h`, class: "muted small" },
+          "Optional and off by default. Changes apply immediately; no need to press Save settings.",
+        ),
+      ),
+      status,
+    );
+  }
+
+  function showConsent(): void {
+    status.textContent = "";
+    const cancel = h(
+      "button",
+      {
+        type: "button",
+        class: "btn",
+        onclick: () => {
+          render();
+          refocus();
+        },
+      },
+      "Cancel",
+    );
+    const confirm = h(
+      "button",
+      {
+        type: "button",
+        class: "btn btn-primary",
+        onclick: () => {
+          confirm.disabled = true;
+          cancel.disabled = true;
+          void save(true);
+        },
+      },
+      "Enable page sensor",
+    );
+    wrap.replaceChildren(explanation(), h("div", { class: "button-row" }, confirm, cancel), status);
+    confirm.focus();
+  }
+
+  render();
+  return wrap;
+}
+
 export const renderSettings: View = async (ctx) => {
   const [settings, status] = await Promise.all([
     rpc<Settings>({ type: "get_settings" }),
@@ -285,6 +408,15 @@ export const renderSettings: View = async (ctx) => {
     h("h2", null, "Settings"),
     card("Permission", permission),
     card("Monitoring and retention", form),
+    card(
+      "Optional page sensor",
+      h(
+        "p",
+        null,
+        "An opt-in sensor for structural signals inside embedded sub-frames. Network monitoring works without it.",
+      ),
+      pageSensorControls(m.pageSensorEnabled),
+    ),
     card(
       "Export",
       h(

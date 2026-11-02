@@ -1,12 +1,14 @@
 import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
-import { RULE_VERSION, buildDetection } from "./common.js";
+import { buildDetection, lowerSeverity } from "./common.js";
 import {
   CORRELATION_LIMITATIONS,
   findChain,
   isStep3,
   linkEvidence,
+  scopeEvidence,
+  scopeLimitations,
   step2Description,
   isFirstPartyStep,
 } from "./correlation-common.js";
@@ -14,21 +16,21 @@ import {
 export const definition: RuleDefinition = {
   id: "correlation.adfection_chain",
   name: "Sequence consistent with the documented AdFection delivery chain",
-  version: RULE_VERSION,
+  version: "1.1.0",
   description:
-    "Within the correlation window and the same tab: (1) a NOAS/getAd-pattern request or NOAS indicator contact, then (2) a non-empty JavaScript response for it or a suspicious inspected script, then (3) contact with infrastructure documented as malicious.",
+    "Within the correlation window and the same frame lineage: (1) a NOAS/getAd-pattern request or NOAS indicator contact, then (2) a non-empty JavaScript response for it, a suspicious inspected script, or (with the opt-in page sensor) an observed cross-origin hidden-iframe or script insertion, then (3) contact with infrastructure documented as malicious. A sequence found only across unrelated frames of one tab, or without frame ancestry, is reported one level lower.",
   category: "temporal_correlation",
   severity: "high_priority",
   confidence: "medium",
   confidenceBasis:
-    "Medium: each step is observed directly and the order matches the documented chain, but the links between steps are inferred from tab and timing, and temporal proximity does not prove causation.",
+    "Medium: each step is observed directly and the order matches the documented chain, but the links between steps are inferred from frame lineage (or tab) and timing, and temporal proximity does not prove causation.",
   requiredEvidence: [
     "Step 1: NOAS/getAd-pattern request or contact with a surveillance indicator with role 'noas'.",
-    "Step 2: inspected non-empty JavaScript response to a NOAS-pattern request or NOAS-role host, or a response_inspected event graded suspicious or higher.",
+    "Step 2: inspected non-empty JavaScript response to a NOAS-pattern request or NOAS-role host, a response_inspected event graded suspicious or higher, or a cross-origin hidden_iframe_inserted/script_inserted page signal in the same frame lineage.",
     "Step 3: request to a malicious-classified indicator.",
-    "All in the same tab or correlation id, in order, within the correlation window.",
+    "All in the same frame lineage, in order, within the correlation window (same tab only: one severity level lower).",
   ],
-  requiredCapabilities: ["request_metadata", "response_body_inspection"],
+  requiredCapabilities: ["request_metadata"],
   references: BOTH,
   limitations: CORRELATION_LIMITATIONS,
   falsePositiveConsiderations: [
@@ -38,7 +40,7 @@ export const definition: RuleDefinition = {
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
   if (!isStep3(event, ctx)) return [];
-  const { s1, s2 } = findChain(event, ctx);
+  const { s1, s2, scope, ancestryUnavailable } = findChain(event, ctx, { pageSignalStep2: true });
   if (!s1 || !s2) return [];
   const host = event.destination.hostname;
   const malicious = ctx
@@ -48,13 +50,18 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   // own host, the pattern is more likely an unrelated endpoint or a page trying to trigger
   // alerts, so the priority is lowered while the evidence is still recorded.
   const firstPartyStart = isFirstPartyStep(s1);
+  const base = firstPartyStart ? "elevated" : "high_priority";
+  const severity = scope === "lineage" ? base : lowerSeverity(base);
   return [
     buildDetection(definition, ctx, {
       subject: `${event.tabId ?? event.correlationId ?? ""}|${host}`,
-      ...(firstPartyStart ? { severity: "elevated" as const, confidence: "low" as const } : {}),
+      severity,
+      ...(firstPartyStart ? { confidence: "low" as const } : {}),
       confidenceRationale: firstPartyStart
         ? "The three steps occurred in the documented order, but the ad-selection request went to the page's own host rather than third-party ad infrastructure; this weakens the match to the documented chain and could be deliberately staged by a page."
-        : "All three steps were observed directly and occurred in the documented order. The relationships between them are partly inferred from tab and timing; temporal proximity does not prove causation, and nothing here shows that spyware executed.",
+        : scope === "lineage"
+          ? "All three steps were observed directly, in the documented order and within one frame lineage. The relationships between them are partly inferred from timing; temporal proximity does not prove causation, and nothing here shows that spyware executed."
+          : "All three steps were observed directly and occurred in the documented order, but they could only be linked by tab and timing, not by frame lineage, so the priority is lowered one level. Temporal proximity does not prove causation, and nothing here shows that spyware executed.",
       summary:
         "A sequence of events consistent with the documented AdFection delivery chain was observed: ad-selection request, then a script response, then contact with infrastructure documented as malicious.",
       significance:
@@ -71,9 +78,11 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
           observed: `Step 3: request to ${host}, documented as malicious infrastructure (${malicious.map((m) => m.indicator.id).join(", ")}).`,
           kind: "observed",
         },
-        linkEvidence(s1, s2, "Link step 1 to step 2"),
-        linkEvidence(s2, event, "Link step 2 to step 3"),
+        linkEvidence(s1, s2, "Link step 1 to step 2", scope),
+        linkEvidence(s2, event, "Link step 2 to step 3", scope),
+        scopeEvidence(scope, ancestryUnavailable, [s1, s2, event]),
       ],
+      extraLimitations: scopeLimitations(scope, ancestryUnavailable),
       events: [s1, s2, event],
       matchedIndicatorIds: [...ctx.indicatorMatches(s1), ...malicious].map((m) => m.indicator.id),
       subjectHostnames: [s1.destination.hostname, s2.destination.hostname, host],
@@ -93,5 +102,7 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
 
 export const rule: Rule = {
   definition,
+  // Step 2 can come from response inspection or from the opt-in page sensor.
+  anyOfCapabilities: ["response_body_inspection", "page_signals"],
   evaluate,
 };

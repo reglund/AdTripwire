@@ -2,13 +2,21 @@ import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/sha
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import {
-  RULE_VERSION,
   approxRegistrableDomain,
   buildDetection,
   isFirstObservation,
+  lowerSeverity,
   relatedEvents,
 } from "./common.js";
-import { CORRELATION_LIMITATIONS, linkEvidence } from "./correlation-common.js";
+import {
+  CORRELATION_LIMITATIONS,
+  ancestryMissing,
+  lineageRelation,
+  linkEvidence,
+  scopeEvidence,
+  scopeLimitations,
+  type ChainScope,
+} from "./correlation-common.js";
 import { isNoasContact } from "./noas.js";
 
 const FRAME_PARAMS = ["impid", "qq"];
@@ -16,16 +24,16 @@ const FRAME_PARAMS = ["impid", "qq"];
 export const definition: RuleDefinition = {
   id: "correlation.noas_then_hidden_frame",
   name: "Ad-selection request followed by a loader-style frame",
-  version: RULE_VERSION,
+  version: "1.1.0",
   description:
-    "After a NOAS/getAd-pattern request in the same tab, an iframe loaded a different third-party host with 'impid' or 'qq' parameters, matching the documented '/iframe?impid=' and '/?qq=' loader frames.",
+    "After a NOAS/getAd-pattern request in the same frame lineage (same tab only: one level lower), an iframe loaded a different third-party host with 'impid' or 'qq' parameters, matching the documented '/iframe?impid=' and '/?qq=' loader frames.",
   category: "temporal_correlation",
   severity: "elevated",
   confidence: "medium",
   confidenceBasis:
     "Medium: both events are observed and the parameter names match the documented loader frames; the link between them is inferred from tab and timing.",
   requiredEvidence: [
-    "A NOAS/getAd-pattern request or NOAS indicator contact in the same tab within the correlation window.",
+    "A NOAS/getAd-pattern request or NOAS indicator contact in the same frame lineage within the correlation window (same tab only: one severity level lower).",
     "A later sub_frame request to a different third-party host whose query parameter names include 'impid' or 'qq'.",
   ],
   requiredCapabilities: ["request_metadata"],
@@ -55,15 +63,25 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
     event.frameContext.thirdParty === true ||
     (top !== undefined && approxRegistrableDomain(top) !== approxRegistrableDomain(host));
   if (!thirdParty) return [];
-  const s1 = relatedEvents(event, ctx)
-    .reverse()
-    .find((e) => e.destination.hostname !== host && isNoasContact(e, ctx));
+  const prior = relatedEvents(event, ctx).reverse();
+  const isS1 = (e: NormalizedEvent): boolean =>
+    e.destination.hostname !== host && isNoasContact(e, ctx);
+  let scope: ChainScope = "lineage";
+  let s1 = prior.find((e) => isS1(e) && lineageRelation(e, event) === "related");
+  if (!s1) {
+    scope = "tab";
+    s1 = prior.find(isS1);
+  }
   if (!s1) return [];
+  const ancestryUnavailable = scope === "tab" && ancestryMissing([s1, event]);
   return [
     buildDetection(definition, ctx, {
       subject: `${event.tabId ?? event.correlationId ?? ""}|${host}`,
+      severity: scope === "lineage" ? definition.severity : lowerSeverity(definition.severity),
       confidenceRationale:
-        "Both requests were observed directly and the frame's parameter names match the documented loader; the relationship is inferred from shared tab and timing.",
+        scope === "lineage"
+          ? "Both requests were observed directly, in the same frame lineage, and the frame's parameter names match the documented loader; the relationship is inferred from lineage and timing."
+          : "Both requests were observed directly and the frame's parameter names match the documented loader, but they are linked only by tab and timing, not frame lineage, so the priority is lowered one level.",
       summary:
         "An ad-selection request was followed in the same tab by a frame load with parameters resembling the documented loader frames.",
       significance:
@@ -79,8 +97,10 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
           observed: `Sub-frame request to ${host} with parameter name(s): ${hit.join(", ")}.`,
           kind: "observed",
         },
-        linkEvidence(s1, event, "Link from ad-selection request to frame"),
+        linkEvidence(s1, event, "Link from ad-selection request to frame", scope),
+        scopeEvidence(scope, ancestryUnavailable, [s1, event]),
       ],
+      extraLimitations: scopeLimitations(scope, ancestryUnavailable),
       events: [s1, event],
       matchedIndicatorIds: [...ctx.indicatorMatches(s1), ...ctx.indicatorMatches(event)].map(
         (m) => m.indicator.id,

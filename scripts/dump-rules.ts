@@ -36,7 +36,7 @@ for (const [cat, title] of Object.entries(CATEGORY_TITLES)) {
     lines.push(`- **Confidence basis:** ${d.confidenceBasis}`);
     lines.push(`- **Required evidence:** ${d.requiredEvidence.join("; ")}`);
     lines.push(
-      `- **Required capabilities:** ${d.requiredCapabilities.length ? d.requiredCapabilities.map((c) => `\`${c}\``).join(", ") : "none"}`,
+      `- **Required capabilities:** ${d.requiredCapabilities.length ? d.requiredCapabilities.map((c) => `\`${c}\``).join(", ") : "none"}${(r as { anyOfCapabilities?: string[] }).anyOfCapabilities?.length ? ` · **any of:** ${(r as { anyOfCapabilities?: string[] }).anyOfCapabilities!.map((c) => `\`${c}\``).join(", ")}` : ""}`,
     );
     lines.push(`- **Limitations:** ${d.limitations.join(" ")}`);
     lines.push(`- **False-positive considerations:** ${d.falsePositiveConsiderations.join(" ")}`);

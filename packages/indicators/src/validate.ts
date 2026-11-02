@@ -129,6 +129,16 @@ function validateRecord(raw: unknown, index: number, errors: string[]): Indicato
   }
   if (!isIsoDate(raw["firstReported"])) err("firstReported: must be a valid YYYY-MM-DD date");
   if (!isIsoDate(raw["lastReviewed"])) err("lastReviewed: must be a valid YYYY-MM-DD date");
+  if (raw["validFrom"] !== undefined && !isIsoDate(raw["validFrom"]))
+    err("validFrom: must be a valid YYYY-MM-DD date when present");
+  if (raw["validTo"] !== undefined && !isIsoDate(raw["validTo"]))
+    err("validTo: must be a valid YYYY-MM-DD date when present");
+  if (
+    isIsoDate(raw["validFrom"]) &&
+    isIsoDate(raw["validTo"]) &&
+    (raw["validFrom"] as string) > (raw["validTo"] as string)
+  )
+    err("validFrom must not be after validTo");
   if (typeof raw["enabled"] !== "boolean") err("enabled: must be a boolean");
   for (const k of ["notes", "role"] as const) {
     if (raw[k] !== undefined && typeof raw[k] !== "string")
@@ -181,6 +191,8 @@ function validateRecord(raw: unknown, index: number, errors: string[]): Indicato
     confidence: raw["confidence"] as Confidence,
     firstReported: raw["firstReported"] as string,
     lastReviewed: raw["lastReviewed"] as string,
+    ...(typeof raw["validFrom"] === "string" ? { validFrom: raw["validFrom"] } : {}),
+    ...(typeof raw["validTo"] === "string" ? { validTo: raw["validTo"] } : {}),
     enabled: raw["enabled"] as boolean,
   };
   if (typeof pp === "string") rec.pathPattern = pp;

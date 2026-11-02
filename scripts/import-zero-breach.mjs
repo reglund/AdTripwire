@@ -62,6 +62,9 @@ const CONTEXTUAL = new Set([
   "adtracker.link",
   "cdnmobile.io",
 ]);
+// CloudFront staging distributions were rotated within days (Confiant), so they are only
+// treated as current until this date; later matches are reported as expired.
+const CLOUDFRONT_STAGING_VALID_TO = "2026-12-31";
 const NOAS_HOST = /^(noas|infinoas|ppv2|pqv2|qa-noas)\./;
 const TRACKING = new Set([
   "tracookiepixel.xyz",
@@ -115,6 +118,8 @@ for (const [indicator, tier, confidence, source] of rows) {
   }
 
   let classification, role, conf, notes;
+  // Optional end of the validity window (ISO date); only time-bounded infrastructure sets it.
+  let validTo;
   const labels = value.split(".").length;
   const isCloudFront = value.endsWith(".cloudfront.net");
 
@@ -163,7 +168,8 @@ for (const [indicator, tier, confidence, source] of rows) {
       role = "staging";
       conf = "medium";
       notes =
-        "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: distributions rotated within days; CloudFront names can be reassigned.";
+        "CloudFront distribution used for ?impid= / ?qq= iframe staging. Time-bounded: Confiant reports distributions were rotated within days; CloudFront names can be reassigned.";
+      validTo = CLOUDFRONT_STAGING_VALID_TO;
     } else if (NOAS_HOST.test(value)) {
       classification = "surveillance";
       role = "noas";
@@ -218,6 +224,9 @@ for (const [indicator, tier, confidence, source] of rows) {
     confidence: conf,
     firstReported: src.published,
     lastReviewed: "2026-11-02",
+    // The indicator is considered valid from the date its source was published.
+    validFrom: src.published,
+    ...(validTo === undefined ? {} : { validTo }),
     enabled: true,
     role,
     notes,

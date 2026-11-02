@@ -103,9 +103,12 @@ Recorded Future's 2025 Candiru appendix, via the CC0-licensed curation in
 [Zero Breach](https://github.com/interplains/zero-breach). IP addresses, file hashes and
 2021–2022 historical sets are deliberately excluded (`scripts/import-zero-breach.mjs`
 documents the policy). AdTripwire is independent and not affiliated with or endorsed by
-any of these organisations.
+any of these organisations. Registrable-domain lookups use the ICANN section of the
+[Public Suffix List](https://publicsuffix.org/) (MPL-2.0; notice in
+`packages/indicators/data/PUBLIC-SUFFIX-LIST-LICENSE.md`).
 
 ## License
 
-Apache-2.0 for the code. Indicator data in `packages/indicators/data/` is CC0-1.0.
+Apache-2.0 for the code. Indicator data in `packages/indicators/data/` is CC0-1.0, except the derived Public Suffix
+List (MPL-2.0).
 See `SECURITY.md` for reporting vulnerabilities and `CONTRIBUTING.md` for contributing.

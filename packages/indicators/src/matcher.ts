@@ -97,13 +97,21 @@ export class IndicatorMatcher {
     return this.#idToSet.has(indicatorId);
   }
 
-  match(hostname: string, pathPattern?: string): IndicatorMatch[] {
+  /**
+   * @param now evaluation time (ms since epoch) used for validity windows; defaults to Date.now().
+   */
+  match(hostname: string, pathPattern?: string, now: number = Date.now()): IndicatorMatch[] {
     const host = normalizeHostname(hostname);
     if (host === null) return [];
     const found = new Map<string, IndicatorMatch>();
     const add = (rec: IndicatorRecord, matchKind: IndicatorMatch["matchKind"]): void => {
       if (found.has(rec.id)) return;
-      found.set(rec.id, { indicator: rec, setId: this.#idToSet.get(rec.id) ?? "", matchKind });
+      found.set(rec.id, {
+        indicator: rec,
+        setId: this.#idToSet.get(rec.id) ?? "",
+        matchKind,
+        validity: indicatorValidity(rec, now),
+      });
     };
 
     for (const rec of this.#exact.get(host) ?? []) add(rec, "exact_hostname");
@@ -150,4 +158,17 @@ export class IndicatorMatcher {
     });
     return { matcher: new IndicatorMatcher(sets), errors };
   }
+}
+
+/** Validity of an indicator at `now`, from its optional validFrom/validTo (ISO dates, inclusive). */
+export function indicatorValidity(rec: IndicatorRecord, now: number): IndicatorMatch["validity"] {
+  if (rec.validFrom !== undefined) {
+    const from = Date.parse(rec.validFrom + "T00:00:00Z");
+    if (Number.isFinite(from) && now < from) return "not_yet_valid";
+  }
+  if (rec.validTo !== undefined) {
+    const to = Date.parse(rec.validTo + "T23:59:59Z");
+    if (Number.isFinite(to) && now > to) return "expired";
+  }
+  return "current";
 }

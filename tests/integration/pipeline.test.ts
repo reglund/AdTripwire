@@ -352,6 +352,29 @@ describe("synthetic pipeline scenarios", () => {
     assertLanguage(h.detections);
   });
 
+  it("6c. the same chain with step 3 in a sibling ad frame is reported one level lower (frame lineage)", async () => {
+    const h = new Harness();
+    await h.request(NOAS, SELECTED_JS);
+    h.now += 1000;
+    await h.request(
+      "https://validator.synthetic-adfection.test/check.js?q=c3ludGhldGlj",
+      "/* ok */",
+      {
+        frameId: 7,
+        parentFrameId: 0,
+        frameAncestors: [{ url: PUBLISHER, frameId: 0 }],
+      },
+    );
+    const c = h.detections.find((d) => d.ruleId === "correlation.adfection_chain")!;
+    expect(c.severity).toBe("elevated");
+    expect(
+      c.evidence.some(
+        (e) => e.kind === "inferred" && /not in the same frame lineage/.test(e.observed),
+      ),
+    ).toBe(true);
+    assertLanguage(h.detections);
+  });
+
   it("6b. the same chain outside the correlation window does not correlate", async () => {
     const h = new Harness(FIREFOX_CAPS, { windowMs: 60_000 });
     await h.request(NOAS, SELECTED_JS);

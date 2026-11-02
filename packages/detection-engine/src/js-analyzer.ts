@@ -21,6 +21,12 @@ export interface JsAnalysisStats {
 export interface JsAnalysisResult {
   markers: string[];
   stats: JsAnalysisStats;
+  /**
+   * First character offset of each emitted marker that has a location (statistical markers
+   * have none). Offsets only, never text. Not persisted by the sensor; derived
+   * "js.colocated_*" markers carry the co-location result into events.
+   */
+  proximity: Record<string, number>;
 }
 
 export const JS_MARKER_DESCRIPTIONS: Record<string, string> = {
@@ -77,6 +83,10 @@ export const JS_MARKER_DESCRIPTIONS: Record<string, string> = {
   "js.obfuscation_short_identifiers":
     "Identifiers in the script are unusually short on average, consistent with heavy minification or obfuscation.",
   "js.timer_polling": "The script polls on a short timer (setInterval at 2 seconds or less).",
+  "js.colocated_dynamic_transport":
+    "Runtime code construction, a network channel and cryptography appear within 4000 characters of each other in the script.",
+  "js.colocated_cookie_exfil":
+    "The cookie read and the outbound beacon or '~~~' separator appear within 4000 characters of each other in the script.",
 };
 
 const JS_KEYWORDS = new Set([
@@ -121,41 +131,307 @@ const JS_KEYWORDS = new Set([
   "yield",
 ]);
 
-/** True if `re` matches within `windowLen` chars after each occurrence of `needle` (up to `maxHits` occurrences). */
+/**
+ * Maximum distance (characters, between first occurrences) for markers to count as co-located.
+ * 4000 characters is roughly one large function body in unminified code, or a few hundred
+ * statements in a minified bundle: wide enough to cover a loader routine, narrow enough that
+ * unrelated modules concatenated into one bundle rarely satisfy it.
+ */
+export const JS_COLOCATION_MAX_CHARS = 4000;
+
+/** Bound on anchor occurrences examined per marker, keeping hostile inputs linear. */
+const MAX_HITS = 200;
+
+/**
+ * Build a view of `src` with comments and string/template/regex literal contents replaced by
+ * spaces. Offsets are preserved (same length). Quote delimiters are kept so callers can tell a
+ * real string literal from text inside a comment. Single pass, no regular expressions.
+ *
+ * Limits (documented): regex-literal detection uses the previous significant character, so a
+ * regex after a keyword such as `return` is treated as division; single- and double-quoted
+ * strings end at a newline, so a mis-detected quote blanks at most the rest of that line.
+ */
+export function buildCodeView(src: string): string {
+  const n = src.length;
+  const parts: string[] = [];
+  let last = 0;
+  const blank = (from: number, to: number): void => {
+    if (to <= from) return;
+    parts.push(src.slice(last, from), " ".repeat(to - from));
+    last = to;
+  };
+  const templateStack: number[] = [];
+  let braceDepth = 0;
+  let prevSig = 0; // last significant code character (0 = start of input)
+  let noRegexBefore = 0;
+  // Characters after which a '/' starts a regular-expression literal rather than a division.
+  const regexAfter = (c: number): boolean =>
+    c === 0 || "(,=:[!&|?{};+-*%<>~^}".includes(String.fromCharCode(c));
+
+  /** Scan template text from `from`; returns the index after the template or after "${". */
+  const template = (from: number): number => {
+    let j = from;
+    while (j < n) {
+      const ch = src.charCodeAt(j);
+      if (ch === 92) {
+        j += 2;
+        continue;
+      }
+      if (ch === 96) break;
+      if (ch === 36 && src.charCodeAt(j + 1) === 123) break;
+      j++;
+    }
+    const end = Math.min(j, n);
+    blank(from, end);
+    if (end >= n) return n;
+    if (src.charCodeAt(end) === 96) {
+      prevSig = 97;
+      return end + 1;
+    }
+    templateStack.push(braceDepth);
+    braceDepth++;
+    prevSig = 123;
+    return end + 2;
+  };
+
+  let i = 0;
+  while (i < n) {
+    const c = src.charCodeAt(i);
+    if (c === 47 /* / */) {
+      const next = src.charCodeAt(i + 1);
+      if (next === 47) {
+        const j = src.indexOf("\n", i + 2);
+        const end = j < 0 ? n : j;
+        blank(i, end);
+        i = end;
+        continue;
+      }
+      if (next === 42) {
+        const j = src.indexOf("*/", i + 2);
+        const end = j < 0 ? n : j + 2;
+        blank(i, end);
+        i = end;
+        continue;
+      }
+      // `noRegexBefore`: an earlier regex scan from before this point failed to terminate up to
+      // there, so retrying would rescan the same text (quadratic on hostile input).
+      if (i >= noRegexBefore && regexAfter(prevSig)) {
+        let j = i + 1;
+        let inClass = false;
+        while (j < n) {
+          const ch = src.charCodeAt(j);
+          if (ch === 92) {
+            j += 2;
+            continue;
+          }
+          if (ch === 10) break;
+          if (inClass) {
+            if (ch === 93) inClass = false;
+          } else if (ch === 91) inClass = true;
+          else if (ch === 47) break;
+          j++;
+        }
+        if (j < n && src.charCodeAt(j) === 47) {
+          blank(i + 1, j);
+          i = j + 1;
+          prevSig = 97;
+          continue;
+        }
+        noRegexBefore = Math.min(j, n);
+      }
+      prevSig = c;
+      i++;
+      continue;
+    }
+    if (c === 34 || c === 39) {
+      let j = i + 1;
+      while (j < n) {
+        const ch = src.charCodeAt(j);
+        if (ch === 92) {
+          j += 2;
+          continue;
+        }
+        if (ch === c || ch === 10) break;
+        j++;
+      }
+      const end = Math.min(j, n);
+      blank(i + 1, end);
+      i = end < n && src.charCodeAt(end) === c ? end + 1 : end;
+      prevSig = 97;
+      continue;
+    }
+    if (c === 96) {
+      i = template(i + 1);
+      continue;
+    }
+    if (c === 123) braceDepth++;
+    else if (c === 125) {
+      braceDepth--;
+      if (templateStack.length > 0 && braceDepth === templateStack[templateStack.length - 1]) {
+        templateStack.pop();
+        i = template(i + 1);
+        continue;
+      }
+    }
+    if (c !== 32 && c !== 9 && c !== 10 && c !== 13) prevSig = c;
+    i++;
+  }
+  if (last === 0) return src;
+  parts.push(src.slice(last));
+  return parts.join("");
+}
+
+/** Offset of the first match of a non-global regex, or -1. */
+function at(text: string, re: RegExp): number {
+  const m = re.exec(text);
+  return m ? m.index : -1;
+}
+
+/**
+ * First offset where the global `anchor` matches in `code` AND the sticky `tail` matches the
+ * full text immediately after it (the tail usually contains a string literal blanked in code).
+ */
+function anchored(code: string, full: string, anchor: RegExp, tail: RegExp): number {
+  anchor.lastIndex = 0;
+  for (let hits = 0; hits < MAX_HITS; hits++) {
+    const m = anchor.exec(code);
+    if (!m) return -1;
+    tail.lastIndex = m.index + m[0].length;
+    if (tail.test(full)) return m.index;
+    if (m[0].length === 0) anchor.lastIndex++;
+  }
+  return -1;
+}
+
+/**
+ * True-offset of the first occurrence of `needle` in `code` after which `re` matches within
+ * `windowLen` chars of the FULL text (up to MAX_HITS occurrences).
+ */
 function nearAfter(
-  text: string,
+  code: string,
+  full: string,
   needle: string,
   re: RegExp,
   windowLen: number,
-  maxHits = 200,
-): boolean {
+): number {
   let from = 0;
-  for (let hits = 0; hits < maxHits; hits++) {
-    const i = text.indexOf(needle, from);
-    if (i < 0) return false;
-    const slice = text.slice(i + needle.length, i + needle.length + windowLen);
-    if (re.test(slice)) return true;
+  for (let hits = 0; hits < MAX_HITS; hits++) {
+    const i = code.indexOf(needle, from);
+    if (i < 0) return -1;
+    const slice = full.slice(i + needle.length, i + needle.length + windowLen);
+    if (re.test(slice)) return i;
     from = i + needle.length;
   }
-  return false;
+  return -1;
 }
 
-/** Find the first numeric literal second argument in setInterval calls; true if any is <= 2000 ms. */
-function hasShortInterval(text: string): boolean {
-  const delayRe = /,\s*(\d{1,7}(?:\.\d{1,3})?(?:e\d)?)\s*\)/;
-  let from = 0;
-  for (let hits = 0; hits < 200; hits++) {
-    const i = text.indexOf("setInterval", from);
-    if (i < 0) return false;
-    const slice = text.slice(i, i + 2000);
-    const m = delayRe.exec(slice);
-    if (m && m[1] !== undefined) {
-      const v = Number(m[1]);
-      if (Number.isFinite(v) && v <= 2000) return true;
-    }
-    from = i + 11;
+/** Offset of the first real string literal (not inside a comment) matching global `re` in full text. */
+function realLiteral(code: string, full: string, re: RegExp): number {
+  re.lastIndex = 0;
+  for (let hits = 0; hits < MAX_HITS; hits++) {
+    const m = re.exec(full);
+    if (!m) return -1;
+    if (code.charCodeAt(m.index) === full.charCodeAt(m.index)) return m.index;
   }
-  return false;
+  return -1;
+}
+
+/**
+ * Offset of the first `setInterval(` call whose own second argument is a numeric literal
+ * <= 2000 ms. The argument list is scanned in the code view (strings and comments blanked) to
+ * the matching ')' at depth 0, bounded to 2000 chars per call.
+ */
+function shortIntervalAt(code: string): number {
+  const re = /\bsetInterval\s*\(/g;
+  for (let hits = 0; hits < MAX_HITS; hits++) {
+    const m = re.exec(code);
+    if (!m) return -1;
+    const start = m.index + m[0].length;
+    const limit = Math.min(code.length, start + 2000);
+    let depth = 0;
+    let argStart = -1;
+    let argEnd = -1;
+    for (let j = start; j < limit; j++) {
+      const c = code.charCodeAt(j);
+      if (c === 40 || c === 91 || c === 123) depth++;
+      else if (c === 41 || c === 93 || c === 125) {
+        if (depth === 0) {
+          if (c === 41 && argStart >= 0) argEnd = j;
+          break;
+        }
+        depth--;
+      } else if (c === 44 && depth === 0) {
+        if (argStart < 0) argStart = j + 1;
+        else {
+          argEnd = j;
+          break;
+        }
+      }
+    }
+    if (argStart >= 0 && argEnd > argStart) {
+      const lit = code.slice(argStart, argEnd).trim();
+      if (/^\d{1,7}(?:\.\d{1,3})?(?:e\d)?$/.test(lit)) {
+        const v = Number(lit);
+        if (Number.isFinite(v) && v <= 2000) return m.index;
+      }
+    }
+  }
+  return -1;
+}
+
+/** Property-form 1x1 sizing (width=1 and height=1) with "iframe" within 600 chars. */
+function iframeOnePxPropertyAt(full: string): number {
+  const w1 = /width["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/gi;
+  const h1 = /height["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/i;
+  for (let hits = 0; hits < MAX_HITS; hits++) {
+    const m = w1.exec(full);
+    if (!m) return -1;
+    const win = full.slice(Math.max(0, m.index - 600), m.index + 600);
+    if (h1.test(win) && win.toLowerCase().includes("iframe")) return m.index;
+  }
+  return -1;
+}
+
+/** Smallest span covering one marker from each group, using first offsets; Infinity if none. */
+export function colocationSpan(
+  proximity: Readonly<Record<string, number>>,
+  groups: readonly (readonly string[])[],
+): number {
+  let best = Infinity;
+  const walk = (g: number, lo: number, hi: number): void => {
+    if (g === groups.length) {
+      best = Math.min(best, hi - lo);
+      return;
+    }
+    for (const id of groups[g]!) {
+      const o = proximity[id];
+      if (o === undefined) continue;
+      walk(g + 1, Math.min(lo, o), Math.max(hi, o));
+    }
+  };
+  walk(0, Infinity, -Infinity);
+  return best;
+}
+
+/** Marker groups whose co-location yields a derived "js.colocated_*" marker. */
+export const COLOCATION_GROUPS: Record<string, readonly (readonly string[])[]> = {
+  "js.colocated_dynamic_transport": [
+    ["js.new_function", "js.eval"],
+    ["js.websocket", "js.webrtc", "js.webtransport", "js.timer_polling"],
+    ["js.crypto_subtle", "js.ecdh", "js.aes_cbc", "js.rsa_oaep"],
+  ],
+  "js.colocated_cookie_exfil": [["js.cookie_read"], ["js.cookie_tilde_join", "js.image_beacon"]],
+};
+
+/** True when the input carries a standard minified-bundle banner (license, source map, .min.js). */
+export function looksLikeMinifiedBundle(full: string): boolean {
+  const head = full.slice(0, 2000);
+  return (
+    head.includes("/*!") ||
+    full.includes("//# sourceMappingURL=") ||
+    full.includes("//@ sourceMappingURL=") ||
+    /\/[*/][^\n]{0,200}\.min\.js/.test(head)
+  );
 }
 
 function computeStats(text: string): JsAnalysisStats & { identifierCount: number } {
@@ -207,80 +483,129 @@ function computeStats(text: string): JsAnalysisStats & { identifierCount: number
 
 /**
  * Analyse at most `maxChars` characters of `text` and return technique markers.
- * Never returns any substring of the input.
+ * API/technique markers are evaluated on a code view (comments and literal contents blanked);
+ * string-content markers on the full text. Never returns any substring of the input.
  */
 export function analyzeJavaScript(text: string, opts?: { maxChars?: number }): JsAnalysisResult {
   const max = Math.max(0, Math.floor(opts?.maxChars ?? DEFAULT_JS_ANALYSIS_MAX_CHARS));
   const src = typeof text === "string" ? text.slice(0, max) : "";
+  const code = buildCodeView(src);
   const markers = new Set<string>();
-  const add = (id: string, cond: boolean): void => {
-    if (cond) markers.add(id);
+  const proximity: Record<string, number> = {};
+  const mark = (id: string, offset: number): void => {
+    if (offset < 0) return;
+    markers.add(id);
+    if (proximity[id] === undefined) proximity[id] = offset;
+  };
+  const firstOf = (...offsets: number[]): number => {
+    let best = -1;
+    for (const o of offsets) if (o >= 0 && (best < 0 || o < best)) best = o;
+    return best;
   };
 
   const lower = src.toLowerCase();
 
-  add("js.new_function", /\bnew\s+Function\s*\(/.test(src));
-  add("js.eval", /(?:^|[^.\w$])eval\s*\(/.test(src));
-  add("js.websocket", /\bWebSocket\b/.test(src));
-  add(
+  // --- API / technique markers: code view ---
+  mark("js.new_function", at(code, /\bnew\s+Function\s*\(/));
+  mark("js.eval", at(code, /(?:^|[^.\w$])eval\s*\(/));
+  mark("js.websocket", at(code, /\bWebSocket\b/));
+  mark(
     "js.webrtc",
-    /\b(?:RTCPeerConnection|webkitRTCPeerConnection|RTCDataChannel|createDataChannel)\b/.test(src),
+    at(code, /\b(?:RTCPeerConnection|webkitRTCPeerConnection|RTCDataChannel|createDataChannel)\b/),
   );
-  add("js.webtransport", /\bWebTransport\b/.test(src));
-  add("js.postmessage_wildcard", nearAfter(src, "postMessage(", /,\s*(["'`])\*\1\s*[,)]/, 600));
+  mark("js.webtransport", at(code, /\bWebTransport\b/));
+  mark(
+    "js.cookie_read",
+    firstOf(
+      at(code, /document\s*\.\s*cookie\b/),
+      anchored(code, src, /document\s*\[\s*/g, /["']cookie["']\s*\]/y),
+    ),
+  );
+  mark(
+    "js.webdriver_probe",
+    firstOf(at(code, /\.\s*webdriver\b/), realLiteral(code, src, /["']webdriver["']/g)),
+  );
+  mark("js.battery", code.indexOf("getBattery"));
+  mark("js.performance_memory", at(code, /performance\s*\.\s*memory\b/));
+  mark(
+    "js.webgl_renderer",
+    firstOf(
+      code.indexOf("UNMASKED_RENDERER_WEBGL"),
+      code.indexOf("WEBGL_debug_renderer_info"),
+      anchored(code, src, /getExtension\s*\(\s*/g, /["'`]WEBGL_debug_renderer_info["'`]/y),
+    ),
+  );
+  mark("js.high_entropy_hints", code.indexOf("getHighEntropyValues"));
+  mark("js.crypto_subtle", at(code, /crypto\s*\.\s*subtle\b/));
+  mark(
+    "js.iframe_create",
+    anchored(code, src, /createElement\s*\(\s*/g, /["'`]iframe["'`]\s*\)/iy),
+  );
+  const setsSrc = at(code, /\.src\s*=[^=]/) >= 0;
+  if (setsSrc) {
+    mark(
+      "js.script_inject",
+      anchored(code, src, /createElement\s*\(\s*/g, /["'`]script["'`]\s*\)/iy),
+    );
+    mark("js.image_beacon", at(code, /\bnew\s+Image\s*\(/));
+  }
+  mark("js.timer_polling", shortIntervalAt(code));
+  mark(
+    "js.error_stack_trap",
+    firstOf(
+      nearAfter(code, src, "defineProperty", /["'`]stack["'`][\s\S]{0,200}\bget\b/, 300),
+      anchored(code, src, /__defineGetter__\s*\(\s*/g, /["'`]stack["'`]/y),
+    ),
+  );
+  // postMessage call in code; its '*' target origin is a string literal read from the full text.
+  mark(
+    "js.postmessage_wildcard",
+    nearAfter(code, src, "postMessage(", /,\s*(["'`])\*\1\s*[,)]/, 600),
+  );
+  mark(
+    "js.raw_ip_fetch",
+    anchored(
+      code,
+      src,
+      /\bfetch\s*\(\s*/g,
+      /["'`]https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}[:/"'`]|(["'])https?:\/\/\1\s*\+\s*[\w$.]{1,64}\s*\+\s*(["'])\/json|`https?:\/\/\$\{\s*[\w$.]{1,64}\s*\}\/json/y,
+    ),
+  );
 
-  const iframeCreate = /createElement\s*\(\s*["'`]iframe["'`]\s*\)/i.test(src);
-  add("js.iframe_create", iframeCreate);
-
+  // --- string-content markers: full text ---
   // Bounded separator between the two declarations: adjacent unbounded `\s*` groups around an
   // optional `;` backtrack quadratically on long whitespace runs (ReDoS).
-  const cssOnePx = /width\s*:\s*1px[\s;]{0,8}height\s*:\s*1px/i.test(src);
-  const w1 = /width["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/i.test(src);
-  const h1 = /height["']?\s*[:=]\s*["']?1(?:px)?["']?\s*[;,)}]/i.test(src);
-  add("js.iframe_1x1", cssOnePx || (w1 && h1 && lower.includes("iframe")));
+  mark(
+    "js.iframe_1x1",
+    firstOf(at(src, /width\s*:\s*1px[\s;]{0,8}height\s*:\s*1px/i), iframeOnePxPropertyAt(src)),
+  );
+  mark("js.cookie_tilde_join", src.indexOf("~~~"));
+  mark("js.doh_cloudflare", lower.indexOf("cloudflare-dns.com/dns-query"));
+  mark("js.adfection_sdk_auth", firstOf(src.indexOf("SDK_AUTH"), src.indexOf("remainingRequests")));
+  mark("js.adfection_sdk_ready", src.indexOf("analytics_sdk_ready"));
+  mark("js.adfection_script_tok", src.indexOf("script_tok="));
+  mark("js.adfection_getad_script_id", src.indexOf("getAdScript"));
+  mark("js.ecdh", at(src, /\bECDH\b/));
+  mark("js.aes_cbc", src.indexOf("AES-CBC"));
+  mark("js.rsa_oaep", src.indexOf("RSA-OAEP"));
+  mark("js.obfuscation_bang_bracket", firstOf(src.indexOf("!![]"), at(src, /!0x[01]\b/)));
 
-  const setsSrc = /\.src\s*=[^=]/.test(src);
-  add("js.script_inject", /createElement\s*\(\s*["'`]script["'`]\s*\)/i.test(src) && setsSrc);
-  add("js.cookie_read", /document\s*(?:\.\s*cookie\b|\[\s*["']cookie["']\s*\])/.test(src));
-  add("js.cookie_tilde_join", src.includes("~~~"));
-  add("js.image_beacon", /\bnew\s+Image\s*\(/.test(src) && setsSrc);
-  add("js.high_entropy_hints", src.includes("getHighEntropyValues"));
-  add(
-    "js.webgl_renderer",
-    src.includes("UNMASKED_RENDERER_WEBGL") || src.includes("WEBGL_debug_renderer_info"),
-  );
-  add("js.battery", src.includes("getBattery"));
-  add("js.performance_memory", /performance\s*\.\s*memory\b/.test(src));
-  add("js.webdriver_probe", /\.\s*webdriver\b|["']webdriver["']/.test(src));
-  add(
-    "js.error_stack_trap",
-    nearAfter(src, "defineProperty", /["'`]stack["'`][\s\S]{0,200}\bget\b/, 300) ||
-      /__defineGetter__\s*\(\s*["'`]stack["'`]/.test(src),
-  );
-  add("js.doh_cloudflare", lower.includes("cloudflare-dns.com/dns-query"));
-  add(
-    "js.raw_ip_fetch",
-    /fetch\s*\(\s*["'`]https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}[:/"'`]/.test(src) ||
-      /fetch\s*\(\s*(["'])https?:\/\/\1\s*\+\s*[\w$.]{1,64}\s*\+\s*(["'])\/json/.test(src) ||
-      /fetch\s*\(\s*`https?:\/\/\$\{\s*[\w$.]{1,64}\s*\}\/json/.test(src),
-  );
-  add("js.adfection_sdk_auth", src.includes("SDK_AUTH") || src.includes("remainingRequests"));
-  add("js.adfection_sdk_ready", src.includes("analytics_sdk_ready"));
-  add("js.adfection_script_tok", src.includes("script_tok="));
-  add("js.adfection_getad_script_id", src.includes("getAdScript"));
-  add("js.crypto_subtle", /crypto\s*\.\s*subtle\b/.test(src));
-  add("js.ecdh", /\bECDH\b/.test(src));
-  add("js.aes_cbc", src.includes("AES-CBC"));
-  add("js.rsa_oaep", src.includes("RSA-OAEP"));
-  add("js.obfuscation_bang_bracket", src.includes("!![]") || /!0x[01]\b/.test(src));
-  add("js.timer_polling", hasShortInterval(src));
+  // --- co-location (derived markers; the offsets themselves stay in `proximity`) ---
+  for (const [id, groups] of Object.entries(COLOCATION_GROUPS)) {
+    if (colocationSpan(proximity, groups) <= JS_COLOCATION_MAX_CHARS) markers.add(id);
+  }
 
+  // --- statistics: full text ---
   const { identifierCount, ...stats } = computeStats(src);
-  add("js.obfuscation_hex_escapes", stats.escapeRatio > 0.05);
-  add(
-    "js.obfuscation_short_identifiers",
-    identifierCount >= 200 && stats.avgIdentifierLength < 2.5,
-  );
+  if (stats.escapeRatio > 0.05) markers.add("js.obfuscation_hex_escapes");
+  if (identifierCount >= 200 && stats.avgIdentifierLength < 2.5) {
+    // Standard minified bundles have short identifiers by design: only keep the marker for
+    // them when another obfuscation indicator is present.
+    const accompanied =
+      markers.has("js.obfuscation_hex_escapes") || markers.has("js.obfuscation_bang_bracket");
+    if (accompanied || !looksLikeMinifiedBundle(src))
+      markers.add("js.obfuscation_short_identifiers");
+  }
 
-  return { markers: [...markers].sort(), stats };
+  return { markers: [...markers].sort(), stats, proximity };
 }

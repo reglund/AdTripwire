@@ -18,6 +18,9 @@ import { rule as adfectionChain } from "./correlation-adfection-chain.js";
 import { rule as jsThenMalicious } from "./correlation-js-then-malicious.js";
 import { rule as noasHiddenFrame } from "./correlation-noas-hidden-frame.js";
 import { rule as repeatedExposure } from "./exposure-repeated.js";
+import { rule as pageSdkReady } from "./page-sdk-ready-message.js";
+import { rule as pageHiddenIframe } from "./page-hidden-iframe-after-load.js";
+import { rule as pageLateScript } from "./page-late-third-party-script.js";
 
 export const ALL_RULES: readonly Rule[] = Object.freeze([
   maliciousContact,
@@ -39,6 +42,9 @@ export const ALL_RULES: readonly Rule[] = Object.freeze([
   jsThenMalicious,
   noasHiddenFrame,
   repeatedExposure,
+  pageSdkReady,
+  pageHiddenIframe,
+  pageLateScript,
 ]);
 
 export type { Rule, RuleContext, EventWindow, ExposureStore } from "./types.js";

@@ -3,6 +3,7 @@ import { jsDefinition, makeJsRule } from "./js-common.js";
 
 export const definition = jsDefinition({
   id: "js.cookie_exfil_pattern",
+  version: "1.1.0",
   name: "Script reads cookies and has an outbound beacon or the documented join separator",
   description:
     "An inspected script reads document.cookie and either joins values with the documented '~~~' separator or creates Image beacons, matching the documented first-party cookie collection.",
@@ -10,7 +11,9 @@ export const definition = jsDefinition({
   confidence: "medium",
   confidenceBasis:
     "Medium: the '~~~' separator is specific to the documented code; Image beacons with cookie reads are also used by ordinary analytics, so the rule does not reach high.",
-  requiredEvidence: ["Markers js.cookie_read AND (js.cookie_tilde_join OR js.image_beacon)."],
+  requiredEvidence: [
+    "Markers js.cookie_read AND (js.cookie_tilde_join OR js.image_beacon), co-located: js.colocated_cookie_exfil (first occurrences within 4000 characters).",
+  ],
   references: BOTH,
   falsePositiveConsiderations: [
     "Analytics libraries read their own cookies and send Image beacons.",

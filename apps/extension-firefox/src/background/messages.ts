@@ -15,6 +15,19 @@ export function isTrustedSender(
   return true;
 }
 
+/**
+ * Content-script senders (optional page sensor): must be our extension, come from a tab,
+ * and from a sub-frame (frameId > 0). Everything else about the payload is validated by
+ * buildPageSignalEvent.
+ */
+export function isPageSensorSender(sender: browser.runtime.MessageSender): boolean {
+  if (sender.id !== browser.runtime.id) return false;
+  if (!sender.tab || typeof sender.tab.id !== "number" || sender.tab.id < 0) return false;
+  if (typeof sender.frameId !== "number" || sender.frameId <= 0) return false;
+  if (!sender.url || !/^https?:\/\//.test(sender.url)) return false;
+  return true;
+}
+
 const isStrArr = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((x) => typeof x === "string") && v.length <= 1000;
 
@@ -76,6 +89,7 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
         "responseInspectionMaxBytes",
         "excludeIncognito",
         "correlationWindowMs",
+        "pageSensorEnabled",
         "detectionRetentionDays",
         "maxDetections",
         "maxEvents",

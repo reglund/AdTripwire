@@ -17,6 +17,11 @@ export interface MonitoringSettings {
   excludeIncognito: boolean;
   /** Correlation window in milliseconds for temporal rules. */
   correlationWindowMs: number;
+  /**
+   * Opt-in page sensor: an isolated-world content script in sub-frames that reports
+   * structural signals (hidden iframe insertion, SDK postMessage). Off by default.
+   */
+  pageSensorEnabled: boolean;
 }
 
 export interface Settings {
@@ -33,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
     responseInspectionMaxBytes: 512 * 1024,
     excludeIncognito: true,
     correlationWindowMs: 5 * 60 * 1000,
+    pageSensorEnabled: false,
   },
   retention: {
     detectionRetentionDays: 7,

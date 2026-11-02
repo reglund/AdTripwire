@@ -34,6 +34,8 @@ const EXPECTED = [
   // The arrow is emitted as \u2192 by Firefox's stdout logger, so match up to it.
   "escalated ad_delivery.noas_selective_response suspicious",
   "[AdTripwire] dashboard rendered detections",
+  "page sensor registered",
+  "detection page.hidden_iframe_after_load",
 ];
 const FORBIDDEN = [/infected/i, /spied/i, /is safe/i, /are safe/i];
 
@@ -86,12 +88,16 @@ const args = [
   ...urls.flatMap((u) => ["--start-url", u]),
 ];
 console.log(`launching Firefox for ${RUN_SECONDS}s…`);
-const ff = spawn("pnpm", args, { stdio: ["ignore", "pipe", "pipe"] });
+const ff = spawn("pnpm", args, { stdio: ["ignore", "pipe", "pipe"], detached: true });
 let log = "";
 ff.stdout.on("data", (d) => (log += d.toString()));
 ff.stderr.on("data", (d) => (log += d.toString()));
 await new Promise((r) => setTimeout(r, RUN_SECONDS * 1000));
-ff.kill("SIGTERM");
+try {
+  process.kill(-ff.pid, "SIGTERM"); // whole group: pnpm → web-ext → Firefox
+} catch {
+  ff.kill("SIGTERM");
+}
 fixture.kill("SIGTERM");
 await new Promise((r) => setTimeout(r, 1500));
 
