@@ -175,6 +175,30 @@ async function pickArticle(page, siteHost) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Registrable domain from the bundled Public Suffix List (same data the extension uses), so the
+// third-party count is measured by the runner itself from the page's own requests and does not
+// depend on extension state (a Firefox event page can be suspended, which resets in-memory sets).
+const PSL = JSON.parse(readFileSync("packages/indicators/data/public-suffix-list.json", "utf8"));
+const PSL_RULES = new Set(PSL.rules ?? []);
+function registrable(host) {
+  const labels = host.toLowerCase().replace(/\.$/, "").split(".");
+  if (labels.length < 2 || /^\d+(?:\.\d+){3}$/.test(host)) return host.toLowerCase();
+  let suffixLen = 1;
+  for (let i = 0; i < labels.length; i++) {
+    const cand = labels.slice(i).join(".");
+    if (PSL_RULES.has(`!${cand}`)) {
+      suffixLen = labels.length - i - 1;
+      break;
+    }
+    const wild = ["*", ...labels.slice(i + 1)].join(".");
+    if (PSL_RULES.has(cand) || (i + 1 < labels.length && PSL_RULES.has(wild))) {
+      suffixLen = labels.length - i;
+      break;
+    }
+  }
+  return labels.slice(Math.max(0, labels.length - suffixLen - 1)).join(".");
+}
+
 let initialPages = [];
 
 async function launch() {
@@ -286,6 +310,18 @@ async function main() {
     };
     const t0 = Date.now();
     const page = await browser.newPage();
+    const firstParty = registrable(host);
+    const seenThirdParty = new Set();
+    page.on("request", (req) => {
+      try {
+        const u = new URL(req.url());
+        if (u.protocol !== "http:" && u.protocol !== "https:") return;
+        const d = registrable(u.hostname);
+        if (d !== firstParty) seenThirdParty.add(d);
+      } catch {
+        /* ignore malformed */
+      }
+    });
     try {
       if (MOBILE) await page.emulate(KnownDevices["iPhone 13"]);
       try {
@@ -398,7 +434,9 @@ async function main() {
   L.push("");
   L.push("## Per site");
   L.push("");
-  L.push("| # | Site | Loaded | Consent | Article | Requests | 3rd-party domains | Detections |");
+  L.push(
+    "| # | Site | Loaded | Consent clicked | Article | Requests (sensor) | 3rd-party domains (page) | Detections |",
+  );
   L.push("|---:|---|:-:|---|:-:|---:|---:|---|");
   results.forEach((r, i) =>
     L.push(
