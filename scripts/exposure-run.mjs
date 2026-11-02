@@ -37,16 +37,22 @@ const DIST = arg("dist", join(SNAP_COMMON, "adtripwire-eval-dist"));
 const SITES_PATH = arg("sites", "tests/fixtures/exposure-sites.txt");
 const SECONDS = Number(arg("seconds", "75"));
 const LIMIT = Number(arg("limit", "0"));
-const MOBILE = flag("mobile");
+// --device=<puppeteer KnownDevices name> emulates a phone; --mobile is shorthand for iPhone 15.
+const DEVICE = arg("device", flag("mobile") ? "iPhone 15" : "");
+if (DEVICE && !KnownDevices[DEVICE]) throw new Error(`unknown --device "${DEVICE}"`);
+const MOBILE = DEVICE !== "";
+const DEVICE_SLUG = DEVICE.toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "");
 const HEADED = flag("headed");
 const PROFILE = arg(
   "profile",
-  join(SNAP_COMMON, `adtripwire-exposure-profile${MOBILE ? "-mobile" : ""}`),
+  join(SNAP_COMMON, `adtripwire-exposure-profile${MOBILE ? `-${DEVICE_SLUG}` : ""}`),
 );
 const today = new Date().toISOString().slice(0, 10);
 const OUT = arg(
   "out",
-  `docs/evaluations/${today}-exposure-interactive-${BROWSER}${MOBILE ? "-mobile" : ""}.md`,
+  `docs/evaluations/${today}-exposure-interactive-${BROWSER}${MOBILE ? `-${DEVICE_SLUG}` : ""}.md`,
 );
 const JSON_OUT = arg("json", "");
 const ACCEPT_LANGUAGE = "nb-NO,nb;q=0.9,no;q=0.8,en;q=0.7";
@@ -282,7 +288,7 @@ async function status(dash) {
 
 async function main() {
   console.log(
-    `exposure run: ${BROWSER}${MOBILE ? " (mobile)" : ""}, ${sites.length} sites, ${SECONDS}s each, profile ${PROFILE}`,
+    `exposure run: ${BROWSER}${MOBILE ? ` (${DEVICE} emulation)` : ""}, ${sites.length} sites, ${SECONDS}s each, profile ${PROFILE}`,
   );
   const browser = await launch();
   const dash = await dashboardPage(browser);
@@ -323,7 +329,7 @@ async function main() {
       }
     });
     try {
-      if (MOBILE) await page.emulate(KnownDevices["iPhone 13"]);
+      if (MOBILE) await page.emulate(KnownDevices[DEVICE]);
       try {
         await page.setExtraHTTPHeaders({ "Accept-Language": ACCEPT_LANGUAGE });
       } catch {
@@ -377,9 +383,12 @@ async function main() {
       row.detections.push({
         ruleId: d.ruleId,
         severity: d.severity,
-        hostnames: ["elevated", "high_priority"].includes(d.severity)
-          ? d.subjectHostnames
-          : undefined,
+        // Hosts are shown for elevated and above and for every contact with documented
+        // infrastructure; routine ad-tech rules keep their hosts out of the report.
+        hostnames:
+          ["elevated", "high_priority"].includes(d.severity) || d.ruleId.startsWith("known_infra.")
+            ? d.subjectHostnames
+            : undefined,
       });
     }
     prev = cur;
@@ -412,7 +421,9 @@ async function main() {
   const sevOrder = ["high_priority", "elevated", "suspicious", "informational"];
 
   const L = [];
-  L.push(`# Interactive exposure run, ${BROWSER}${MOBILE ? " (mobile emulation)" : ""} — ${today}`);
+  L.push(
+    `# Interactive exposure run, ${BROWSER}${MOBILE ? ` (${DEVICE} emulation)` : ""} — ${today}`,
+  );
   L.push("");
   L.push(
     `Script: \`scripts/exposure-run.mjs\`. Evaluation build ${end.productVersion} (production indicator set, ${end.indicatorSets.map((s) => `${s.id} ${s.version}`).join(", ")}), ${HEADED ? "headed" : "headless"} ${BROWSER}, persistent profile \`${PROFILE.replace(homedir(), "~")}\`, ${SECONDS} s per site, consent accepted where a dialog was recognised, scrolled, one article opened. Capabilities: ${end.capabilities.capabilities.join(", ")}.`,
@@ -456,7 +467,9 @@ async function main() {
   L.push("");
   if (totals.detections.length === 0) L.push("None during this run.");
   else {
-    L.push("| Rule | Severity | Site | Subject hostnames (elevated and above only) |");
+    L.push(
+      "| Rule | Severity | Site | Subject hostnames (documented infrastructure, elevated and above) |",
+    );
     L.push("|---|---|---|---|");
     for (const r of results)
       for (const d of r.detections)
@@ -481,7 +494,14 @@ async function main() {
     writeFileSync(
       JSON_OUT,
       JSON.stringify(
-        { date: today, browser: BROWSER, mobile: MOBILE, seconds: SECONDS, totals, results },
+        {
+          date: today,
+          browser: BROWSER,
+          device: DEVICE || null,
+          seconds: SECONDS,
+          totals,
+          results,
+        },
         null,
         2,
       ),
