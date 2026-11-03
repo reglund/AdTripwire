@@ -7,6 +7,7 @@ import { renderOverview } from "./views/overview.js";
 import { renderRules } from "./views/rules.js";
 import { renderTimeline } from "./views/timeline.js";
 import { renderClusterDetail, renderCorrelation } from "./views/correlation.js";
+import { renderExposure } from "./views/exposure.js";
 import { renderSettings } from "./views/settings.js";
 import type { ViewContext } from "./views/common.js";
 import { NO_DETECTIONS_NOTICE } from "./format.js";
@@ -25,6 +26,7 @@ const TITLES: Record<TabName, string> = {
   detections: "Detections",
   timeline: "Timeline",
   correlation: "Related activity",
+  exposure: "Exposure",
   indicators: "Indicators",
   rules: "Rules",
   settings: "Settings",
@@ -118,6 +120,8 @@ async function renderRoute(route: Route): Promise<Node> {
       return renderTimeline(ctx);
     case "correlation":
       return renderCorrelation(ctx);
+    case "exposure":
+      return renderExposure(ctx);
     case "cluster":
       return renderClusterDetail(route.id);
     case "assist_selftest": {

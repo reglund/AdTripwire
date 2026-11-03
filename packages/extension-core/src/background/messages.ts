@@ -234,6 +234,8 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
       }
       return { type: "update_assist_settings", patch };
     }
+    case "get_exposure":
+      return { type: "get_exposure" };
     case "update_ui_settings": {
       if (!r.patch || typeof r.patch !== "object") return null;
       const patch: Partial<Settings["ui"]> = {};

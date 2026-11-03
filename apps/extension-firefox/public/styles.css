@@ -788,3 +788,142 @@ label.radio {
   border: 1px solid currentColor;
   border-radius: 4px;
 }
+
+/* Exposure overview, toolbar headline in the popup */
+.exposure-hero,
+.popup-hero {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.popup-hero {
+  margin: 0.5rem 0 0.75rem;
+}
+.hero-title {
+  font-size: 1.2rem;
+  font-weight: 650;
+  margin: 0;
+  text-wrap: balance;
+}
+.popup-hero .hero-title {
+  font-size: 1.02rem;
+}
+.hero-sub,
+.hero-note {
+  margin: 0;
+}
+.hero-note {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.hero-clear {
+  background: var(--ok-bg);
+}
+.hero-clear .hero-title {
+  color: var(--ok-text);
+}
+.hero-found {
+  background: var(--sev-suspicious-bg);
+  color: var(--sev-suspicious-fg);
+}
+.hero-found .hero-note {
+  color: inherit;
+}
+.hero-strong {
+  background: var(--sev-high_priority-bg);
+  color: var(--sev-high_priority-fg);
+}
+.contact-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.contact-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+}
+.contact-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.contact-headline {
+  font-weight: 600;
+  margin: 0;
+}
+.contact-meaning {
+  color: var(--text-muted);
+  margin: 0;
+}
+.class-pill {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--sev-informational-bg);
+  color: var(--sev-informational-fg);
+}
+.class-surveillance {
+  background: var(--sev-suspicious-bg);
+  color: var(--sev-suspicious-fg);
+}
+.class-malicious {
+  background: var(--sev-high_priority-bg);
+  color: var(--sev-high_priority-fg);
+}
+.chain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+.chain-step {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  min-width: 0;
+}
+.chain-arrow {
+  align-self: center;
+  color: var(--text-muted);
+}
+.chain-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.chain-value {
+  overflow-wrap: anywhere;
+}
+.chain-host {
+  border-color: var(--sev-suspicious-fg);
+}
+.contact-malicious .chain-host {
+  border-color: var(--sev-high_priority-fg);
+}
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.copy-row pre {
+  flex-basis: 100%;
+}

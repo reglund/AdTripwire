@@ -2,6 +2,7 @@
 
 export type Route =
   | { name: "overview" }
+  | { name: "exposure" }
   | { name: "detections" }
   | { name: "detection"; id: string }
   | { name: "timeline" }
@@ -13,10 +14,18 @@ export type Route =
   | { name: "settings" };
 
 export type TabName =
-  "overview" | "detections" | "timeline" | "correlation" | "indicators" | "rules" | "settings";
+  | "overview"
+  | "exposure"
+  | "detections"
+  | "timeline"
+  | "correlation"
+  | "indicators"
+  | "rules"
+  | "settings";
 
 export const TABS: ReadonlyArray<{ name: TabName; label: string }> = [
   { name: "overview", label: "Overview" },
+  { name: "exposure", label: "Exposure" },
   { name: "detections", label: "Detections" },
   { name: "timeline", label: "Timeline" },
   { name: "correlation", label: "Related activity" },
@@ -46,6 +55,8 @@ export function parseHash(hash: string): Route {
       return { name: "timeline" };
     case "correlation":
       return { name: "correlation" };
+    case "exposure":
+      return { name: "exposure" };
     case "cluster": {
       const id = rest.join("/");
       return /^c-[0-9a-f]{8}$/.test(id) ? { name: "cluster", id } : { name: "correlation" };

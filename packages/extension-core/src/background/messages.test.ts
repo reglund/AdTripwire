@@ -219,3 +219,9 @@ describe("parseUiRequest Phase 5", () => {
     });
   });
 });
+
+describe("parseUiRequest exposure", () => {
+  it("accepts get_exposure without parameters", () => {
+    expect(parseUiRequest({ type: "get_exposure" })).toEqual({ type: "get_exposure" });
+  });
+});

@@ -22,7 +22,7 @@
 // (the globals above are used only inside page.evaluate callbacks that run in the browser)
 import puppeteer, { KnownDevices } from "puppeteer-core";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -213,6 +213,10 @@ let initialPages = [];
 async function launch() {
   mkdirSync(PROFILE, { recursive: true });
   if (BROWSER === "chromium") {
+    // Chromium caches an unpacked extension's service-worker script in the profile and keeps
+    // running it after the extension files change (even with a new version). Clear that cache
+    // so a persistent evaluation profile always runs the freshly built background code.
+    rmSync(join(PROFILE, "Default", "Service Worker"), { recursive: true, force: true });
     const bin = process.env.CHROME_BIN ?? execFileSync("which", ["chromium"]).toString().trim();
     return puppeteer.launch({
       executablePath: bin,

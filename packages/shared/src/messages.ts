@@ -93,6 +93,8 @@ export type UiRequest =
     }
   | { type: "update_assist_settings"; patch: Partial<Settings["assist"]> }
   | { type: "update_ui_settings"; patch: Partial<Settings["ui"]> }
+  // Exposure overview: documented-infrastructure contacts grouped per host
+  | { type: "get_exposure" }
   // Phase 6: signed indicator bundles (offline, file-based)
   | { type: "verify_signed_bundle"; text: string }
   | { type: "activate_signed_bundle"; text: string }

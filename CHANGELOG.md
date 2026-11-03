@@ -3,6 +3,27 @@
 All notable changes to AdTripwire. The format follows Keep a Changelog; versions follow
 semantic versioning for the extension packages.
 
+## [Unreleased]
+
+### Added
+
+- **Exposure view**: every documented host this browser contacted, told as a short story —
+  site → ad frame → documented host — with what the source says the host is, what that
+  means, first/last seen, days, path and parameter names, and a copy-ready sanitized note
+  for researchers.
+- **Toolbar badge**: the extension icon shows the number of recent contacts with documented
+  infrastructure (amber for ad-platform hosts, red for spyware-delivery hosts, "!" for strong
+  signals); the tooltip says what it counts.
+- **Popup headline**: the answer first — "No documented infrastructure seen" with the traffic
+  watched, or what was contacted with a button straight to the story.
+- Signed indicator bundles, upstream refresh workflow and stale-indicator notice; interactive
+  exposure runner with consent, device emulation and long-term trend reports.
+
+### Changed
+
+- `ad_delivery.redirect_chain` is informational by default and reported once per tab; it
+  escalates to suspicious only when a hop reaches documented infrastructure.
+
 ## [0.2.0] — 2026-11-02
 
 Released: https://github.com/reglund/AdTripwire/releases/tag/v0.2.0

@@ -4,6 +4,49 @@
  * Placeholders such as {n} must be kept exactly as in the key.
  */
 export const NB: Record<string, string> = {
+  Exposure: "Eksponering",
+  "Strong signals need review": "Sterke signaler må gjennomgås",
+  "Documented infrastructure contacted": "Dokumentert infrastruktur kontaktet",
+  "No documented infrastructure seen": "Ingen dokumentert infrastruktur sett",
+  "{contacts} contact(s) with {hosts} host(s) in the last {days} days.":
+    "{contacts} kontakt(er) med {hosts} vert(er) de siste {days} dagene.",
+  "Watching ad traffic: {n} requests observed.":
+    "Følger annonsetrafikken: {n} forespørsler observert.",
+  "See what happened": "Se hva som skjedde",
+  "not recorded": "ikke registrert",
+  "Path of the request": "Forespørselens vei",
+  Site: "Nettsted",
+  "Ad frame": "Annonseramme",
+  "Documented host": "Dokumentert vert",
+  "Spyware delivery path": "Leveringsvei for spionvare",
+  "Campaign ad platform": "Kampanjens annonseplattform",
+  "Related vendor": "Tilknyttet leverandør",
+  "Copied. Paste it into an email or issue.": "Kopiert. Lim den inn i en e-post eller en issue.",
+  "Copying is not allowed here; select the text below instead.":
+    "Kopiering er ikke tillatt her; marker teksten under i stedet.",
+  "Copy note for researchers": "Kopier notat til forskere",
+  "First seen": "Først sett",
+  "Last seen": "Sist sett",
+  "Days with contact": "Dager med kontakt",
+  "Requested path": "Forespurt sti",
+  "Parameter names (values are never stored)": "Parameternavn (verdier lagres aldri)",
+  Source: "Kilde",
+  "Open the latest detection": "Åpne siste deteksjon",
+  "Documented infrastructure was contacted": "Dokumentert infrastruktur ble kontaktet",
+  "No documented infrastructure contacted": "Ingen dokumentert infrastruktur kontaktet",
+  "{contacts} contact(s) with {hosts} host(s) in the last {days} days; {total} host(s) in all stored history.":
+    "{contacts} kontakt(er) med {hosts} vert(er) de siste {days} dagene; {total} vert(er) i all lagret historikk.",
+  "AdTripwire has watched {n} requests since {date}.":
+    "AdTripwire har fulgt {n} forespørsler siden {date}.",
+  "AdTripwire is watching ad traffic.": "AdTripwire følger annonsetrafikken.",
+  "Contacts show exposure to the ad-delivery path described in public reporting. They are not evidence of targeting or of anything reaching this device.":
+    "Kontaktene viser eksponering for leveringsveien som er beskrevet i offentlige rapporter. De er ikke bevis på målretting eller på at noe har nådd denne enheten.",
+  "This does not mean nothing happened: only documented hosts can be recognised, and the list is incomplete.":
+    "Det betyr ikke at ingenting har skjedd: bare dokumenterte verter kan gjenkjennes, og listen er ufullstendig.",
+  "Strong signals recorded. ": "Sterke signaler registrert. ",
+  "{n} detection(s) at elevated priority or from correlation rules need review.":
+    "{n} deteksjon(er) med forhøyet prioritet eller fra korrelasjonsregler må gjennomgås.",
+  "Review detections": "Gå gjennom deteksjoner",
   "Indicator set may be out of date. ": "Indikatorsettet kan være utdatert. ",
   "The curated set is {days} days old (as of {date}). Documented infrastructure rotates, so newer hosts may be missing. Check the AdTripwire releases for a signed indicator update and import it under Indicators.":
     "Det kuraterte settet er {days} dager gammelt (per {date}). Dokumentert infrastruktur roteres, så nyere verter kan mangle. Se prosjektets utgivelser etter en signert indikatoroppdatering og importer den under Indikatorer.",

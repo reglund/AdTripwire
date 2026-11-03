@@ -21,3 +21,5 @@ export type {
   OllamaProviderOptions,
   FetchLike,
 } from "./assist/provider.js";
+export { summarizeExposure, exposureStory, sightingText, badgeFor } from "./exposure-summary.js";
+export type { ExposureContact, ExposureSummary, IndicatorInfo } from "./exposure-summary.js";

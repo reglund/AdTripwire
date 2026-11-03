@@ -1,4 +1,5 @@
 import type { MonitoringStatus, Settings } from "@adtripwire/shared";
+import type { ExposureSummary } from "@adtripwire/correlation";
 import { errorMessage, errorState, h, loadingState, replaceChildren } from "./dom.js";
 import {
   monitoringPill,
@@ -20,12 +21,13 @@ let actionError: string | null = null;
 async function load(): Promise<void> {
   replaceChildren(app, loadingState());
   try {
-    const [status, settings] = await Promise.all([
+    const [status, settings, exposure] = await Promise.all([
       rpc<MonitoringStatus>({ type: "get_status" }),
       rpc<Settings>({ type: "get_settings" }),
+      rpc<ExposureSummary>({ type: "get_exposure" }).catch(() => null),
     ]);
     applyLanguageSetting(settings);
-    render(status, settings);
+    render(status, settings, exposure);
   } catch (err) {
     replaceChildren(
       app,
@@ -54,11 +56,67 @@ function footerNote(): HTMLElement {
   return h("p", { class: "popup-note" }, t(NO_DETECTIONS_NOTICE));
 }
 
+function openDashboard(hash: string): void {
+  void browser.tabs
+    .create({ url: browser.runtime.getURL(`dashboard.html${hash}`) })
+    .then(() => window.close());
+}
+
+/** The answer first: has this browser contacted documented infrastructure? */
+function exposureHeadline(status: MonitoringStatus, e: ExposureSummary): HTMLElement {
+  const found = e.recentHosts > 0;
+  const strong = e.strongSignals > 0;
+  return h(
+    "section",
+    {
+      class: `popup-hero ${strong ? "hero-strong" : found ? "hero-found" : "hero-clear"}`,
+      role: "status",
+    },
+    h(
+      "p",
+      { class: "hero-title" },
+      strong
+        ? t("Strong signals need review")
+        : found
+          ? t("Documented infrastructure contacted")
+          : t("No documented infrastructure seen"),
+    ),
+    h(
+      "p",
+      { class: "hero-sub" },
+      found || strong
+        ? t("{contacts} contact(s) with {hosts} host(s) in the last {days} days.", {
+            contacts: e.recentContacts,
+            hosts: e.recentHosts,
+            days: e.windowDays,
+          })
+        : t("Watching ad traffic: {n} requests observed.", {
+            n: (status.metrics?.eventsObserved ?? 0).toLocaleString(),
+          }),
+    ),
+    found || strong
+      ? h(
+          "button",
+          {
+            type: "button",
+            class: "btn btn-primary btn-block",
+            onclick: () => openDashboard(strong ? "#detections" : "#exposure"),
+          },
+          t("See what happened"),
+        )
+      : null,
+  );
+}
+
 function summaryRow(label: string, value: number): HTMLElement {
   return h("div", { class: "summary-row" }, h("dt", null, label), h("dd", null, String(value)));
 }
 
-function render(status: MonitoringStatus, settings: Settings): void {
+function render(
+  status: MonitoringStatus,
+  settings: Settings,
+  exposure: ExposureSummary | null,
+): void {
   const pill = monitoringPill(status);
   const enabled = settings.monitoring.enabled;
   const last = status.lastSignificant;
@@ -96,6 +154,8 @@ function render(status: MonitoringStatus, settings: Settings): void {
       ),
     );
   }
+
+  if (exposure && pill !== "permission") children.push(exposureHeadline(status, exposure));
 
   children.push(
     h(

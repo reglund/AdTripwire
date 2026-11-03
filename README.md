@@ -72,6 +72,11 @@ See `docs/browser-capabilities.md`.
 
 ## Using it
 
+The toolbar icon shows a number when documented infrastructure was contacted in the last
+seven days. The popup answers the main question first, and the dashboard's **Exposure** tab
+tells each contact as a story (site → ad frame → documented host) with what it means and a
+copy-ready note for researchers.
+
 - **Toolbar popup**: monitoring state, counts of known-IOC observations, suspicious
   patterns and high-priority detections, last significant observation.
 - **Investigation dashboard**: Overview, Detections (filter by category, severity,

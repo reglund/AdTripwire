@@ -40,9 +40,13 @@ import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import { stixToIndicatorSet } from "@adtripwire/interop";
 import { exportResearch } from "./research-export.js";
 import {
+  badgeFor,
   buildAssistContext,
   clusterDetections,
   clusterDomain,
+  summarizeExposure,
+  type ExposureSummary,
+  type IndicatorInfo,
   renderPrompt,
   suggestActions,
   summarizeTimeline,
@@ -314,6 +318,58 @@ class Background {
     entries.sort((a, b) => a.timestamp - b.timestamp);
     const limit = opts.limit ?? 500;
     return entries.length > limit ? entries.slice(entries.length - limit) : entries;
+  }
+
+  // ── Exposure overview and toolbar badge ────────────────────────────────────────────────
+
+  private exposure_(): ExposureSummary {
+    const indicators = new Map<string, IndicatorInfo>();
+    for (const set of this.activeSets())
+      for (const r of set.indicators)
+        indicators.set(r.id, {
+          id: r.id,
+          indicator: r.indicator,
+          classification: r.classification,
+          source: r.source,
+          sourceUrl: r.sourceUrl,
+          ...(r.role ? { role: r.role } : {}),
+          ...(r.notes ? { notes: r.notes } : {}),
+        });
+    return summarizeExposure(
+      this.store.listDetections(),
+      (ids) => this.store.getEvents([...ids]),
+      indicators,
+    );
+  }
+
+  private badgeTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastBadge = "";
+
+  /** Debounced: the badge shows recent documented-infrastructure contacts at a glance. */
+  private scheduleBadge(): void {
+    if (this.badgeTimer) return;
+    this.badgeTimer = setTimeout(() => {
+      this.badgeTimer = undefined;
+      void this.updateBadge();
+    }, 1500);
+  }
+
+  private async updateBadge(): Promise<void> {
+    const action = (browser as unknown as { action?: typeof browser.browserAction }).action;
+    if (!action?.setBadgeText) return;
+    try {
+      const b = badgeFor(this.exposure_());
+      await action.setBadgeText({ text: b.text });
+      if (b.text) await action.setBadgeBackgroundColor({ color: b.color });
+      await action.setTitle({ title: b.title });
+      const key = `${b.text}|${b.color}`;
+      if (key !== this.lastBadge) {
+        this.lastBadge = key;
+        log("info", `badge: ${b.text || "none"}`);
+      }
+    } catch (e) {
+      log("warn", `badge update failed: ${String(e)}`);
+    }
   }
 
   // ── Phase 5: deterministic correlation ─────────────────────────────────────────────────
@@ -746,11 +802,13 @@ class Background {
       for (const d of detections) {
         const supporting = this.eventsById(d.eventIds);
         this.store.addDetection(d, supporting);
+        this.scheduleBadge();
         log("info", `detection ${d.ruleId} [${d.severity}] ${d.summary}`);
       }
       for (const d of updated) {
         const prev = this.store.getDetection(d.detectionId);
         this.store.updateDetection(d);
+        this.scheduleBadge();
         for (const e of this.eventsById(d.eventIds)) this.store.addSupportingEvent(e);
         if (prev && prev.severity !== d.severity) {
           log("info", `escalated ${d.ruleId} ${prev.severity} → ${d.severity}: ${d.summary}`);
@@ -801,6 +859,8 @@ class Background {
   }
 
   private runRetention(): void {
+    // Retention runs at start and hourly; refresh the badge so expired contacts drop off it.
+    this.scheduleBadge();
     const removed = this.store.applyRetention(Date.now(), this.store.getSettings().retention);
     if (removed.removedDetections || removed.removedEvents)
       log(
@@ -952,6 +1012,7 @@ class Background {
             this.snapshotTimer = undefined;
           }
           await this.store.deleteAll();
+          this.scheduleBadge();
           this.metrics = { ...EMPTY_METRICS, startedAt: Date.now() };
         } finally {
           this.deleting = false;
@@ -993,6 +1054,8 @@ class Background {
       case "export_siem":
       case "export_handoff":
         return this.exportResearch(req);
+      case "get_exposure":
+        return this.exposure_();
       case "get_clusters":
         return this.clusters();
       case "get_cluster":
@@ -1066,6 +1129,9 @@ export function startBackground(adapter: SensorAdapter): void {
         browser.tabs
           .create({ url: browser.runtime.getURL("dashboard.html#detections"), active: false })
           .catch((e) => log("warn", `could not open dashboard: ${String(e)}`));
+        browser.tabs
+          .create({ url: browser.runtime.getURL("dashboard.html#exposure"), active: false })
+          .catch((e) => log("warn", `could not open exposure view: ${String(e)}`));
         if (__ADTRIPWIRE_ASSIST__) {
           browser.tabs
             .create({

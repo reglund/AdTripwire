@@ -27,6 +27,9 @@ const DOMAINS = [
 ];
 const EXPECTED = [
   "[AdTripwire] ready:",
+  // Toolbar badge reflects documented-infrastructure contacts (synthetic indicators).
+  "[AdTripwire] badge: ",
+  "[AdTripwire] dashboard rendered exposure",
   "signed bundle selftest ok key=adtripwire-2026a version=2026.11.02",
   "detection known_infra.surveillance_contact [elevated]",
   "detection ad_delivery.noas_request [suspicious]",
@@ -191,5 +194,10 @@ for (const re of FORBIDDEN_WORDING) {
 if (!log.includes("[AdTripwire] ready:")) {
   console.log("\nThe extension never reported ready. Last log lines:");
   for (const l of log.trim().split("\n").slice(-15)) console.log("  " + l.slice(0, 200));
+}
+// A dashboard view that rendered its error state must fail the run, not pass as "rendered".
+if (/dashboard rendered [a-z_]+ \(error state\)/.test(log)) {
+  console.log("FAIL  a dashboard view rendered its error state");
+  failed = true;
 }
 process.exit(failed ? 1 : 0);

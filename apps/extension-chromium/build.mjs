@@ -29,6 +29,13 @@ mkdirSync(dist, { recursive: true });
 
 const manifest = JSON.parse(readFileSync(join(here, "manifest.json"), "utf8"));
 manifest.version = pkg.version;
+// Evaluation builds get a fourth version component that changes on every build: Chromium keeps
+// an unpacked extension's service worker across restarts while the version is unchanged, so a
+// persistent evaluation profile would otherwise keep running yesterday's background code.
+if (process.argv.includes("--eval")) {
+  manifest.version = `${pkg.version}.${Math.floor(Date.now() / 60_000) % 65_536}`;
+  manifest.version_name = `${pkg.version} (evaluation build)`;
+}
 if (dev) manifest.name = "AdTripwire (dev build with synthetic test indicators)";
 if (evalMode) manifest.name = `${manifest.name} (evaluation build)`;
 if (assist) {
