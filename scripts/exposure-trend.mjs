@@ -52,6 +52,9 @@ for (const f of readdirSync(DIR)
 runs.sort((a, b) => (a.date + a.variant).localeCompare(b.date + b.variant));
 
 const SEV = ["high_priority", "elevated", "suspicious", "informational"];
+// Rules that fire on ordinary ad slots in nearly every run and would otherwise dominate the
+// per-severity counts. They are counted in their own column instead of by severity.
+const NOISY_RULES = new Set(["page.hidden_iframe_after_load"]);
 const L = [];
 L.push("# AdTripwire exposure trend");
 L.push("");
@@ -130,9 +133,9 @@ L.push("");
 L.push(
   "| Date | Variant | Sites loaded | Consent clicked | Requests | Median 3rd-party domains | " +
     SEV.join(" | ") +
-    " |",
+    " | Hidden iframes |",
 );
-L.push("|---|---|---:|---:|---:|---:|" + SEV.map(() => "---:").join("|") + "|");
+L.push("|---|---|---:|---:|---:|---:|" + SEV.map(() => "---:").join("|") + "|---:|");
 for (const r of runs) {
   const loaded = r.results.filter((x) => x.loaded);
   const tp = loaded
@@ -141,11 +144,15 @@ for (const r of runs) {
     .sort((a, b) => a - b);
   const med = tp.length ? tp[Math.floor(tp.length / 2)] : "—";
   const bySev = Object.fromEntries(SEV.map((s) => [s, 0]));
+  let noisy = 0;
   for (const x of r.results)
-    for (const d of x.detections ?? []) bySev[d.severity] = (bySev[d.severity] ?? 0) + 1;
+    for (const d of x.detections ?? []) {
+      if (NOISY_RULES.has(d.ruleId)) noisy += 1;
+      else bySev[d.severity] = (bySev[d.severity] ?? 0) + 1;
+    }
   const req = r.results.reduce((a, x) => a + (x.events > 0 ? x.events : 0), 0);
   L.push(
-    `| ${r.date} | ${r.variant} | ${loaded.length}/${r.results.length} | ${r.results.filter((x) => x.consent).length} | ${req} | ${med} | ${SEV.map((s) => bySev[s]).join(" | ")} |`,
+    `| ${r.date} | ${r.variant} | ${loaded.length}/${r.results.length} | ${r.results.filter((x) => x.consent).length} | ${req} | ${med} | ${SEV.map((s) => bySev[s]).join(" | ")} | ${noisy} |`,
   );
 }
 L.push("");
@@ -156,6 +163,9 @@ L.push(
 );
 L.push(
   "- Runs before 2026-11-03 used the pre-retune redirect_chain rule and an unreliable third-party counter; compare severities and counts from later runs only.",
+);
+L.push(
+  `- The severity columns leave out ${[...NOISY_RULES].map((r) => `\`${r}\``).join(", ")}: it fires on ordinary ad slots on most sites and is counted separately under "Hidden iframes". Any of those detections that is elevated or above still appears under "Signals that matter".`,
 );
 L.push(
   "- Absence of signals means the automated profiles were not shown the documented infrastructure in these auctions; it says nothing about other profiles or devices.",
