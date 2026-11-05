@@ -230,3 +230,96 @@ describe("LocalStore Phase 5: assist settings", () => {
     expect(again.getSettings().monitoring).toEqual(DEFAULT_SETTINGS.monitoring);
   });
 });
+
+describe("LocalStore day counters", () => {
+  const dateOf = (i: number): string => {
+    const d = new Date(2020, 0, 1 + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const retention = { detectionRetentionDays: 7, maxDetections: 50, maxEvents: 500 };
+
+  it("upserts, lists newest first and survives a reload", async () => {
+    const { local } = installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    s.updateDay("2026-11-04", (d) => void d.pages++);
+    s.updateDay("2026-11-05", (d) => void (d.pages += 2));
+    s.updateDay("2026-11-05", (d) => void d.hosts.push("b.example", "a.example", "a.example"));
+    await s.flushDaily();
+    expect(local.has("daily")).toBe(true);
+    const s2 = new LocalStore();
+    await s2.load();
+    expect(s2.listDays().map((d) => d.date)).toEqual(["2026-11-05", "2026-11-04"]);
+    expect(s2.getDay("2026-11-05")).toMatchObject({ pages: 2, hosts: ["a.example", "b.example"] });
+  });
+
+  it("caps pages at 100000 and ignores invalid date keys", async () => {
+    installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    s.updateDay("2026-11-05", (d) => void (d.pages = 100_000));
+    s.updateDay("2026-11-05", (d) => void d.pages++);
+    s.updateDay("not-a-date", (d) => void d.pages++);
+    expect(s.getDay("2026-11-05")?.pages).toBe(100_000);
+    expect(s.listDays().length).toBe(1);
+  });
+
+  it("drops malformed stored entries on load", async () => {
+    const { local } = installBrowserMock();
+    const good = {
+      date: "2026-11-05",
+      pages: 1,
+      pagesMeasured: 0,
+      thirdPartyDomainsTotal: 0,
+      thirdPartyDomainsMax: 0,
+      contacts: 0,
+      hosts: [],
+      strong: 0,
+    };
+    local.set("daily", {
+      "2026-11-05": good,
+      "2026-11-04": { ...good, date: "2026-11-04", pages: "x" },
+      "2026-11-03": { ...good, date: "2026-11-02" },
+      junk: { ...good, date: "junk" },
+      "2026-11-01": 5,
+    });
+    const s = new LocalStore();
+    await s.load();
+    expect(s.listDays().map((d) => d.date)).toEqual(["2026-11-05"]);
+  });
+
+  it("prunes to the 400 newest by date, not by age", async () => {
+    installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    for (let i = 0; i < 410; i++) s.updateDay(dateOf(i), (d) => void d.pages++);
+    // `now` is far from every date: an age-based prune would remove all of them.
+    s.applyRetention(5_000_000_000_000, retention);
+    const days = s.listDays();
+    expect(days.length).toBe(400);
+    expect(days[0]?.date).toBe(dateOf(409));
+    expect(days[399]?.date).toBe(dateOf(10));
+    expect(s.getDay(dateOf(9))).toBeUndefined();
+  });
+
+  it("deleteAll clears days in memory and in storage", async () => {
+    const { local } = installBrowserMock();
+    const s = new LocalStore();
+    await s.load();
+    s.updateDay("2026-11-05", (d) => void d.pages++);
+    await s.flushDaily();
+    expect(local.has("daily")).toBe(true);
+    await s.deleteAll();
+    await s.flushDaily(); // nothing may resurrect the deleted days
+    expect(s.listDays()).toEqual([]);
+    expect(local.has("daily")).toBe(false);
+  });
+
+  it("does not write before load has completed", async () => {
+    const { local } = installBrowserMock();
+    const s = new LocalStore();
+    s.updateDay("2026-11-05", (d) => void d.pages++);
+    await s.flushDaily();
+    expect(local.has("daily")).toBe(false);
+  });
+});

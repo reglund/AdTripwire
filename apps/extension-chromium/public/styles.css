@@ -25,6 +25,11 @@
   --sev-elevated-fg: #6b3300;
   --sev-high_priority-bg: #ecc3bd;
   --sev-high_priority-fg: #5e1a12;
+  /* Calendar cells. The three filled states are at least 3:1 against --surface. */
+  --cal-empty: #e5e7eb;
+  --cal-seen: #7a8594;
+  --cal-contact: #b7791f;
+  --cal-strong: #b42318;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -55,6 +60,10 @@
     --sev-elevated-fg: #f5c791;
     --sev-high_priority-bg: #542824;
     --sev-high_priority-fg: #f3beb7;
+    --cal-empty: #2a303a;
+    --cal-seen: #6b7480;
+    --cal-contact: #c99a3f;
+    --cal-strong: #f2766b;
   }
 }
 
@@ -926,4 +935,102 @@ label.radio {
 }
 .copy-row pre {
   flex-basis: 100%;
+}
+
+/* Morning line and the 53-week calendar on the Exposure view */
+.morning-line {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+.cal-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.cal-layout {
+  --cell: 12px;
+  --gap: 2px;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  column-gap: 0.4rem;
+  row-gap: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.cal-months {
+  display: grid;
+  grid-template-columns: repeat(53, var(--cell));
+  column-gap: var(--gap);
+  white-space: nowrap;
+}
+.cal-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, var(--cell));
+  row-gap: var(--gap);
+  line-height: var(--cell);
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(53, var(--cell));
+  grid-template-rows: repeat(7, var(--cell));
+  grid-auto-flow: column;
+  gap: var(--gap);
+}
+.day {
+  display: block;
+  width: var(--cell, 12px);
+  height: var(--cell, 12px);
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--cal-empty);
+  font: inherit;
+}
+button.day {
+  cursor: pointer;
+}
+.day-future {
+  background: transparent;
+}
+.day-seen {
+  background: var(--cal-seen);
+}
+.day-contact {
+  background: var(--cal-contact);
+}
+.day-strong {
+  background: var(--cal-strong);
+}
+.day-today {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.day:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.cal-status {
+  min-height: 1.5em;
+  margin: 0.6rem 0 0.4rem;
+}
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.cal-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.cal-days {
+  margin-bottom: 0.6rem;
+}
+.cal-days summary {
+  cursor: pointer;
 }

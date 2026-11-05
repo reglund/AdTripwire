@@ -225,3 +225,9 @@ describe("parseUiRequest exposure", () => {
     expect(parseUiRequest({ type: "get_exposure" })).toEqual({ type: "get_exposure" });
   });
 });
+
+describe("parseUiRequest digest", () => {
+  it("accepts get_digest without parameters", () => {
+    expect(parseUiRequest({ type: "get_digest" })).toEqual({ type: "get_digest" });
+  });
+});

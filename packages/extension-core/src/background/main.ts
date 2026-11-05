@@ -7,11 +7,13 @@
  */
 import type {
   AssistPackage,
+  DayStats,
   ClusterDetail,
   Detection,
   DetectionCluster,
   ExportFile,
   ImportResult,
+  IndicatorRecord,
   IndicatorSet,
   SignedBundlePreview,
   TimelineEntry,
@@ -39,6 +41,17 @@ import {
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import { stixToIndicatorSet } from "@adtripwire/interop";
 import { exportResearch } from "./research-export.js";
+import {
+  PageAccounting,
+  applyNewDetection,
+  applyPageFinalised,
+  applyPageStarted,
+  buildDigest,
+  documentedHostFor,
+  isTopLevelNavigation,
+  localDate,
+  type FinalisedPage,
+} from "./daily.js";
 import {
   badgeFor,
   buildAssistContext,
@@ -111,6 +124,10 @@ class Background {
   /** Events observed before async init finished; drained into the engine on ready. */
   private readonly preReady: NormalizedEvent[] = [];
   private static readonly PRE_READY_MAX = 500;
+  /** Per-tab third-party domain accounting for the current page (memory only, bounded). */
+  private pages = new PageAccounting();
+  /** Day-counter updates made before the store finished loading; applied on ready. */
+  private readonly preReadyDay: Array<{ date: string; fn: (day: DayStats) => void }> = [];
 
   constructor(private readonly adapter: SensorAdapter) {
     this.capabilities = {
@@ -162,6 +179,10 @@ class Background {
       },
     });
     this.sensor.register();
+    browser.tabs.onRemoved.addListener((tabId) => {
+      const finalised = this.pages.onTabRemoved(tabId);
+      if (finalised) this.recordFinalisedPage(finalised);
+    });
     browser.alarms.onAlarm.addListener((a) => {
       if (a.name === ALARM_RETENTION) void this.ready.then(() => this.runRetention());
     });
@@ -226,6 +247,9 @@ class Background {
       );
     }, 60_000);
     this.isReady = true;
+    const earlyDayOps = this.preReadyDay.splice(0);
+    for (const op of earlyDayOps) this.store.updateDay(op.date, op.fn);
+    if (earlyDayOps.length > 0) this.scheduleSnapshot();
     const queued = this.preReady.splice(0);
     for (const ev of queued) this.onEvent(ev);
     log(
@@ -775,7 +799,11 @@ class Background {
     if (isExtensionOriginated(ev)) return false;
     this.metrics.eventsObserved++;
     if (ev.eventType === "page_signal") return true;
-    if (ev.resourceType === "main_frame") return false;
+    if (ev.resourceType === "main_frame") {
+      // Top-level navigations are counted per day and otherwise discarded (never stored or named).
+      if (isTopLevelNavigation(ev)) this.onTopLevelNavigation(ev);
+      return false;
+    }
     if (ev.frameContext.thirdParty === true) return true;
     if (ev.frameContext.depth > 0) return true;
     if (isNoasPath(ev.destination.pathPattern)) return true;
@@ -790,11 +818,11 @@ class Background {
     }
     const engine = this.engine;
     const t0 = performance.now();
-    if (
-      ev.frameContext.thirdParty === true &&
-      this.thirdPartyDomains.size < Background.THIRD_PARTY_DOMAINS_MAX
-    ) {
-      this.thirdPartyDomains.add(clusterDomain(ev.destination.hostname));
+    if (ev.frameContext.thirdParty === true) {
+      const domain = clusterDomain(ev.destination.hostname);
+      if (this.thirdPartyDomains.size < Background.THIRD_PARTY_DOMAINS_MAX)
+        this.thirdPartyDomains.add(domain);
+      if (typeof ev.tabId === "number" && ev.tabId >= 0) this.pages.onThirdParty(ev.tabId, domain);
     }
     try {
       const { detections, updated } = engine.ingest(ev);
@@ -802,6 +830,9 @@ class Background {
       for (const d of detections) {
         const supporting = this.eventsById(d.eventIds);
         this.store.addDetection(d, supporting);
+        // New detections only; the `updated` loop below must never touch the day counters.
+        const host = d.ruleId.startsWith("known_infra.") ? this.detectionHost(d) : undefined;
+        this.recordDay(d.timestamp, (day) => applyNewDetection(day, d, host));
         this.scheduleBadge();
         log("info", `detection ${d.ruleId} [${d.severity}] ${d.summary}`);
       }
@@ -822,6 +853,36 @@ class Background {
     } finally {
       this.metrics.ingestMsTotal += performance.now() - t0;
     }
+  }
+
+  /** Documented indicator name only; never the request's destination hostname. */
+  private detectionHost(d: Detection): string | undefined {
+    const byId = new Map<string, IndicatorRecord>();
+    for (const set of this.activeSets()) for (const r of set.indicators) byId.set(r.id, r);
+    return documentedHostFor(d, byId);
+  }
+
+  private onTopLevelNavigation(ev: NormalizedEvent): void {
+    if (typeof ev.tabId !== "number" || ev.tabId < 0) return;
+    const { counted, finalised } = this.pages.onNavigation(ev.tabId, ev.timestamp, ev.requestId);
+    if (counted) this.recordDay(ev.timestamp, applyPageStarted);
+    if (finalised) this.recordFinalisedPage(finalised);
+  }
+
+  private recordFinalisedPage(f: FinalisedPage): void {
+    this.recordDay(f.startedAt, (day) => applyPageFinalised(day, f.count));
+  }
+
+  /** Updates the local-day counters; queued until the store has loaded. Flushed by the snapshot timer. */
+  private recordDay(ts: number, fn: (day: DayStats) => void): void {
+    if (this.deleting) return;
+    const date = localDate(ts);
+    if (!this.isReady) {
+      if (this.preReadyDay.length < Background.PRE_READY_MAX) this.preReadyDay.push({ date, fn });
+      return;
+    }
+    this.store.updateDay(date, fn);
+    this.scheduleSnapshot();
   }
 
   private eventsById(ids: string[]): NormalizedEvent[] {
@@ -849,6 +910,7 @@ class Background {
     if (this.snapshotTimer) return;
     this.snapshotTimer = setTimeout(() => {
       this.snapshotTimer = undefined;
+      void this.store.flushDaily();
       if (!this.engine) return;
       this.engine.pruneWindow();
       browser.storage.session
@@ -862,6 +924,7 @@ class Background {
     // Retention runs at start and hourly; refresh the badge so expired contacts drop off it.
     this.scheduleBadge();
     const removed = this.store.applyRetention(Date.now(), this.store.getSettings().retention);
+    void this.store.flushDaily();
     if (removed.removedDetections || removed.removedEvents)
       log(
         "info",
@@ -1011,6 +1074,8 @@ class Background {
             clearTimeout(this.snapshotTimer);
             this.snapshotTimer = undefined;
           }
+          this.pages = new PageAccounting();
+          this.preReadyDay.length = 0;
           await this.store.deleteAll();
           this.scheduleBadge();
           this.metrics = { ...EMPTY_METRICS, startedAt: Date.now() };
@@ -1056,6 +1121,8 @@ class Background {
         return this.exportResearch(req);
       case "get_exposure":
         return this.exposure_();
+      case "get_digest":
+        return buildDigest(this.store.listDays(), Date.now());
       case "get_clusters":
         return this.clusters();
       case "get_cluster":

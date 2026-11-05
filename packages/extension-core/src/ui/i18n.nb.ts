@@ -7,7 +7,10 @@ export const NB: Record<string, string> = {
   Exposure: "Eksponering",
   "Strong signals need review": "Sterke signaler må gjennomgås",
   "Documented infrastructure contacted": "Dokumentert infrastruktur kontaktet",
-  "No documented infrastructure seen": "Ingen dokumentert infrastruktur sett",
+  "The daily calendar keeps counts and documented hostnames for 400 days regardless of this setting; deleting all data removes them.":
+    "Den daglige kalenderen beholder tall og dokumenterte vertsnavn i 400 dager uavhengig av denne innstillingen; sletting av alle data fjerner dem.",
+  "No documented infrastructure seen in the last {days} days":
+    "Ingen dokumentert infrastruktur sett de siste {days} dagene",
   "{contacts} contact(s) with {hosts} host(s) in the last {days} days.":
     "{contacts} kontakt(er) med {hosts} vert(er) de siste {days} dagene.",
   "Watching ad traffic: {n} requests observed.":
@@ -698,4 +701,27 @@ export const NB: Record<string, string> = {
   "Incognito excluded": "Privat vindu utelatt",
   "Sensor restarted during request": "Sensor startet på nytt under forespørsel",
   "Page sensor disabled": "Sidesensor av",
+  "The last 365 days": "De siste 365 dagene",
+  "Yesterday: {pages} page(s), {contacts} contact(s) with documented infrastructure.":
+    "I går: {pages} side(r), {contacts} kontakt(er) med dokumentert infrastruktur.",
+  "Last contact {date}: {hosts}.": "Siste kontakt {date}: {hosts}.",
+  "Nothing was recorded for yesterday.": "Ingenting ble registrert for i går.",
+  "Yesterday {n} third-party domains per page on average; your 30-day normal is {m}.":
+    "I går var det i snitt {n} tredjepartsdomener per side; din 30-dagers normal er {m}.",
+  "Daily counts, last 53 weeks": "Daglige tall, siste 53 uker",
+  "Select a day to see what was recorded.": "Velg en dag for å se hva som ble registrert.",
+  "List days with contacts": "List dager med kontakter",
+  "No days with contacts in this period.": "Ingen dager med kontakter i denne perioden.",
+  "Pages are only counted, never named. Days are in local time and are kept on this device for 400 days.":
+    "Sider telles bare, de navngis aldri. Dager følger lokal tid og lagres på denne enheten i 400 dager.",
+  "Nothing recorded": "Ingenting registrert",
+  "Pages counted": "Sider talt",
+  "Contact with documented infrastructure": "Kontakt med dokumentert infrastruktur",
+  "Elevated detection": "Forhøyet deteksjon",
+  "{date}: nothing recorded.": "{date}: ingenting registrert.",
+  "{date}: {pages} page(s) counted; no contact with documented infrastructure recorded.":
+    "{date}: {pages} side(r) talt; ingen kontakt med dokumentert infrastruktur registrert.",
+  "{date}: {pages} page(s) counted; {contacts} contact(s) with documented infrastructure: {hosts}.":
+    "{date}: {pages} side(r) talt; {contacts} kontakt(er) med dokumentert infrastruktur: {hosts}.",
+  "{n} detection(s) at elevated priority.": "{n} deteksjon(er) med forhøyet prioritet.",
 };

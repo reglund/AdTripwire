@@ -7,6 +7,12 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Morning line and calendar**: the popup and the Exposure view say what yesterday looked like
+  ("Yesterday: N page(s), N contact(s) with documented infrastructure"), compare yesterday's
+  third-party domains per page with the 30-day normal, and show a 53-week calendar (one button
+  per day, keyboard-navigable, with a plain list of days with contacts). Built from per-day
+  counters kept on the device for 400 days; pages are counted, never named. Norwegian strings
+  included.
 - **Exposure view**: every documented host this browser contacted, told as a short story —
   site → ad frame → documented host — with what the source says the host is, what that
   means, first/last seen, days, path and parameter names, and a copy-ready sanitized note

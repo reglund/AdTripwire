@@ -1,5 +1,6 @@
-import type { MonitoringStatus, Settings } from "@adtripwire/shared";
+import type { Digest, MonitoringStatus, Settings } from "@adtripwire/shared";
 import type { ExposureSummary } from "@adtripwire/correlation";
+import { morningLine } from "./calendar.js";
 import { errorMessage, errorState, h, loadingState, replaceChildren } from "./dom.js";
 import {
   monitoringPill,
@@ -21,13 +22,14 @@ let actionError: string | null = null;
 async function load(): Promise<void> {
   replaceChildren(app, loadingState());
   try {
-    const [status, settings, exposure] = await Promise.all([
+    const [status, settings, exposure, digest] = await Promise.all([
       rpc<MonitoringStatus>({ type: "get_status" }),
       rpc<Settings>({ type: "get_settings" }),
       rpc<ExposureSummary>({ type: "get_exposure" }).catch(() => null),
+      rpc<Digest>({ type: "get_digest" }).catch(() => null),
     ]);
     applyLanguageSetting(settings);
-    render(status, settings, exposure);
+    render(status, settings, exposure, digest);
   } catch (err) {
     replaceChildren(
       app,
@@ -63,7 +65,12 @@ function openDashboard(hash: string): void {
 }
 
 /** The answer first: has this browser contacted documented infrastructure? */
-function exposureHeadline(status: MonitoringStatus, e: ExposureSummary): HTMLElement {
+function exposureHeadline(
+  status: MonitoringStatus,
+  e: ExposureSummary,
+  digest: Digest | null,
+): HTMLElement {
+  const morning = digest ? morningLine(digest) : null;
   const found = e.recentHosts > 0;
   const strong = e.strongSignals > 0;
   return h(
@@ -79,7 +86,7 @@ function exposureHeadline(status: MonitoringStatus, e: ExposureSummary): HTMLEle
         ? t("Strong signals need review")
         : found
           ? t("Documented infrastructure contacted")
-          : t("No documented infrastructure seen"),
+          : t("No documented infrastructure seen in the last {days} days", { days: e.windowDays }),
     ),
     h(
       "p",
@@ -90,9 +97,10 @@ function exposureHeadline(status: MonitoringStatus, e: ExposureSummary): HTMLEle
             hosts: e.recentHosts,
             days: e.windowDays,
           })
-        : t("Watching ad traffic: {n} requests observed.", {
-            n: (status.metrics?.eventsObserved ?? 0).toLocaleString(),
-          }),
+        : (morning ??
+            t("Watching ad traffic: {n} requests observed.", {
+              n: (status.metrics?.eventsObserved ?? 0).toLocaleString(),
+            })),
     ),
     found || strong
       ? h(
@@ -116,6 +124,7 @@ function render(
   status: MonitoringStatus,
   settings: Settings,
   exposure: ExposureSummary | null,
+  digest: Digest | null,
 ): void {
   const pill = monitoringPill(status);
   const enabled = settings.monitoring.enabled;
@@ -155,7 +164,7 @@ function render(
     );
   }
 
-  if (exposure && pill !== "permission") children.push(exposureHeadline(status, exposure));
+  if (exposure && pill !== "permission") children.push(exposureHeadline(status, exposure, digest));
 
   children.push(
     h(

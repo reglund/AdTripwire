@@ -9,10 +9,10 @@ Bundles: `popup.ts` -> `dist/popup.js`, `dashboard.ts` -> `dist/dashboard.js`. S
 
 ## Pages and `UiRequest`s
 
-| Page            | Entry                            | Requests                                                                                   |
-| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
-| Popup           | `popup.html`, `popup.ts`         | `get_status`, `get_settings`, `update_settings` (`{ enabled }`), `request_host_permission` |
-| Dashboard shell | `dashboard.html`, `dashboard.ts` | none (router only)                                                                         |
+| Page            | Entry                            | Requests                                                                                                                 |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Popup           | `popup.html`, `popup.ts`         | `get_status`, `get_settings`, `get_exposure`, `get_digest`, `update_settings` (`{ enabled }`), `request_host_permission` |
+| Dashboard shell | `dashboard.html`, `dashboard.ts` | none (router only)                                                                                                       |
 
 ## Dashboard hash routes
 
@@ -21,6 +21,7 @@ Bundles: `popup.ts` -> `dist/popup.js`, `dashboard.ts` -> `dist/dashboard.js`. S
 | `#overview` (default) | `views/overview.ts`         | `get_status` (incl. optional `metrics`), `list_detections` (`{ limit: 5 }`)                                                                                                             |
 | `#detections`         | `views/detections.ts`       | `list_detections` (`DetectionFilter` built by `filter.ts`)                                                                                                                              |
 | `#detection/<id>`     | `views/detection-detail.ts` | `get_detection` (`DetectionWithNote`), `get_events`, `set_detection_note`, `export_evidence` / `export_stix` / `export_siem` / `export_handoff` (all with `detectionIds: [id]`)         |
+| `#exposure`           | `views/exposure.ts`         | `get_exposure`, `get_status`, `get_digest` (morning line, 30-day normal and the 53-week calendar; helpers in `calendar.ts`)                                                             |
 | `#timeline`           | `views/timeline.ts`         | `get_timeline` (`{ limit: 500, since?, tabId? }`)                                                                                                                                       |
 | `#indicators`         | `views/indicators.ts`       | `get_status` (`indicatorSets`), `import_indicator_set`, `set_indicator_set_enabled`, `remove_indicator_set`                                                                             |
 | `#rules`              | `views/rules.ts`            | `list_rules`                                                                                                                                                                            |

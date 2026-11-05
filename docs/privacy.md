@@ -45,7 +45,20 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
 | `events`                  | Sanitized events referenced by detections                              |
 | `exposure`                | Per-hostname distinct-day counters for surveillance-classified hosts   |
 | `metrics`                 | Aggregate counters and timing totals (no URLs)                         |
+| `daily`                   | Per-local-day counters for the morning line and calendar (see below)   |
 | session: `engineSnapshot` | Bounded correlation window and dedup state; cleared when Firefox exits |
+
+### Daily counters
+
+For the morning line and the calendar the extension keeps, per local calendar day: the number of
+pages opened (a count), the mean and maximum number of distinct third-party domains per page, the
+number of contacts with documented infrastructure together with the documented hostnames
+(public indicator names), and the number of elevated detections.
+
+Not stored: no URL, hostname or timestamp of any page you visited, and no per-page or per-site
+record. A page is counted when it starts loading and its third-party domain count is reduced to a
+single number in memory when the page is replaced or the tab is closed. The counters are kept for
+400 days and are removed by "Delete all data" together with everything else.
 
 ## Permissions requested and why
 

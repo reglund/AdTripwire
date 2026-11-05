@@ -3,19 +3,29 @@
  * path it took (site → ad frame → documented host), what the source says the host is, what
  * that means, and a copy-ready note for researchers. Built from stored detections only.
  */
-import type { MonitoringStatus } from "@adtripwire/shared";
+import type { Digest, MonitoringStatus } from "@adtripwire/shared";
 import {
   exposureStory,
   sightingText,
   type ExposureContact,
   type ExposureSummary,
 } from "@adtripwire/correlation";
+import {
+  calendarCells,
+  dayLabelText,
+  monthLabels,
+  morningLine,
+  weekdayName,
+  yesterdayOf,
+  type CalendarCell,
+  type CellState,
+} from "../calendar.js";
 import { externalLink, h } from "../dom.js";
 import { formatTimestamp, relativeTime } from "../format.js";
 import { t } from "../i18n.js";
 import { detectionHash } from "../route.js";
 import { rpc } from "../rpc.js";
-import { kv, type View } from "./common.js";
+import { card, kv, type View } from "./common.js";
 
 const CLASS_LABEL: Record<ExposureContact["classification"], string> = {
   malicious: "Spyware delivery path",
@@ -116,10 +126,149 @@ function contactCard(c: ExposureContact, status: MonitoringStatus): HTMLElement 
   );
 }
 
+const LEGEND: Array<[CellState, string]> = [
+  ["empty", "Nothing recorded"],
+  ["seen", "Pages counted"],
+  ["contact", "Contact with documented infrastructure"],
+  ["strong", "Elevated detection"],
+];
+
+const fmt1 = (n: number): string => (Math.round(n * 10) / 10).toLocaleString();
+
+/** The calendar: one button per day, roving tabindex, the focused day's sentence in a status line. */
+/** One span per week column (no inline styles under the extension CSP); labels sit in their column. */
+function monthSpans(cells: readonly CalendarCell[]): HTMLElement[] {
+  const labels = new Map(monthLabels(cells).map((m) => [m.column, m.label] as const));
+  return Array.from({ length: 53 }, (_, col) => h("span", null, labels.get(col) ?? ""));
+}
+
+function calendar(digest: Digest): HTMLElement {
+  const cells = calendarCells(digest.days, digest.today);
+  const status = h(
+    "p",
+    { class: "cal-status", role: "status" },
+    t("Select a day to see what was recorded."),
+  );
+  const buttons: Array<HTMLElement | null> = [];
+  let current = cells.reduce((last, c, i) => (c.state === "future" ? last : i), 0);
+
+  const select = (i: number): void => {
+    const cell = cells[i];
+    if (!cell || !buttons[i]) return;
+    buttons[current]?.setAttribute("tabindex", "-1");
+    buttons[i]?.setAttribute("tabindex", "0");
+    current = i;
+    status.textContent = dayLabelText(cell);
+  };
+
+  const cellEl = (cell: CalendarCell, i: number): HTMLElement => {
+    if (cell.state === "future") {
+      buttons.push(null);
+      return h("span", { class: "day day-future", "aria-hidden": "true" });
+    }
+    const btn = h("button", {
+      type: "button",
+      class: `day day-${cell.state}${cell.date === digest.today ? " day-today" : ""}`,
+      "aria-label": dayLabelText(cell),
+      "aria-current": cell.date === digest.today ? "date" : null,
+      tabindex: i === current ? "0" : "-1",
+      "data-i": i,
+      onclick: () => select(i),
+      onfocus: () => select(i),
+    });
+    buttons.push(btn);
+    return btn;
+  };
+
+  const STEP: Record<string, number> = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 };
+  const onKey = (ev: Event): void => {
+    const step = STEP[(ev as KeyboardEvent).key];
+    if (step === undefined) return;
+    ev.preventDefault();
+    buttons[current + step]?.focus();
+  };
+
+  const grid = h(
+    "div",
+    {
+      class: "cal-grid",
+      role: "group",
+      "aria-label": t("Daily counts, last 53 weeks"),
+      onkeydown: onKey,
+    },
+    cells.map(cellEl),
+  );
+  const months = h("div", { class: "cal-months", "aria-hidden": "true" }, monthSpans(cells));
+  const weekdays = h(
+    "div",
+    { class: "cal-weekdays", "aria-hidden": "true" },
+    [0, 1, 2, 3, 4, 5, 6].map((r) => h("span", null, r % 2 === 0 ? weekdayName(r) : "")),
+  );
+  const withContacts = cells.filter((c) => c.contacts > 0).reverse();
+  return h(
+    "div",
+    { class: "calendar" },
+    h(
+      "div",
+      { class: "cal-scroll" },
+      h("div", { class: "cal-layout" }, h("div"), months, weekdays, grid),
+    ),
+    status,
+    h(
+      "ul",
+      { class: "cal-legend" },
+      LEGEND.map(([state, label]) =>
+        h("li", null, h("span", { class: `day day-${state}`, "aria-hidden": "true" }), t(label)),
+      ),
+    ),
+    h(
+      "details",
+      { class: "cal-days" },
+      h("summary", null, t("List days with contacts")),
+      withContacts.length > 0
+        ? h(
+            "ul",
+            null,
+            withContacts.map((c) => h("li", null, dayLabelText(c))),
+          )
+        : h("p", { class: "muted" }, t("No days with contacts in this period.")),
+    ),
+    h(
+      "p",
+      { class: "muted small" },
+      t(
+        "Pages are only counted, never named. Days are in local time and are kept on this device for 400 days.",
+      ),
+    ),
+  );
+}
+
+function morningSection(digest: Digest): HTMLElement {
+  const line = morningLine(digest);
+  const y = yesterdayOf(digest);
+  const normal = digest.normalThirdPartyPerPage;
+  return card(
+    t("The last 365 days"),
+    h("p", { class: "morning-line" }, line ?? t("Nothing was recorded for yesterday.")),
+    y && normal !== null && y.pagesMeasured > 0
+      ? h(
+          "p",
+          { class: "muted" },
+          t("Yesterday {n} third-party domains per page on average; your 30-day normal is {m}.", {
+            n: fmt1(y.thirdPartyDomainsTotal / y.pagesMeasured),
+            m: fmt1(normal),
+          }),
+        )
+      : null,
+    calendar(digest),
+  );
+}
+
 export const renderExposure: View = async () => {
-  const [summary, status] = await Promise.all([
+  const [summary, status, digest] = await Promise.all([
     rpc<ExposureSummary>({ type: "get_exposure" }),
     rpc<MonitoringStatus>({ type: "get_status" }),
+    rpc<Digest>({ type: "get_digest" }).catch(() => null),
   ]);
   const observed = status.metrics?.eventsObserved ?? 0;
   const since = status.metrics?.since;
@@ -170,6 +319,7 @@ export const renderExposure: View = async () => {
     "div",
     { class: "view" },
     h("h2", null, t("Exposure")),
+    digest ? morningSection(digest) : null,
     hero,
     summary.strongSignals > 0
       ? h(

@@ -40,6 +40,7 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
     case "delete_all_data":
     case "request_host_permission":
     case "list_rules":
+    case "get_digest":
       return { type: r.type };
     case "list_detections": {
       const f = r.filter;

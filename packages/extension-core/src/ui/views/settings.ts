@@ -401,6 +401,13 @@ export const renderSettings: View = async (ctx) => {
     windowMin.el,
     days.el,
     maxDet.el,
+    h(
+      "p",
+      { class: "muted small" },
+      t(
+        "The daily calendar keeps counts and documented hostnames for 400 days regardless of this setting; deleting all data removes them.",
+      ),
+    ),
     h("button", { type: "submit", class: "btn btn-primary" }, t("Save settings")),
     saveStatus,
   );

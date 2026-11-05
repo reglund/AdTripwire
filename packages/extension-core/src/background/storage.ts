@@ -1,4 +1,5 @@
 import type {
+  DayStats,
   Detection,
   IndicatorSet,
   NormalizedEvent,
@@ -7,6 +8,7 @@ import type {
 } from "@adtripwire/shared";
 import { DEFAULT_SETTINGS } from "@adtripwire/shared";
 import { validateIndicatorSet } from "@adtripwire/indicators";
+import { MAX_DAY_ENTRIES, emptyDay, isDateKey, normaliseDay, sanitiseDay } from "./daily.js";
 
 /**
  * Local persistence (browser.storage.local). Only detections and the events they
@@ -20,6 +22,8 @@ const KEY_METRICS = "metrics";
 const KEY_IMPORTED_SETS = "importedIndicatorSets";
 const KEY_NOTES = "detectionNotes";
 const KEY_SIGNED_BUNDLE = "signedIndicatorBundle";
+/** Per-day counters (Record<YYYY-MM-DD, DayStats>); counts only, kept 400 days. */
+const KEY_DAILY = "daily";
 
 export interface ImportedSetRecord {
   set: IndicatorSet;
@@ -72,6 +76,9 @@ export class LocalStore {
   private importedSets: ImportedSetRecord[] = [];
   private notes = new Map<string, NoteRecord>();
   private signedBundle: SignedBundleRecord | null = null;
+  private days = new Map<string, DayStats>();
+  private dailyLoaded = false;
+  private dailyDirty = false;
   private dirty = false;
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -83,7 +90,18 @@ export class LocalStore {
       KEY_IMPORTED_SETS,
       KEY_NOTES,
       KEY_SIGNED_BUNDLE,
+      KEY_DAILY,
     ]);
+    const daily = data[KEY_DAILY];
+    this.days = new Map(
+      daily && typeof daily === "object" && !Array.isArray(daily)
+        ? Object.entries(daily as Record<string, unknown>).flatMap(([k, v]) => {
+            const day = sanitiseDay(k, v);
+            return day ? [[k, day] as const] : [];
+          })
+        : [],
+    );
+    this.dailyLoaded = true;
     const sb = data[KEY_SIGNED_BUNDLE] as SignedBundleRecord | undefined;
     this.signedBundle =
       sb &&
@@ -114,6 +132,39 @@ export class LocalStore {
 
   getSettings(): Settings {
     return this.settings;
+  }
+
+  // ---- per-day counters ----
+
+  getDay(date: string): DayStats | undefined {
+    return this.days.get(date);
+  }
+
+  /** Upserts one day: `fn` mutates the (possibly new) record, which is then clamped. */
+  updateDay(date: string, fn: (day: DayStats) => void): void {
+    if (!isDateKey(date)) return;
+    const day = this.days.get(date) ?? emptyDay(date);
+    fn(day);
+    this.days.set(date, normaliseDay(day));
+    this.dailyDirty = true;
+  }
+
+  /** Newest first, at most 400 entries. */
+  listDays(): DayStats[] {
+    return Array.from(this.days.values())
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+      .slice(0, MAX_DAY_ENTRIES);
+  }
+
+  /** Writes the counters if changed. Never writes before `load()` (would overwrite stored days). */
+  async flushDaily(): Promise<void> {
+    if (!this.dailyLoaded || !this.dailyDirty) return;
+    this.dailyDirty = false;
+    try {
+      await browser.storage.local.set({ [KEY_DAILY]: Object.fromEntries(this.days) });
+    } catch {
+      this.dailyDirty = true;
+    }
   }
 
   async updateSettings(
@@ -244,6 +295,12 @@ export class LocalStore {
       for (const e of sorted.slice(0, this.events.size - r.maxEvents))
         this.events.delete(e.eventId);
     }
+    // Day counters: keep the 400 newest by date (not by age, so a clock jump cannot wipe them).
+    if (this.days.size > MAX_DAY_ENTRIES) {
+      const keep = new Set(this.listDays().map((d) => d.date));
+      for (const k of Array.from(this.days.keys())) if (!keep.has(k)) this.days.delete(k);
+      this.dailyDirty = true;
+    }
     const kept = new Set(this.detections.map((d) => d.detectionId));
     let notesChanged = false;
     for (const id of Array.from(this.notes.keys()))
@@ -264,6 +321,8 @@ export class LocalStore {
   async deleteAll(): Promise<void> {
     this.detections = [];
     this.events.clear();
+    this.days.clear();
+    this.dailyDirty = false;
     const keep = this.settings;
     const keepSets = this.importedSets;
     this.notes.clear();

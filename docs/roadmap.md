@@ -30,7 +30,11 @@ Three promises hold through every phase, exactly as in `prompt.md`:
    "spied on" or "safe". Magic is in clarity, not in certainty we do not have.
 3. **Never blocks or modifies.** It is a tripwire, not a wall.
 
-### Phase 7 — The morning line (personal meaning) · size S–M
+### Phase 7 — The morning line (personal meaning) · size S–M ✅ delivered 2026-11-05
+
+Report: `docs/phase-7-report.md`; plan and known limitations: `docs/phase-7-plan.md`. "Your
+normal" shipped per day rather than per site (a per-site table would be a browsing history); no
+new settings; the digest-vs-eval-JSON gate check is pending the next daily run.
 
 **The moment.** The toolbar badge is quiet. You click it anyway and read: _"Yesterday: 214
 pages, 0 contacts with documented infrastructure. Last contact 4 Nov, independent.co.uk,
