@@ -56,6 +56,8 @@ The results can also be published as a static site, the observatory: a page and 
 data per day and variant, with a one-command way to reproduce any day. See
 [observatory.md](observatory.md).
 
+To run the automated variant daily from your own machine and contribute the rows to the observatory, see `docs/rig-setup.md`.
+
 ## Session
 
 - Visit the sites in `tests/fixtures/exposure-sites.txt` (or your own daily sites).

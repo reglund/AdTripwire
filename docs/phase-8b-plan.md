@@ -80,3 +80,48 @@ publishes a day; the primary rig's next run shows both rigs on the page; the sec
 cannot be used to change the root (verified by the script's refusal, with the GitHub-side
 limitation stated in the docs); `docs/rig-setup.md` followed by a person who has not seen the
 repository produces a published row.
+
+## Interfaces (fixed 2026-11-06 before implementation; every task codes against these)
+
+Environment (`~/.config/adtripwire/observatory.env`, read by the service):
+
+- `ADTRIPWIRE_RIG` rig name, `^[a-z0-9][a-z0-9-]{0,31}$`, default `rig-1`; required when
+  `ADTRIPWIRE_OBSERVATORY_REMOTE` is set (else the observatory steps are skipped).
+- `ADTRIPWIRE_RIG_COUNTRY` ISO 3166-1 alpha-2, upper case, optional.
+- `ADTRIPWIRE_RIG_NETWORK` one of `home`, `mobile`, `office`, `datacentre`, optional.
+- `ADTRIPWIRE_OBSERVATORY_ROLE` `rig` (default) or `primary` (explicit only).
+
+Run JSON gains `rig`, `rigCountry`, `rigNetwork` (the last two only when given) from
+`exposure-run.mjs --rig=<name> [--rig-country=XX] [--rig-network=home]`.
+
+Scripts:
+
+- `node scripts/observatory-export-rig.mjs --dir=<cache> --out=<dir> --rig=<name>
+[--country=XX] [--network=home]`: empties `<out>`, writes scrubbed copies of every run JSON
+  (adding `rig` when missing), evidence files and reports as `runs/<date>-<slug>.json`,
+  `runs/<date>-<slug>.evidence.json`, `reports/<date>-<slug>.md`, plus `rig.json`
+  `{ rig, country?, network?, exportedAt, runs }`. Slugs from the library.
+- `sh scripts/observatory-publish.sh --rig <name> <export-dir>`: replaces only
+  `rigs/<name>/` on the branch. `sh scripts/observatory-publish.sh <site-dir>` (root mode):
+  replaces everything except `rigs/` and `.git`. Root mode is refused when the branch root has
+  content other than `index.html`-sites, `rigs/`, `.nojekyll`, `README.md` (a code branch).
+  Both modes retry a rejected push up to three times by re-cloning and re-applying. Bot
+  identity and UTC as today; message `observatory <date>` or `observatory rig <name> <date>`.
+- `sh scripts/observatory-sync.sh <dir>`: clones the branch into `<dir>` (or fetches and
+  resets when `<dir>/.git` exists); exit 0 with an empty `<dir>/rigs` when the branch does not
+  exist yet.
+- `node scripts/observatory-build.mjs --dir=<cache> --out=<site> [--rig=<name>]`
+  (single rig, as today, runs attributed to `--rig` or `rig-1`) or
+  `--rigs=<sync-dir>/rigs --out=<site>` (many rigs: loads `rigs/*/runs/*.json`, `rig` is always the
+  directory name (what the rig's key wrote to; the JSON cannot claim another rig), evidence and reports from the same rig directory). Site files
+  are always `data/runs/<date>-<rig>-<slug>.json` etc. `index.json` gains `rigs: [{ rig,
+country, network, days, runs, variants, contacts, hosts }]` and `rig` on each run.
+- `node scripts/observatory-reproduce.mjs ... [--rig=<name>]`: picks the row by rig; when
+  `index.json` lists exactly one rig, `--rig` may be omitted.
+- `scripts/exposure-daily.sh`, after the trend step (its status is still the script's):
+  role `rig`: export-rig → publish `--rig`. Role `primary`: export-rig → publish `--rig` →
+  sync into `$c/remote` → build `--rigs=$c/remote/rigs` → publish root. Each step best-effort.
+
+Page: a **Rigs** table before the variants table; a rig column in "Signals that matter",
+"Documented hosts over time" and "Sites that carried documented hosts"; the side-by-side table
+grouped per rig. Wording unchanged. `docs/rig-setup.md` is the onboarding page for a rig owner.

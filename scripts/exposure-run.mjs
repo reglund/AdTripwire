@@ -10,7 +10,11 @@
  *   node scripts/exposure-run.mjs --browser=chromium|firefox [--dist=<eval build dir>]
  *        [--sites=tests/fixtures/exposure-sites.txt] [--seconds=75] [--mobile] [--limit=N]
  *        [--profile=<dir>] [--headed] [--out=docs/evaluations/<date>-exposure-interactive-<browser>.md]
- *        [--json=<path>]
+ *        [--json=<path>] [--rig=<name>] [--rig-country=XX] [--rig-network=home|mobile|office|datacentre]
+ *
+ * --rig names the machine that runs this (default rig-1) and is written as `rig` in the --json
+ * file; --rig-country (ISO 3166-1 alpha-2) and --rig-network are self-declared, optional and
+ * written as `rigCountry` and `rigNetwork` only when given. No IP address is ever recorded.
  *
  * Build the evaluation bundle first (production indicators, dashboard opens on install):
  *   node apps/extension-<browser>/build.mjs --eval --out=<dir>
@@ -61,6 +65,22 @@ const OUT = arg(
   `docs/evaluations/${today}-exposure-interactive-${BROWSER}${MOBILE ? `-${DEVICE_SLUG}` : ""}.md`,
 );
 const JSON_OUT = arg("json", "");
+// Rig identity (Phase 8b): who ran this, and the vantage point the rig owner declares.
+const RIG = arg("rig", "rig-1");
+const RIG_COUNTRY = arg("rig-country", "");
+const RIG_NETWORK = arg("rig-network", "");
+if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(RIG)) {
+  console.error(`--rig must match ^[a-z0-9][a-z0-9-]{0,31}$ (got "${RIG}")`);
+  process.exit(2);
+}
+if (RIG_COUNTRY !== "" && !/^[A-Z]{2}$/.test(RIG_COUNTRY)) {
+  console.error(`--rig-country must be two upper-case letters, e.g. NO (got "${RIG_COUNTRY}")`);
+  process.exit(2);
+}
+if (RIG_NETWORK !== "" && !["home", "mobile", "office", "datacentre"].includes(RIG_NETWORK)) {
+  console.error(`--rig-network must be home, mobile, office or datacentre (got "${RIG_NETWORK}")`);
+  process.exit(2);
+}
 const ACCEPT_LANGUAGE = "nb-NO,nb;q=0.9,no;q=0.8,en;q=0.7";
 
 if (!existsSync(join(DIST, "manifest.json"))) {
@@ -571,6 +591,9 @@ async function main() {
           sites: SITES_PATH,
           etpOff: ETP_OFF,
           seconds: SECONDS,
+          rig: RIG,
+          ...(RIG_COUNTRY ? { rigCountry: RIG_COUNTRY } : {}),
+          ...(RIG_NETWORK ? { rigNetwork: RIG_NETWORK } : {}),
           totals,
           results,
         },

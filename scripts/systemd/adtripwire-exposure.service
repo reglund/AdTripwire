@@ -7,6 +7,13 @@ WorkingDirectory=%h/git/AdTripwire
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
 # Optional publishing settings (ADTRIPWIRE_OBSERVATORY_REMOTE, ADTRIPWIRE_OBSERVATORY_BRANCH);
 # see docs/observatory.md. Without the file, or without a remote in it, nothing is published.
+# Rig identity and role, also set in that file (no values here):
+#   ADTRIPWIRE_RIG                rig name, [a-z0-9-], 1-32 characters, default rig-1; required
+#                                 when ADTRIPWIRE_OBSERVATORY_REMOTE is set (else no publishing)
+#   ADTRIPWIRE_RIG_COUNTRY        optional, ISO 3166-1 alpha-2 upper case, self-declared
+#   ADTRIPWIRE_RIG_NETWORK        optional: home, mobile, office or datacentre, self-declared
+#   ADTRIPWIRE_OBSERVATORY_ROLE   rig (default: only publishes its own rigs/<name>/ rows) or
+#                                 primary (must be set explicitly: also builds and publishes the site)
 EnvironmentFile=-%h/.config/adtripwire/observatory.env
 # Rebuild the evaluation bundles from the checked-out tree so the run always uses the current
 # indicator set (pull the repository to pick up merged indicator refreshes).

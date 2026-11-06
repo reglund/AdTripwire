@@ -2,11 +2,21 @@
  * Observatory data library and static site build (scripts/lib/exposure-runs.mjs,
  * scripts/observatory-build.mjs). Runs against synthetic run JSON in temp directories.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadRuns, scrub, variantSlug } from "../../scripts/lib/exposure-runs.mjs";
+import { contactsOf, loadRuns, scrub, variantSlug } from "../../scripts/lib/exposure-runs.mjs";
 import {
   MAX_CALENDAR_DAYS,
   build,
@@ -20,6 +30,8 @@ import {
   flagsForSlug,
   formatComparison,
   loadedAllowance,
+  publishedPaths,
+  resolveRig,
 } from "../../scripts/observatory-reproduce.mjs";
 
 type Det = { ruleId: string; severity: string; hostnames?: string[] };
@@ -112,6 +124,44 @@ describe("loadRuns", () => {
 
   it("returns an empty list for a missing directory", () => {
     expect(loadRuns(join(tmp(), "missing"))).toEqual([]);
+  });
+
+  it("drops runs with a malformed structure and never throws in contactsOf", () => {
+    const dir = tmp();
+    const put = (f: string, results: unknown) =>
+      writeFileSync(join(dir, f), JSON.stringify(run({}, results as Row[])));
+    put("ok.json", [row("a.example", [KNOWN])]);
+    put("rows.json", ["x", null, 5]);
+    put("nosite.json", [{ ...row("a.example"), site: 5 }]);
+    put("detarr.json", [{ ...row("a.example"), detections: { ruleId: "x" } }]);
+    put("rule.json", [row("a.example", [{ ruleId: 5, severity: "high_priority" } as never])]);
+    put("sev.json", [row("a.example", [{ ruleId: "x" } as never])]);
+    put("hosts.json", [row("a.example", [{ ...KNOWN, hostnames: "tracker.example" } as never])]);
+    put("hosts2.json", [row("a.example", [{ ...KNOWN, hostnames: [1] } as never])]);
+    put("nulldet.json", [row("a.example", [null as never])]);
+    const runs = loadRuns(dir);
+    expect(runs.map((r: { file: string }) => r.file)).toEqual(["ok.json"]);
+    expect(() => contactsOf(runs)).not.toThrow();
+    expect(() =>
+      contactsOf([{ date: "2026-11-02", variant: "v", results: [null, { detections: [{}] }] }]),
+    ).not.toThrow();
+  });
+
+  it("skips entries that are not regular files and reports them", () => {
+    const dir = tmp();
+    const target = join(tmp(), "real.json");
+    writeFileSync(target, JSON.stringify(run()));
+    symlinkSync(target, join(dir, "link.json"));
+    mkdirSync(join(dir, "folder.json"));
+    writeFileSync(join(dir, "good.json"), JSON.stringify(run()));
+    let skipped = 0;
+    const runs = loadRuns(dir, {
+      onSkip: (n = 1) => {
+        skipped += n;
+      },
+    });
+    expect(runs.map((r: { file: string }) => r.file)).toEqual(["good.json"]);
+    expect(skipped).toBe(2);
   });
 });
 
@@ -226,7 +276,7 @@ describe("renderHtml", () => {
     expect(html).toContain('title="2026-11-02: contact"');
     expect(html).toContain('title="2026-11-03: run without contact"');
     expect(html).toContain('title="2026-11-04: no run"');
-    expect(html).toContain("--date=2026-11-05 --variant=chromium --from=");
+    expect(html).toContain("--date=2026-11-05 --variant=chromium --rig=rig-1 --from=");
   });
 });
 
@@ -267,7 +317,8 @@ describe("buildIndex", () => {
     expect(idx.schemaVersion).toBe(1);
     expect(idx.period).toMatchObject({ from: "2026-11-02", to: "2026-11-03", days: 2 });
     expect(idx.runs[0]).toMatchObject({
-      file: "data/runs/2026-11-02-chromium.json",
+      file: "data/runs/2026-11-02-rig-1-chromium.json",
+      rig: "rig-1",
       slug: "chromium",
       sites: 2,
       loaded: 2,
@@ -285,6 +336,19 @@ describe("buildIndex", () => {
         days: ["2026-11-02"],
         variants: ["chromium"],
         sites: ["a.example", "b.example"],
+        rigs: ["rig-1"],
+      },
+    ]);
+    expect(idx.rigs).toEqual([
+      {
+        rig: "rig-1",
+        country: null,
+        network: null,
+        days: 2,
+        runs: 2,
+        variants: 2,
+        contacts: 2,
+        hosts: 1,
       },
     ]);
   });
@@ -323,10 +387,10 @@ describe("build", () => {
       expect(existsSync(join(out, f)), f).toBe(true);
     expect(written).toEqual(
       expect.arrayContaining([
-        "data/runs/2026-11-02-chromium-own.json",
-        "data/runs/2026-11-02-chromium-own.evidence.json",
-        "data/reports/2026-11-02-chromium-own.md",
-        "data/runs/2026-11-03-firefox.json",
+        "data/runs/2026-11-02-rig-1-chromium-own.json",
+        "data/runs/2026-11-02-rig-1-chromium-own.evidence.json",
+        "data/reports/2026-11-02-rig-1-chromium-own.md",
+        "data/runs/2026-11-03-rig-1-firefox.json",
       ]),
     );
     for (const f of written) expect(existsSync(join(out, f))).toBe(true);
@@ -337,14 +401,15 @@ describe("build", () => {
       expect(text, f).not.toMatch(/\brigger\b/);
     }
     const published = JSON.parse(
-      readFileSync(join(out, "data/runs/2026-11-02-chromium-own.json"), "utf8"),
+      readFileSync(join(out, "data/runs/2026-11-02-rig-1-chromium-own.json"), "utf8"),
     );
     expect(published.results[0].error).toBe("failed in ~/profile");
     expect(published.file).toBeUndefined();
     expect(published.variant).toBeUndefined();
     expect(readFileSync(join(out, "index.html"), "utf8")).toContain(
-      "data/runs/2026-11-02-chromium-own.evidence.json",
+      "data/runs/2026-11-02-rig-1-chromium-own.evidence.json",
     );
+    expect(published.rig).toBe("rig-1");
   });
 
   it("removes data/ left over from an earlier build and refuses a directory holding .git", () => {
@@ -356,12 +421,338 @@ describe("build", () => {
     writeFileSync(join(out, "data", "runs", "2026-10-01-gone.json"), "{}");
     build({ dir: src, out, identity: { home: "/home/rigger", user: "rigger" } });
     expect(existsSync(join(out, "data", "runs", "2026-10-01-gone.json"))).toBe(false);
-    expect(existsSync(join(out, "data", "runs", "2026-11-02-chromium.json"))).toBe(true);
+    expect(existsSync(join(out, "data", "runs", "2026-11-02-rig-1-chromium.json"))).toBe(true);
 
     mkdirSync(join(out, ".git"));
     writeFileSync(join(out, "data", "keep.txt"), "x");
     expect(() => build({ dir: src, out })).toThrow(/\.git/);
     expect(existsSync(join(out, "data", "keep.txt"))).toBe(true);
+  });
+});
+
+describe("build, single directory with --rig", () => {
+  it("names files with the rig, attributes runs without one and keeps a valid own rig", () => {
+    const src = tmp();
+    const out = join(tmp(), "site");
+    writeFileSync(join(src, "2026-11-02-chromium.json"), JSON.stringify(run()));
+    writeFileSync(
+      join(src, "2026-11-03-chromium.json"),
+      JSON.stringify(run({ date: "2026-11-03", rig: "rig-x" })),
+    );
+    writeFileSync(
+      join(src, "2026-11-04-chromium.json"),
+      JSON.stringify(run({ date: "2026-11-04", rig: "Bad Name!" })),
+    );
+    const { index, written } = build({ dir: src, out, rig: "home-1" });
+    expect(written).toEqual(
+      expect.arrayContaining([
+        "data/runs/2026-11-02-home-1-chromium.json",
+        "data/runs/2026-11-03-rig-x-chromium.json",
+        "data/runs/2026-11-04-home-1-chromium.json",
+      ]),
+    );
+    expect(index.rigs.map((g: { rig: string }) => g.rig)).toEqual(["home-1", "rig-x"]);
+    expect(
+      JSON.parse(readFileSync(join(out, "data/runs/2026-11-02-home-1-chromium.json"), "utf8")).rig,
+    ).toBe("home-1");
+    expect(() => build({ dir: src, out, rig: "../x" })).toThrow(/invalid rig/);
+  });
+});
+
+describe("build, --rigs mode", () => {
+  const put = (base: string, rigDir: string, stem: string, body: unknown) => {
+    mkdirSync(join(base, rigDir, "runs"), { recursive: true });
+    writeFileSync(join(base, rigDir, "runs", `${stem}.json`), JSON.stringify(body));
+  };
+  const setup = () => {
+    const rigs = tmp();
+    // oslo: has rig.json and a declared rig in its runs; evidence and report next to them
+    put(rigs, "oslo", "2026-11-02-chromium", run({ rig: "oslo" }, [row("a.example", [KNOWN])]));
+    put(
+      rigs,
+      "oslo",
+      "2026-11-03-firefox",
+      run({ rig: "oslo", date: "2026-11-03", browser: "firefox" }),
+    );
+    writeFileSync(
+      join(rigs, "oslo", "runs", "2026-11-02-chromium.evidence.json"),
+      JSON.stringify({ at: "/home/rigger/x" }),
+    );
+    mkdirSync(join(rigs, "oslo", "reports"), { recursive: true });
+    writeFileSync(join(rigs, "oslo", "reports", "2026-11-02-chromium.md"), "report oslo\n");
+    writeFileSync(
+      join(rigs, "oslo", "rig.json"),
+      JSON.stringify({ rig: "oslo", country: "NO", network: "home", runs: 2 }),
+    );
+    // lima: no rig.json, one run without a rig field, same file name as oslo's
+    put(rigs, "lima", "2026-11-02-chromium", run({}, [row("b.example", [KNOWN, STRONG])]));
+    // an invalid directory name is skipped, and so is a plain file
+    put(rigs, "Bad Rig", "2026-11-02-chromium", run({ rig: "bad" }));
+    put(rigs, "UPPER", "2026-11-02-chromium", run());
+    writeFileSync(join(rigs, "notes.txt"), "x");
+    return rigs;
+  };
+
+  it("loads two rigs, names the directory for a run without rig and skips invalid names", () => {
+    const rigs = setup();
+    const out = join(tmp(), "site");
+    const { index, written } = build({
+      rigsDir: rigs,
+      out,
+      identity: { home: "/home/rigger", user: "rigger" },
+      generatedAt: "2026-11-05T00:00:00.000Z",
+    });
+    expect(index.runs).toHaveLength(3);
+    expect(index.runs.map((r: { rig: string }) => r.rig).sort()).toEqual(["lima", "oslo", "oslo"]);
+    expect(index.rigs).toEqual([
+      {
+        rig: "lima",
+        country: null,
+        network: null,
+        days: 1,
+        runs: 1,
+        variants: 1,
+        contacts: 2,
+        hosts: 1,
+      },
+      {
+        rig: "oslo",
+        country: "NO",
+        network: "home",
+        days: 2,
+        runs: 2,
+        variants: 2,
+        contacts: 1,
+        hosts: 1,
+      },
+    ]);
+    expect(written).toEqual(
+      expect.arrayContaining([
+        "data/runs/2026-11-02-lima-chromium.json",
+        "data/runs/2026-11-02-oslo-chromium.json",
+        "data/runs/2026-11-02-oslo-chromium.evidence.json",
+        "data/reports/2026-11-02-oslo-chromium.md",
+        "data/runs/2026-11-03-oslo-firefox.json",
+      ]),
+    );
+    expect(written.filter((f: string) => /bad|upper/i.test(f))).toEqual([]);
+    expect(existsSync(join(out, "data/runs/2026-11-02-lima-chromium.evidence.json"))).toBe(false);
+    expect(
+      JSON.parse(readFileSync(join(out, "data/runs/2026-11-02-lima-chromium.json"), "utf8")).rig,
+    ).toBe("lima");
+    expect(
+      readFileSync(join(out, "data/runs/2026-11-02-oslo-chromium.evidence.json"), "utf8"),
+    ).toBe('{\n  "at": "~/x"\n}\n');
+    expect(index.hosts[0].rigs.sort()).toEqual(["lima", "oslo"]);
+  });
+
+  it("attributes a run to its directory even when the JSON claims another rig", () => {
+    const rigs = setup();
+    // lima's key can only write under rigs/lima/; a run there that says rig "oslo" is lima's.
+    put(rigs, "lima", "2026-11-04-chromium", run({ rig: "oslo", date: "2026-11-04" }));
+    const out = join(tmp(), "site");
+    const { index } = build({ rigsDir: rigs, out });
+    const spoofed = index.runs.find((r: { date: string }) => r.date === "2026-11-04");
+    expect(spoofed.rig).toBe("lima");
+    expect(index.rigs.find((r: { rig: string }) => r.rig === "oslo").runs).toBe(2);
+  });
+
+  it("renders the Rigs table and a rig column in each table", () => {
+    const rigs = setup();
+    const out = join(tmp(), "site");
+    build({ rigsDir: rigs, out });
+    const html = readFileSync(join(out, "index.html"), "utf8");
+    expect(html).toContain("<h2>Rigs</h2>");
+    expect(html).toMatch(
+      /<th>Rig<\/th><th>Country<\/th><th>Network<\/th><th class="n">Days run<\/th><th class="n">Runs<\/th><th class="n">Variants<\/th><th class="n">Contacts<\/th><th class="n">Distinct hosts<\/th>/,
+    );
+    expect(html).toContain("<td>oslo</td><td>NO</td><td>home</td>");
+    expect(html).toContain("<td>lima</td><td>—</td><td>—</td>");
+    expect(html.indexOf("<h2>Rigs</h2>")).toBeLessThan(
+      html.indexOf("<h2>Browsers and devices side by side</h2>"),
+    );
+    expect(html).toContain("<th>Date</th><th>Rig</th><th>Variant</th><th>Site</th>");
+    expect(html).toContain("<th>Rigs</th><th>Variants</th><th>Sites</th>");
+    expect(html).toContain("<th>Dates</th><th>Rigs</th><th>Variants</th>");
+    expect(html).toContain('<th>Rig</th><th>Variant</th><th class="n">Days run</th>');
+    expect(html).toContain("declared by its owner");
+    expect(html).not.toMatch(/\b(safe|clean|infected|spied)\b/i);
+  });
+
+  it("escapes rig metadata that is not a plain value", () => {
+    const rigs = tmp();
+    put(rigs, "evil", "2026-11-02-chromium", run({ rigCountry: "<b>", rigNetwork: "<i>" }));
+    writeFileSync(
+      join(rigs, "evil", "rig.json"),
+      JSON.stringify({ country: "<script>", network: "<script>" }),
+    );
+    const out = join(tmp(), "site");
+    const { index } = build({ rigsDir: rigs, out });
+    expect(index.rigs[0]).toMatchObject({ rig: "evil", country: null, network: null });
+    expect(readFileSync(join(out, "index.html"), "utf8")).not.toMatch(/<script|<b>|<i>/);
+  });
+
+  const SECRET = "TOPSECRET-do-not-publish";
+  const allText = (root: string): string => {
+    let all = "";
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else all += `${e.name}\n${readFileSync(p, "utf8")}\n`;
+      }
+    };
+    walk(root);
+    return all;
+  };
+
+  it("never follows a symbolic link: report, evidence, runs/ and rigs/<name> are ignored", () => {
+    const rigs = setup();
+    const outside = tmp();
+    const secretFile = join(outside, "secret.txt");
+    writeFileSync(secretFile, SECRET);
+    const leakRuns = join(outside, "runs");
+    mkdirSync(leakRuns);
+    writeFileSync(
+      join(leakRuns, "2026-11-02-chromium.json"),
+      JSON.stringify(run({}, [row("a.example", [], { error: SECRET })])),
+    );
+    // lima: a symlinked report and a symlinked evidence file next to a real run
+    put(rigs, "lima", "2026-11-03-firefox", run({ date: "2026-11-03", browser: "firefox" }));
+    mkdirSync(join(rigs, "lima", "reports"), { recursive: true });
+    symlinkSync(secretFile, join(rigs, "lima", "reports", "2026-11-03-firefox.md"));
+    symlinkSync(secretFile, join(rigs, "lima", "runs", "2026-11-03-firefox.evidence.json"));
+    // a symlinked run file
+    symlinkSync(secretFile, join(rigs, "lima", "runs", "2026-11-04-link.json"));
+    // a rig whose runs/ is a link, one whose reports/ is a link and a rig directory that is a link
+    mkdirSync(join(rigs, "linkruns"));
+    symlinkSync(leakRuns, join(rigs, "linkruns", "runs"));
+    mkdirSync(join(outside, "rigdir"));
+    symlinkSync(leakRuns, join(outside, "rigdir", "runs"));
+    symlinkSync(join(outside, "rigdir"), join(rigs, "linkrig"));
+    symlinkSync(secretFile, join(rigs, "oslo", "rig.json.link"));
+    const out = join(tmp(), "site");
+    const { index, written, skipped } = build({ rigsDir: rigs, out });
+    expect(allText(out)).not.toContain(SECRET);
+    expect(written.filter((f: string) => /linkruns|linkrig/.test(f))).toEqual([]);
+    expect(index.rigs.map((r: { rig: string }) => r.rig)).toEqual(["lima", "oslo"]);
+    expect(written).toContain("data/runs/2026-11-03-lima-firefox.json");
+    expect(written).not.toContain("data/reports/2026-11-03-lima-firefox.md");
+    expect(written).not.toContain("data/runs/2026-11-03-lima-firefox.evidence.json");
+    // counted: Bad Rig and UPPER, notes.txt, the link run, report, evidence, runs/ link, rig link
+    expect(skipped).toBeGreaterThanOrEqual(7);
+    // a symlinked rigs directory is refused whole
+    const viaLink = join(tmp(), "rigs-link");
+    symlinkSync(rigs, viaLink);
+    const out2 = join(tmp(), "site2");
+    expect(build({ rigsDir: viaLink, out: out2 }).index.runs).toEqual([]);
+    expect(allText(out2)).not.toContain(SECRET);
+  });
+
+  it("skips files over 5 MB and keeps the others", () => {
+    const rigs = setup();
+    const big = "x".repeat(5 * 1024 * 1024 + 1);
+    writeFileSync(join(rigs, "oslo", "reports", "2026-11-02-chromium.md"), big);
+    writeFileSync(join(rigs, "oslo", "runs", "2026-11-02-chromium.evidence.json"), big);
+    writeFileSync(join(rigs, "lima", "runs", "2026-11-05-firefox.json"), big);
+    const out = join(tmp(), "site");
+    const { index, written, skipped } = build({ rigsDir: rigs, out });
+    expect(index.runs).toHaveLength(3);
+    expect(written).toContain("data/runs/2026-11-02-oslo-chromium.json");
+    expect(written).not.toContain("data/reports/2026-11-02-oslo-chromium.md");
+    expect(written).not.toContain("data/runs/2026-11-02-oslo-chromium.evidence.json");
+    expect(skipped).toBeGreaterThanOrEqual(3);
+    expect(statSync(join(out, "data", "runs", "2026-11-02-oslo-chromium.json")).size).toBeLessThan(
+      100000,
+    );
+  });
+
+  it("keeps at most 4000 runs per rig, the newest by date", () => {
+    const rigs = tmp();
+    for (let i = 0; i < 4002; i += 1)
+      put(
+        rigs,
+        "busy",
+        `r${i}`,
+        run({ date: i < 2 ? "2026-01-02" : "2026-11-02", device: `d${i}` }, []),
+      );
+    const out = join(tmp(), "site");
+    const { index, skipped } = build({ rigsDir: rigs, out });
+    expect(index.runs).toHaveLength(4000);
+    expect(index.runs.every((r: { date: string }) => r.date === "2026-11-02")).toBe(true);
+    expect(skipped).toBe(2);
+  });
+
+  it("drops a malformed foreign run but still writes the site", () => {
+    const rigs = setup();
+    put(rigs, "lima", "2026-11-04-bad", {
+      ...run({ date: "2026-11-04" }),
+      results: [{ site: "evil.example", detections: [{ ruleId: 5, severity: "high_priority" }] }],
+    });
+    const out = join(tmp(), "site");
+    const { index, written } = build({ rigsDir: rigs, out });
+    expect(index.runs).toHaveLength(3);
+    expect(written).toContain("index.html");
+    expect(readFileSync(join(out, "index.html"), "utf8")).not.toContain("evil.example");
+  });
+
+  it("drops runs dated before 2026 or after tomorrow, in both modes", () => {
+    const rigs = setup();
+    put(rigs, "lima", "far", run({ date: "9999-12-31" }));
+    put(rigs, "lima", "old", run({ date: "2025-12-31" }));
+    put(rigs, "lima", "tomorrow", run({ date: "2026-11-07", browser: "firefox" }));
+    put(rigs, "lima", "later", run({ date: "2026-11-08", browser: "firefox" }));
+    const now = Date.parse("2026-11-06T12:00:00Z");
+    const { index, skipped } = build({ rigsDir: rigs, out: join(tmp(), "site"), now });
+    const dates = index.runs.map((r: { date: string }) => r.date);
+    expect(dates).not.toContain("9999-12-31");
+    expect(dates).not.toContain("2025-12-31");
+    expect(dates).not.toContain("2026-11-08");
+    expect(dates).toContain("2026-11-07");
+    expect(skipped).toBeGreaterThanOrEqual(3);
+    const single = tmp();
+    writeFileSync(join(single, "a.json"), JSON.stringify(run({ date: "9999-12-31" })));
+    writeFileSync(join(single, "b.json"), JSON.stringify(run()));
+    const r2 = build({ dir: single, out: join(tmp(), "site2"), now });
+    expect(r2.index.runs.map((r: { date: string }) => r.date)).toEqual(["2026-11-02"]);
+  });
+
+  it("returns no runs for a missing rigs directory", () => {
+    const out = join(tmp(), "site");
+    const { index } = build({ rigsDir: join(tmp(), "missing"), out });
+    expect(index.runs).toEqual([]);
+    expect(index.rigs).toEqual([]);
+  });
+});
+
+describe("reproduce rig resolution", () => {
+  const idx = (...rigs: string[]) => ({ rigs: rigs.map((rig) => ({ rig })) });
+
+  it("uses --rig when valid and refuses an invalid one", () => {
+    expect(resolveRig("oslo", idx("a", "b"))).toEqual({ rig: "oslo" });
+    expect(resolveRig("../x", null).error).toMatch(/invalid --rig/);
+  });
+
+  it("picks the only rig in index.json and refuses to guess among several", () => {
+    expect(resolveRig("", idx("oslo"))).toEqual({ rig: "oslo" });
+    const many = resolveRig("", idx("oslo", "lima"));
+    expect(many.error).toMatch(/oslo, lima/);
+    expect(many.error).toMatch(/--rig/);
+  });
+
+  it("falls back to the legacy file name for a site without a rig list", () => {
+    expect(resolveRig("", null)).toEqual({ rig: null });
+    expect(resolveRig("", { runs: [] })).toEqual({ rig: null });
+    expect(publishedPaths("2026-11-02", "chromium", null)).toEqual([
+      "data/runs/2026-11-02-chromium.json",
+    ]);
+    expect(publishedPaths("2026-11-02", "chromium", "rig-1")).toEqual([
+      "data/runs/2026-11-02-rig-1-chromium.json",
+      "data/runs/2026-11-02-chromium.json",
+    ]);
+    expect(publishedPaths("2026-11-02", "chromium", "oslo")).toEqual([
+      "data/runs/2026-11-02-oslo-chromium.json",
+    ]);
   });
 });
 

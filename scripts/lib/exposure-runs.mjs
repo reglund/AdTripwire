@@ -3,7 +3,16 @@
  * Used by scripts/exposure-trend.mjs (Markdown trend) and scripts/observatory-build.mjs
  * (static site). Pure functions except loadRuns, which reads a directory.
  */
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 export const SEV = ["high_priority", "elevated", "suspicious", "informational"];
@@ -11,6 +20,17 @@ export const SEV = ["high_priority", "elevated", "suspicious", "informational"];
 // Rules that fire on ordinary ad slots in nearly every run and would otherwise dominate the
 // per-severity counts. They are counted in their own column instead of by severity.
 export const NOISY_RULES = new Set(["page.hidden_iframe_after_load"]);
+
+/** Rig (measurement machine) names: lower case letters, digits and hyphens, 1-32 characters. */
+export const RIG_NAME_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+export const DEFAULT_RIG = "rig-1";
+export const RIG_NETWORKS = ["home", "mobile", "office", "datacentre"];
+
+/** True for a usable rig name. */
+export const validRigName = (n) => typeof n === "string" && RIG_NAME_RE.test(n);
+
+/** The rig of a run: its own valid `rig` field, else the default rig. */
+export const rigOf = (run) => (validRigName(run?.rig) ? run.rig : DEFAULT_RIG);
 
 /** Human-readable variant label: browser, device or mobile, ETP, non-default site list. */
 export function variantOf(j) {
@@ -43,22 +63,119 @@ export function validDate(d) {
   return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === d;
 }
 
-/** Every run JSON in dir (skips malformed files and evidence exports), sorted by date+variant. */
-export function loadRuns(dir) {
+/** Largest file the observatory reads from a rig directory, in bytes. */
+export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+/** Most runs taken from one rig directory (the newest by date). */
+// 400 calendar days on the page times up to ten variants a day.
+export const MAX_RUNS_PER_RIG = 4000;
+
+/** True when path is a real directory (not a symbolic link to one). A missing path is false. */
+export function isRealDir(path) {
+  try {
+    return lstatSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The text of a regular file no larger than maxBytes, else null. A symbolic link, a directory, a
+ * special file, a larger file and a missing file all give null; onSkip() is called for each of
+ * them except the missing one. The file is opened with O_NOFOLLOW and checked again after the
+ * open, so a link swapped in after the first look is refused too.
+ */
+export function readRegularFile(path, { maxBytes = MAX_FILE_BYTES, onSkip } = {}) {
+  let st;
+  try {
+    st = lstatSync(path);
+  } catch {
+    return null;
+  }
+  if (!st.isFile() || st.size > maxBytes) {
+    onSkip?.();
+    return null;
+  }
+  try {
+    const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const again = fstatSync(fd);
+      if (!again.isFile() || again.size > maxBytes) {
+        onSkip?.();
+        return null;
+      }
+      return readFileSync(fd, "utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    onSkip?.();
+    return null;
+  }
+}
+
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * True when a run has the shape the readers below rely on: an object whose `results` are objects
+ * with a string `site`, whose `detections` (when present) are arrays of objects with string
+ * `ruleId` and `severity`, and whose `hostnames` (when present) are arrays of strings.
+ */
+export function validRunShape(j) {
+  if (!isObject(j) || typeof j.browser !== "string" || !j.browser || !Array.isArray(j.results))
+    return false;
+  return j.results.every((row) => {
+    if (!isObject(row) || typeof row.site !== "string") return false;
+    if (row.detections === undefined) return true;
+    return (
+      Array.isArray(row.detections) &&
+      row.detections.every(
+        (d) =>
+          isObject(d) &&
+          typeof d.ruleId === "string" &&
+          typeof d.severity === "string" &&
+          (d.hostnames === undefined ||
+            (Array.isArray(d.hostnames) && d.hostnames.every((h) => typeof h === "string"))),
+      )
+    );
+  });
+}
+
+/**
+ * Every run JSON in dir (skips malformed files, evidence exports, anything that is not a regular
+ * file, and runs that fail validRunShape), sorted by date+variant. Options: maxBytes (skip larger
+ * files; no limit when absent), maxRuns (keep only the newest this many), onSkip (called once per
+ * entry that was left out).
+ */
+export function loadRuns(dir, { maxBytes = Infinity, maxRuns = Infinity, onSkip } = {}) {
   const runs = [];
   if (!existsSync(dir)) return runs;
-  for (const f of readdirSync(dir)
-    .filter((n) => n.endsWith(".json") && !n.endsWith(".evidence.json"))
-    .sort()) {
+  const names = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.name.endsWith(".json") && !e.name.endsWith(".evidence.json"))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const e of names) {
+    if (!e.isFile()) {
+      onSkip?.();
+      continue;
+    }
+    const text = readRegularFile(join(dir, e.name), { maxBytes, ...(onSkip ? { onSkip } : {}) });
+    if (text === null) continue;
     try {
-      const j = JSON.parse(readFileSync(join(dir, f), "utf8"));
-      if (!j || !Array.isArray(j.results) || !j.browser || !validDate(j.date)) continue;
-      runs.push({ file: f, ...j, variant: variantOf(j) });
+      const j = JSON.parse(text);
+      if (!validRunShape(j) || !validDate(j.date)) {
+        onSkip?.();
+        continue;
+      }
+      runs.push({ ...j, file: e.name, variant: variantOf(j) });
     } catch {
-      /* skip unreadable files */
+      onSkip?.();
     }
   }
   runs.sort((a, b) => (a.date + a.variant).localeCompare(b.date + b.variant));
+  if (runs.length > maxRuns) {
+    onSkip?.(runs.length - maxRuns);
+    return runs.slice(runs.length - maxRuns);
+  }
   return runs;
 }
 
@@ -66,12 +183,13 @@ export function loadRuns(dir) {
 export function contactsOf(runs) {
   const contacts = [];
   for (const r of runs)
-    for (const row of r.results)
-      for (const d of row.detections ?? [])
+    for (const row of Array.isArray(r?.results) ? r.results : [])
+      for (const d of Array.isArray(row?.detections) ? row.detections : [])
         if (
-          d.ruleId.startsWith("known_infra.") ||
-          d.ruleId.startsWith("correlation.") ||
-          ["elevated", "high_priority"].includes(d.severity)
+          typeof d?.ruleId === "string" &&
+          (d.ruleId.startsWith("known_infra.") ||
+            d.ruleId.startsWith("correlation.") ||
+            ["elevated", "high_priority"].includes(d.severity))
         )
           contacts.push({ date: r.date, variant: r.variant, site: row.site, ...d });
   return contacts;
@@ -94,12 +212,14 @@ export function hostTable(contacts) {
         days: new Set(),
         variants: new Set(),
         sites: new Set(),
+        rigs: new Set(),
       };
       e.first = c.date < e.first ? c.date : e.first;
       e.last = c.date > e.last ? c.date : e.last;
       e.days.add(c.date);
       e.variants.add(c.variant);
       e.sites.add(c.site);
+      if (c.rig) e.rigs.add(c.rig);
       hosts.set(h, e);
     }
   return [...hosts.values()]
@@ -111,6 +231,7 @@ export function hostTable(contacts) {
       days: [...e.days],
       variants: [...e.variants],
       sites: [...e.sites],
+      rigs: [...e.rigs],
     }));
 }
 

@@ -29,6 +29,10 @@ semantic versioning for the extension packages.
   git branch by `scripts/observatory-publish.sh` (off unless `ADTRIPWIRE_OBSERVATORY_REMOTE` is
   set), and `pnpm observatory:reproduce` re-runs one published day and compares it within a
   stated tolerance. See `docs/observatory.md`.
+- **Many rigs**: the observatory page and data are built over several measurement machines
+  (`--rigs=<dir>`, `--rig=<name>`): a Rigs table with self-declared country and network, a rig
+  column in the signal, host and site tables, files named `<date>-<rig>-<slug>`, `rigs[]` in
+  `index.json`, and `observatory:reproduce --rig`. Onboarding: `docs/rig-setup.md`.
 - **Daily run**: the logic moved from the systemd unit to `scripts/exposure-daily.sh`
   (`pnpm exposure:daily`); eight variants run two at a time (`ADTRIPWIRE_EXPOSURE_PARALLEL`),
   with per-variant logs and two new regional site lists (Norway, Middle East and Africa).

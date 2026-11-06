@@ -3,27 +3,44 @@
  * Static observatory site built from the daily exposure run output (harness output only).
  *
  *   node scripts/observatory-build.mjs [--dir=~/.cache/adtripwire-exposure] [--out=<dir>/site]
+ *        [--rig=rig-1]
+ *   node scripts/observatory-build.mjs --rigs=<dir with one subdirectory per rig> --out=<site>
  *
  * Reads every run JSON in --dir (see scripts/lib/exposure-runs.mjs) plus the matching
- * reports/<name>.md and <name>.evidence.json when present, removes the rig's home directory and
+ * reports/<name>.md and <name>.evidence.json when present (single rig: every run without a
+ * `rig` field is attributed to --rig). With --rigs it reads <dir>/<rig>/runs/*.json, the
+ * evidence next to them, <dir>/<rig>/reports/*.md and the optional <dir>/<rig>/rig.json
+ * (country, network), skipping directories whose name is not a valid rig name. Only real
+ * directories and regular files of at most 5 MB are read (a symbolic link is never followed), at
+ * most 2000 runs per rig (the newest), and runs dated before 2026-01-01 or after tomorrow are
+ * dropped; whatever is left out is counted in the `skipped` number build() returns. Site files are
+ * always named <date>-<rig>-<slug>. It removes the rig's home directory and
  * login name (as \`/home/<user>\`) from every string, and writes index.html (inline CSS, no JavaScript, every value
  * through esc()) and data/ (runs, evidence, reports, trend.md, index.json, README.md).
  * Nothing else is read. Exports buildIndex, renderHtml, scrub and friends for tests.
  */
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, lstatSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, userInfo } from "node:os";
 import { pathToFileURL } from "node:url";
 import {
+  DEFAULT_RIG,
+  MAX_FILE_BYTES,
+  MAX_RUNS_PER_RIG,
+  RIG_NETWORKS,
   SEV,
   contactsOf,
   hostTable,
+  isRealDir,
   isStrong,
   loadRuns,
+  readRegularFile,
   readingNotes,
   renderTrendMarkdown,
+  rigOf,
   runStats,
   scrub,
+  validRigName,
   variantSlug,
 } from "./lib/exposure-runs.mjs";
 
@@ -60,12 +77,12 @@ export function dayRange(from, to) {
   return out;
 }
 
-/** Unique <date>-<slug> stem per run, keyed by the run's file name in the source directory. */
+/** Unique <date>-<rig>-<slug> stem per run, keyed by the run's `file` key. */
 export function assignNames(runs) {
   const used = new Set();
   const names = new Map();
   for (const r of runs) {
-    const base = `${r.date}-${variantSlug(r)}`.replace(/[^A-Za-z0-9._-]+/g, "-");
+    const base = `${r.date}-${rigOf(r)}-${variantSlug(r)}`.replace(/[^A-Za-z0-9._-]+/g, "-");
     let name = base;
     for (let i = 2; used.has(name); i++) name = `${base}-${i}`;
     used.add(name);
@@ -74,11 +91,19 @@ export function assignNames(runs) {
   return names;
 }
 
+const validCountry = (c) => (typeof c === "string" && /^[A-Z]{2}$/.test(c) ? c : null);
+const validNetwork = (n) => (RIG_NETWORKS.includes(n) ? n : null);
+
 /**
- * The index.json content. extras maps a run's source file name to { evidence, report }
- * booleans (which optional files exist); absent entries mean neither.
+ * The index.json content. extras maps a run's `file` key to { evidence, report } booleans (which
+ * optional files exist); absent entries mean neither. rigMeta maps a rig name to its declared
+ * { country, network } (from rig.json); a rig without an entry falls back to the declaration in
+ * its newest run, else null.
  */
-export function buildIndex(runs, { generatedAt = new Date().toISOString(), extras = {} } = {}) {
+export function buildIndex(
+  runs,
+  { generatedAt = new Date().toISOString(), extras = {}, rigMeta = {} } = {},
+) {
   const names = assignNames(runs);
   const allContacts = [];
   const entries = runs.map((r) => {
@@ -86,9 +111,11 @@ export function buildIndex(runs, { generatedAt = new Date().toISOString(), extra
     const s = runStats(r);
     const mine = contactsOf([r]);
     const slug = variantSlug(r);
+    const rig = rigOf(r);
     for (const c of mine)
       allContacts.push({
         date: c.date,
+        rig,
         variant: c.variant,
         slug,
         site: c.site,
@@ -102,6 +129,7 @@ export function buildIndex(runs, { generatedAt = new Date().toISOString(), extra
       ...(x.evidence ? { evidence: `data/runs/${name}.evidence.json` } : {}),
       ...(x.report ? { report: `data/reports/${name}.md` } : {}),
       date: r.date,
+      rig,
       variant: r.variant,
       slug,
       browser: r.browser,
@@ -124,6 +152,26 @@ export function buildIndex(runs, { generatedAt = new Date().toISOString(), extra
   const from = dates[0] ?? null;
   const to = dates[dates.length - 1] ?? null;
   const calendar = from ? dayRange(from, to) : [];
+  const rigs = [...new Set(entries.map((e) => e.rig))].sort().map((rig) => {
+    const es = entries.filter((e) => e.rig === rig);
+    const mineRuns = runs.filter((r) => rigOf(r) === rig);
+    const declared = (key, ok) =>
+      [...mineRuns]
+        .reverse()
+        .map((r) => ok(r[key]))
+        .find(Boolean) ?? null;
+    return {
+      rig,
+      country: validCountry(rigMeta[rig]?.country) ?? declared("rigCountry", validCountry),
+      network: validNetwork(rigMeta[rig]?.network) ?? declared("rigNetwork", validNetwork),
+      days: new Set(es.map((e) => e.date)).size,
+      runs: es.length,
+      variants: new Set(es.map((e) => e.variant)).size,
+      contacts: es.reduce((a, e) => a + e.contacts, 0),
+      hosts: new Set(allContacts.filter((c) => c.rig === rig).flatMap((c) => c.hostnames ?? []))
+        .size,
+    };
+  });
   return {
     schemaVersion: 1,
     generatedAt,
@@ -133,6 +181,7 @@ export function buildIndex(runs, { generatedAt = new Date().toISOString(), extra
       days: dates.length,
       calendarDays: calendar.length || dates.length,
     },
+    rigs,
     runs: entries,
     hosts: hostTable(allContacts),
     contacts: allContacts,
@@ -218,7 +267,7 @@ export function renderHtml(index) {
 
   out.push(`<h2>What this is</h2>`);
   out.push(
-    `<p>Every day an automated harness opens a fixed list of public news and media sites in browsers with synthetic, automated profiles that persist across days (no personal browsing, no logins), and records which ad-delivery hosts the pages contact. The browsers and devices${variants.length ? ` in these runs are: ${esc(variants.join("; "))}` : ""}. Each site is observed for ${esc(seconds.length ? seconds.join(" or ") : "about 60")} s with consent dialogs accepted where one is recognised, the page scrolled and one article opened. The extension only observes; it does not block or change traffic. Nothing on this page is about a person or a real device.</p>`,
+    `<p>Every day an automated harness opens a fixed list of public news and media sites in browsers with synthetic, automated profiles that persist across days (no personal browsing, no logins), and records which ad-delivery hosts the pages contact. The browsers and devices${variants.length ? ` in these runs are: ${esc(variants.join("; "))}` : ""}. Each site is observed for ${esc(seconds.length ? seconds.join(" or ") : "about 60")} s with consent dialogs accepted where one is recognised, the page scrolled and one article opened. Several rigs (measurement machines) may contribute runs; the country and network class of each rig are declared by its owner and are not verified. The extension only observes; it does not block or change traffic. Nothing on this page is about a person or a real device.</p>`,
   );
   out.push(`<h2>Legend</h2>`);
   out.push(note());
@@ -235,6 +284,7 @@ export function renderHtml(index) {
     const head = [
       "Host",
       ...dayCols.map((d, i) => [i === 0 || d.endsWith("-01") ? d.slice(5) : d.slice(8), "day"]),
+      "Rigs",
       "Variants",
       "Sites",
     ];
@@ -254,6 +304,7 @@ export function renderHtml(index) {
             state[2],
           ];
         }),
+        (h.rigs ?? []).join(", "),
         h.variants.join(", "),
         h.sites.join(", "),
       ];
@@ -271,9 +322,10 @@ export function renderHtml(index) {
   } else {
     out.push(
       table(
-        ["Date", "Variant", "Site", "Rule", "Severity", "Hosts"],
+        ["Date", "Rig", "Variant", "Site", "Rule", "Severity", "Hosts"],
         index.contacts.map((c) => [
           c.date,
+          c.rig ?? DEFAULT_RIG,
           c.variant,
           c.site,
           raw(`<code>${esc(c.ruleId)}</code>`),
@@ -289,23 +341,25 @@ export function renderHtml(index) {
   out.push(note());
   const bySite = new Map();
   for (const c of index.contacts) {
-    const e = bySite.get(c.site) ?? { hosts: [], days: [], variants: [] };
+    const e = bySite.get(c.site) ?? { hosts: [], days: [], variants: [], rigs: [] };
     e.hosts.push(...(c.hostnames ?? []));
     e.days.push(c.date);
     e.variants.push(c.variant);
+    e.rigs.push(c.rig ?? DEFAULT_RIG);
     bySite.set(c.site, e);
   }
   if (bySite.size === 0) out.push(`<p>No site has carried a documented host so far.</p>`);
   else
     out.push(
       table(
-        ["Site", "Hosts", ["Days", "n"], "Dates", "Variants"],
+        ["Site", "Hosts", ["Days", "n"], "Dates", "Rigs", "Variants"],
         [...bySite]
           .map(([site, e]) => ({
             site,
             hosts: uniq(e.hosts),
             days: uniq(e.days).sort(),
             variants: uniq(e.variants),
+            rigs: uniq(e.rigs).sort(),
           }))
           .sort((a, b) => b.days.length - a.days.length || a.site.localeCompare(b.site))
           .map((e) => [
@@ -313,19 +367,57 @@ export function renderHtml(index) {
             e.hosts.join(", ") || "(not recorded in this run)",
             [e.days.length, "n"],
             e.days.join(", "),
+            e.rigs.join(", "),
             e.variants.join(", "),
           ]),
       ),
     );
 
-  // Variants side by side.
+  // Rigs.
+  out.push(`<h2>Rigs</h2>`);
+  out.push(
+    `<p>A rig is a machine that runs the harness and contributes its runs under its own name. Country and network class are declared by the rig owner and are not verified; no address is recorded.</p>`,
+  );
+  const rigs = index.rigs ?? [];
+  if (rigs.length === 0) out.push(`<p>No runs yet.</p>`);
+  else
+    out.push(
+      table(
+        [
+          "Rig",
+          "Country",
+          "Network",
+          ["Days run", "n"],
+          ["Runs", "n"],
+          ["Variants", "n"],
+          ["Contacts", "n"],
+          ["Distinct hosts", "n"],
+        ],
+        rigs.map((g) => [
+          g.rig,
+          g.country ?? "—",
+          g.network ?? "—",
+          [g.days, "n"],
+          [g.runs, "n"],
+          [g.variants, "n"],
+          [g.contacts, "n"],
+          [g.hosts, "n"],
+        ]),
+      ),
+    );
+
+  // Variants side by side, per rig.
   out.push(`<h2>Browsers and devices side by side</h2>`);
   out.push(note());
+  const pairs = uniq(runs.map((r) => JSON.stringify([r.rig ?? DEFAULT_RIG, r.variant])))
+    .map((k) => JSON.parse(k))
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
   if (total === 0) out.push(`<p>No runs yet.</p>`);
   else
     out.push(
       table(
         [
+          "Rig",
           "Variant",
           ["Days run", "n"],
           ["Mean sites loaded", "n"],
@@ -333,12 +425,15 @@ export function renderHtml(index) {
           ["Contacts", "n"],
           ["Distinct hosts", "n"],
         ],
-        variants.map((v) => {
-          const rs = runs.filter((r) => r.variant === v);
+        pairs.map(([g, v]) => {
+          const rs = runs.filter((r) => (r.rig ?? DEFAULT_RIG) === g && r.variant === v);
           const hosts = new Set(
-            index.contacts.filter((c) => c.variant === v).flatMap((c) => c.hostnames ?? []),
+            index.contacts
+              .filter((c) => (c.rig ?? DEFAULT_RIG) === g && c.variant === v)
+              .flatMap((c) => c.hostnames ?? []),
           );
           return [
+            g,
             v,
             [uniq(rs.map((r) => r.date)).length, "n"],
             [`${fmt(mean(rs.map((r) => r.loaded)))} of ${fmt(mean(rs.map((r) => r.sites)))}`, "n"],
@@ -359,6 +454,7 @@ export function renderHtml(index) {
       table(
         [
           "Date",
+          "Rig",
           "Variant",
           ["Sites loaded", "n"],
           ["Consent clicked", "n"],
@@ -370,6 +466,7 @@ export function renderHtml(index) {
         ],
         runs.map((r) => [
           r.date,
+          r.rig ?? DEFAULT_RIG,
           r.variant,
           [`${r.loaded}/${r.sites}`, "n"],
           [r.consent, "n"],
@@ -395,7 +492,7 @@ export function renderHtml(index) {
   );
   out.push(
     `<pre>${esc(
-      `pnpm observatory:reproduce -- --date=${newest ? newest.date : "YYYY-MM-DD"} --variant=${newest ? newest.slug : "<variant>"} --from=<site URL or directory>`,
+      `pnpm observatory:reproduce -- --date=${newest ? newest.date : "YYYY-MM-DD"} --variant=${newest ? newest.slug : "<variant>"} --rig=${newest ? (newest.rig ?? DEFAULT_RIG) : "<rig>"} --from=<site URL or directory>`,
     )}</pre>`,
   );
   out.push(
@@ -412,7 +509,7 @@ export function renderHtml(index) {
       `<ul>${runs
         .map(
           (r) =>
-            `<li>${esc(r.date)} ${esc(r.variant)}: ${[
+            `<li>${esc(r.date)} ${esc(r.rig ?? DEFAULT_RIG)} ${esc(r.variant)}: ${[
               link(r.file, "run json"),
               ...(r.report ? [link(r.report, "report")] : []),
               ...(r.evidence ? [link(r.evidence, "evidence export")] : []),
@@ -469,18 +566,23 @@ device.
 |---|---|
 | \`index.json\` | Summary used by the site (fields below). |
 | \`trend.md\` | Markdown trend report over all runs. |
-| \`runs/<date>-<variant>.json\` | One run, as written by the run script (fields below). |
-| \`runs/<date>-<variant>.evidence.json\` | Optional. The extension's evidence export (default redaction profile) for that run. |
-| \`reports/<date>-<variant>.md\` | Optional. The Markdown report of that run. |
+| \`runs/<date>-<rig>-<variant>.json\` | One run, as written by the run script (fields below). |
+| \`runs/<date>-<rig>-<variant>.evidence.json\` | Optional. The extension's evidence export (default redaction profile) for that run. |
+| \`reports/<date>-<rig>-<variant>.md\` | Optional. The Markdown report of that run. |
 
-\`<variant>\` is the slug of browser, device, ETP setting and site list, for example \`chromium\`,
-\`chromium-pixel-5\` or \`firefox-etp-off-yandex-ad-sites\`.
+\`<rig>\` is the name of the measurement machine that made the run (lower case letters, digits and
+hyphens, for example \`rig-1\`); several rigs may contribute. \`<variant>\` is the slug of browser,
+device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\` or
+\`firefox-etp-off-yandex-ad-sites\`.
 
 ## Run file
 
 | Field | Meaning |
 |---|---|
 | \`date\` | Day of the run, \`YYYY-MM-DD\`. |
+| \`rig\` | Name of the rig that made the run. Absent in runs from before rigs existed; those are attributed to \`rig-1\`. |
+| \`rigCountry\` | Optional. ISO 3166-1 alpha-2 country declared by the rig owner. Not verified. |
+| \`rigNetwork\` | Optional. Network class declared by the rig owner: \`home\`, \`mobile\`, \`office\` or \`datacentre\`. Not verified. |
 | \`browser\` | \`firefox\` or \`chromium\`. |
 | \`device\` | Emulated device name, or \`null\` for a desktop profile. |
 | \`sites\` | Path of the site list used (relative to the repository). |
@@ -524,20 +626,29 @@ A detection always has \`ruleId\` and \`severity\` (\`informational\`, \`suspici
 | \`schemaVersion\` | \`1\`. |
 | \`generatedAt\` | ISO time the site was built. |
 | \`period\` | \`from\`, \`to\`, \`days\` (days with runs), \`calendarDays\` (days from first to last). |
-| \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
-| \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`. |
-| \`contacts[]\` | Contacts: \`date\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`. |
+| \`rigs[]\` | One entry per rig, sorted by name: \`rig\`, \`country\` and \`network\` (declared by the rig owner, or \`null\`), \`days\` (days with runs), \`runs\`, \`variants\`, \`contacts\`, \`hosts\` (distinct documented hosts). |
+| \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`rig\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
+| \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`, \`rigs[]\`. |
+| \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`. |
 
 A contact is a detection from a \`known_infra.*\` or \`correlation.*\` rule, or at elevated or above.
 \`strong\` counts contacts from \`correlation.*\` rules or at elevated or above.
 `;
 
 function parseArgs(argv) {
+  const has = (k) => argv.some((a) => a.startsWith(`--${k}=`));
   const get = (k, d) =>
     (argv.find((a) => a.startsWith(`--${k}=`)) ?? `--${k}=${d}`).slice(k.length + 3);
   const expand = (p) => (p.startsWith("~/") ? join(homedir(), p.slice(2)) : p);
   const dir = expand(get("dir", "~/.cache/adtripwire-exposure"));
-  return { dir, out: expand(get("out", join(dir, "site"))) };
+  const rigs = has("rigs") ? expand(get("rigs", "")) : null;
+  return {
+    dir,
+    rigs,
+    rig: get("rig", DEFAULT_RIG),
+    outGiven: has("out"),
+    out: expand(get("out", join(dir, "site"))),
+  };
 }
 
 function rigIdentity() {
@@ -550,13 +661,127 @@ function rigIdentity() {
   return { home: homedir(), user };
 }
 
-export function build({ dir, out, identity = rigIdentity(), generatedAt }) {
+/** Earliest run date the site accepts. */
+export const EARLIEST_RUN_DATE = "2026-01-01";
+
+/**
+ * Run sources. Single directory: every run in dir, attributed to `rig` unless it carries a valid
+ * rig of its own. Many rigs: dir/<rig>/runs/*.json for every real subdirectory with a valid rig
+ * name (anything else is skipped and counted), rig from the directory name, country and network
+ * from dir/<rig>/rig.json. Each run's `file` key is unique across the sources; origin maps it to
+ * where its evidence and report live. Runs dated before EARLIEST_RUN_DATE or after tomorrow
+ * (relative to `now`) are dropped. stats.skipped counts everything left out.
+ */
+function gather({ dir, rigsDir, rig, now, stats }) {
+  const runs = [];
+  const origin = new Map();
+  const rigMeta = {};
+  const skip = (n = 1) => {
+    stats.skipped += n;
+  };
+  const latest = new Date(now + 86400000).toISOString().slice(0, 10);
+  // In many-rigs mode the directory name wins over the JSON's `rig`: the directory is what the
+  // rig's deploy key wrote to, the JSON is whatever that rig chose to write. A rig can therefore
+  // not claim another rig's name. In single mode a valid `rig` in the JSON is kept.
+  const add = (list, key, runsDir, reportsDir, fallbackRig, force = false) => {
+    for (const r of list) {
+      if (r.date < EARLIEST_RUN_DATE || r.date > latest) {
+        skip();
+        continue;
+      }
+      const k = key(r.file);
+      origin.set(k, { stem: r.file.replace(/\.json$/, ""), runsDir, reportsDir });
+      runs.push({
+        ...r,
+        file: k,
+        rig: !force && validRigName(r.rig) ? r.rig : fallbackRig,
+      });
+    }
+  };
+  if (rigsDir) {
+    let top = [];
+    try {
+      if (lstatSync(rigsDir).isDirectory()) top = readdirSync(rigsDir, { withFileTypes: true });
+      else skip();
+    } catch {
+      /* a missing rigs directory means no rigs */
+    }
+    const names = [];
+    for (const e of top) {
+      if (e.isDirectory() && validRigName(e.name)) names.push(e.name);
+      else skip();
+    }
+    names.sort();
+    for (const name of names) {
+      const base = join(rigsDir, name);
+      // readdir's type comes from the directory entry; check again so a swapped entry is refused.
+      if (!isRealDir(base)) {
+        skip();
+        continue;
+      }
+      const runsDir = join(base, "runs");
+      const reportsDir = join(base, "reports");
+      const runsOk = isRealDir(runsDir);
+      if (!runsOk && existsLink(runsDir)) skip();
+      const reportsOk = isRealDir(reportsDir);
+      if (!reportsOk && existsLink(reportsDir)) skip();
+      if (runsOk)
+        add(
+          loadRuns(runsDir, { maxBytes: MAX_FILE_BYTES, maxRuns: MAX_RUNS_PER_RIG, onSkip: skip }),
+          (f) => `${name}/${f}`,
+          runsDir,
+          reportsOk ? reportsDir : null,
+          name,
+          true,
+        );
+      const metaText = readRegularFile(join(base, "rig.json"), { onSkip: skip });
+      if (metaText !== null)
+        try {
+          const meta = JSON.parse(metaText);
+          rigMeta[name] = { country: meta?.country, network: meta?.network };
+        } catch {
+          /* rig.json is optional */
+        }
+    }
+  } else {
+    add(loadRuns(dir, { onSkip: skip }), (f) => f, dir, join(dir, "reports"), rig);
+  }
+  runs.sort((a, b) =>
+    (a.date + "\0" + a.rig + "\0" + a.variant).localeCompare(
+      b.date + "\0" + b.rig + "\0" + b.variant,
+    ),
+  );
+  return { runs, origin, rigMeta };
+}
+
+/** True when something (of any kind) exists at path, without following a link. */
+function existsLink(path) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function build({
+  dir,
+  rigsDir,
+  out,
+  rig = DEFAULT_RIG,
+  identity = rigIdentity(),
+  generatedAt,
+  now = Date.now(),
+}) {
+  if (!validRigName(rig)) throw new Error(`invalid rig name "${rig}"`);
   if (existsSync(join(out, ".git")))
     throw new Error(`${out} contains .git; refusing to write the site into a repository`);
   // Start from a clean data/ so runs that were deleted or renamed do not stay published.
   rmSync(join(out, "data"), { recursive: true, force: true });
   const sc = (v) => scrub(v, identity);
-  const runs = loadRuns(dir).map(sc);
+  const stats = { skipped: 0 };
+  const gathered = gather({ dir, rigsDir, rig, now, stats });
+  const runs = gathered.runs.map(sc);
   const names = assignNames(runs);
   const written = [];
   const put = (rel, text) => {
@@ -568,41 +793,73 @@ export function build({ dir, out, identity = rigIdentity(), generatedAt }) {
   const extras = {};
   for (const r of runs) {
     const name = names.get(r.file);
-    const stem = r.file.replace(/\.json$/, "");
+    const o = gathered.origin.get(r.file);
     const { file: _file, variant: _variant, ...orig } = r;
     put(`data/runs/${name}.json`, JSON.stringify(orig, null, 2) + "\n");
-    const evidencePath = join(dir, `${stem}.evidence.json`);
-    const reportPath = join(dir, "reports", `${stem}.md`);
-    extras[r.file] = { evidence: existsSync(evidencePath), report: existsSync(reportPath) };
-    if (extras[r.file].evidence) {
-      const text = readFileSync(evidencePath, "utf8");
+    const evidenceText = readRegularFile(join(o.runsDir, `${o.stem}.evidence.json`), {
+      maxBytes: MAX_FILE_BYTES,
+      onSkip: () => {
+        stats.skipped += 1;
+      },
+    });
+    const reportText =
+      o.reportsDir === null
+        ? null
+        : readRegularFile(join(o.reportsDir, `${o.stem}.md`), {
+            maxBytes: MAX_FILE_BYTES,
+            onSkip: () => {
+              stats.skipped += 1;
+            },
+          });
+    extras[r.file] = { evidence: evidenceText !== null, report: reportText !== null };
+    if (evidenceText !== null) {
       let body;
       try {
-        body = JSON.stringify(sc(JSON.parse(text)), null, 2) + "\n";
+        body = JSON.stringify(sc(JSON.parse(evidenceText)), null, 2) + "\n";
       } catch {
-        body = sc(text);
+        body = sc(evidenceText);
       }
       put(`data/runs/${name}.evidence.json`, body);
     }
-    if (extras[r.file].report) put(`data/reports/${name}.md`, sc(readFileSync(reportPath, "utf8")));
+    if (reportText !== null) put(`data/reports/${name}.md`, sc(reportText));
   }
-  put("data/trend.md", sc(renderTrendMarkdown(runs, { dirLabel: dir.replace(homedir(), "~") })));
-  const index = buildIndex(runs, { ...(generatedAt ? { generatedAt } : {}), extras });
+  const label = (rigsDir ?? dir).replace(homedir(), "~");
+  put("data/trend.md", sc(renderTrendMarkdown(runs, { dirLabel: label })));
+  const index = buildIndex(runs, {
+    ...(generatedAt ? { generatedAt } : {}),
+    extras,
+    rigMeta: gathered.rigMeta,
+  });
   put("data/index.json", JSON.stringify(index, null, 2) + "\n");
   put("data/README.md", DATA_README);
   put("index.html", renderHtml(index));
   put("README.md", SITE_README);
-  return { index, written };
+  return { index, written, skipped: stats.skipped };
 }
 
 function main() {
-  const { dir, out } = parseArgs(process.argv.slice(2));
-  if (!existsSync(dir)) {
+  const { dir, rigs, rig, outGiven, out } = parseArgs(process.argv.slice(2));
+  if (!validRigName(rig)) {
+    console.error(`invalid --rig "${rig}": use lower case letters, digits and hyphens (1-32)`);
+    process.exit(2);
+  }
+  if (rigs !== null) {
+    if (!outGiven) {
+      console.error("--rigs needs an explicit --out=<site dir>");
+      process.exit(2);
+    }
+    if (!existsSync(rigs)) {
+      console.error(`no directory ${rigs}`);
+      process.exit(2);
+    }
+  } else if (!existsSync(dir)) {
     console.error(`no directory ${dir}`);
     process.exit(2);
   }
-  const { index, written } = build({ dir, out });
-  console.log(`observatory → ${out} (${index.runs.length} runs, ${written.length} files)`);
+  const { index, written, skipped } = build({ dir, rigsDir: rigs, out, rig });
+  console.log(
+    `observatory → ${out} (${index.runs.length} runs, ${written.length} files${skipped ? `, ${skipped} skipped` : ""})`,
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

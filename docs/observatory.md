@@ -37,9 +37,9 @@ index.html                         the page: no JavaScript, inline CSS, no exter
 data/index.json                    machine-readable summary: runs, documented hosts, contacts
 data/trend.md                      the cumulative trend report
 data/README.md                     every field of a run file and of index.json
-data/runs/<date>-<slug>.json       the run, as written by the harness (scrubbed)
-data/runs/<date>-<slug>.evidence.json   the extension's evidence export, when present
-data/reports/<date>-<slug>.md      the per-run Markdown report, when present
+data/runs/<date>-<rig>-<slug>.json       the run, as written by the harness (scrubbed)
+data/runs/<date>-<rig>-<slug>.evidence.json   the extension's evidence export, when present
+data/reports/<date>-<rig>-<slug>.md      the per-run Markdown report, when present
 ```
 
 The slug names the variant: the browser (`chromium`, `firefox`), then `-<device>` for an
@@ -94,12 +94,55 @@ private, so GitHub Pages needs either a separate public repository for the site 
 public. For GitHub Pages, choose Settings, Pages, "Deploy from a branch", branch `observatory`,
 folder `/ (root)`.
 
+## Many rigs
+
+Contact with documented infrastructure depends on where the browser is. Several machines
+(rigs) can therefore contribute runs; each has a name (`^[a-z0-9][a-z0-9-]{0,31}$`, default
+`rig-1`), and may declare a country (ISO 3166-1 alpha-2) and a network class (`home`, `mobile`,
+`office`, `datacentre`). Both declarations come from the rig owner and are not verified; no
+address is recorded. Onboarding a rig is described in `docs/rig-setup.md`.
+
+Layout on the publishing branch:
+
+```text
+index.html, data/, README.md, .nojekyll      the page and its data (written by the primary rig only)
+rigs/<name>/runs/<date>-<slug>.json          a rig's runs, scrubbed
+rigs/<name>/runs/<date>-<slug>.evidence.json optional evidence export
+rigs/<name>/reports/<date>-<slug>.md         optional per-run report
+rigs/<name>/rig.json                         { rig, country?, network?, exportedAt, runs }
+```
+
+Roles (`ADTRIPWIRE_OBSERVATORY_ROLE` in `observatory.env`): a `rig` (the default) exports its
+own runs and replaces only `rigs/<name>/` on the branch. The `primary` (set explicitly, never
+the default; the maintainer's machine) does the same for its own rig, then pulls the branch, builds the page over every
+`rigs/*/runs/*.json` with `node scripts/observatory-build.mjs --rigs=<checkout>/rigs --out=<site>`
+and publishes the root, leaving `rigs/` untouched. If the primary is down, the other rigs still
+publish their rows and the page catches up at the next primary run. With a remote configured,
+`ADTRIPWIRE_RIG` must be set too; otherwise the daily run measures but skips every observatory
+step. In `--rigs` mode the directory name is always the rig (a run's own `rig` field is
+ignored); directories whose name is not a valid rig name are skipped, malformed run files are
+dropped as in single mode, home paths are scrubbed again, only real directories and regular
+files are read (never a symbolic link), files over 5 MB are skipped, at most 2000 runs per rig
+are used (the newest), and runs dated before 2026-01-01 or after tomorrow are dropped. The
+build prints how many entries it skipped.
+
+Single-machine builds stay as before: `node scripts/observatory-build.mjs --dir=<cache>
+[--rig=<name>]` attributes every run without a `rig` field to `--rig` (default `rig-1`).
+
+Naming: files in `data/` are always `data/runs/<date>-<rig>-<slug>.json` (and `.evidence.json`,
+`data/reports/<date>-<rig>-<slug>.md`), whatever the mode. `index.json` has a `rigs[]` summary
+and `rig` on every run and contact; the page has a Rigs table and a rig column wherever runs,
+contacts or hosts are listed. Sites built before rigs existed use `<date>-<slug>`.
+
+Trust: every rig's deploy key can write the whole branch. Rigs are people the maintainer
+knows; see `docs/rig-setup.md`.
+
 ## Reproducing a day
 
 From a fresh checkout (`pnpm install` first):
 
 ```sh
-pnpm observatory:reproduce -- --date=2026-11-04 --variant=chromium-pixel-5 \
+pnpm observatory:reproduce -- --date=2026-11-04 --variant=chromium-pixel-5 --rig=rig-1 \
   --from=https://<owner>.github.io/<repository>
 ```
 
@@ -107,7 +150,10 @@ pnpm observatory:reproduce -- --date=2026-11-04 --variant=chromium-pixel-5 \
 `~/.cache/adtripwire-exposure/site`). The script resolves the slug to the flags of
 `scripts/exposure-run.mjs`, builds the evaluation bundle for that browser into a scratch
 directory, runs the same site list with a fresh profile, and compares the result with the
-published `data/runs/<date>-<slug>.json`. Options: `--seconds=60`, `--limit=N` (both sides are
+published `data/runs/<date>-<rig>-<slug>.json`. `--rig` may be left out when the site's
+`data/index.json` lists exactly one rig; with several it is required (exit 2 otherwise). A site
+built before rigs existed is still found by its `<date>-<slug>` file name. A different rig
+sits on a different network, so differences from its published row are expected. Options: `--seconds=60`, `--limit=N` (both sides are
 trimmed to the first N sites for a quick check), `--keep` (keep the scratch directory),
 `--dry-run` (print the commands and stop). A full run takes about the site count times the
 dwell time, so one variant is roughly an hour and a half.

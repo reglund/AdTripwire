@@ -96,7 +96,7 @@ topic where almost no independent measurement exists, with your name on it.
 the published JSON can identify a person or device; a day's row reproduces from a clean
 checkout within the stated tolerance; the legend passes the conservative-language rule.
 
-### Phase 8b — Many rigs, one observatory · size M (planned 2026-11-05)
+### Phase 8b — Many rigs, one observatory · size M ✅ delivered 2026-11-06 (gate: first external rig pending)
 
 **The moment.** Friends in other countries run the same daily harness on their own home or
 mobile connections, each publishing under a rig name to its own directory; your rig aggregates

@@ -3,10 +3,14 @@
  * Reproduce one published observatory row and compare it with the published run.
  *
  *   node scripts/observatory-reproduce.mjs --date=YYYY-MM-DD --variant=<slug>
- *        [--from=<site dir or https URL>] [--seconds=60] [--limit=N] [--keep] [--dry-run]
+ *        [--rig=<name>] [--from=<site dir or https URL>] [--seconds=60] [--limit=N] [--keep] [--dry-run]
  *
- * The variant slug is the one in the published file name (`data/runs/<date>-<slug>.json`):
- * browser, then `-<device slug>`, then `-etp-off`, then `-<site list basename>` when the list
+ * The published file is `data/runs/<date>-<rig>-<slug>.json`. --rig may be omitted when the
+ * site's data/index.json lists exactly one rig; with several rigs it must be given (exit 2
+ * otherwise). Sites built before rigs existed publish `data/runs/<date>-<slug>.json`, which is
+ * still found (for rig-1, or when the site has no rig list). A rig on another network is
+ * expected to differ from the published row. The variant slug is the one in the published file
+ * name: browser, then `-<device slug>`, then `-etp-off`, then `-<site list basename>` when the list
  * is not exposure-sites.txt. It is resolved to the flags of scripts/exposure-run.mjs, the
  * evaluation bundle is built into a scratch directory, one run is made with a fresh profile,
  * and the result is compared with the published JSON on what is deterministic (decision 5 of
@@ -25,6 +29,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validRigName } from "./lib/exposure-runs.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DEFAULT_LIST = "exposure-sites";
@@ -167,16 +172,69 @@ const arg = (argv, k, d = "") => {
 const shown = (argv) =>
   argv.map((a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : JSON.stringify(a))).join(" ");
 
-async function loadPublished(from, date, slug) {
-  const rel = `data/runs/${date}-${slug}.json`;
-  if (/^https:\/\//i.test(from)) {
+/**
+ * Which rig a reproduction is about. `rigArg` is the --rig value ("" when omitted), `index` the
+ * parsed data/index.json of the site (or null when it could not be read). Returns { rig } (a
+ * name; or null for a site that predates rigs, which is read with the legacy file name) or
+ * { error }.
+ */
+export function resolveRig(rigArg, index) {
+  if (rigArg) {
+    return validRigName(rigArg)
+      ? { rig: rigArg }
+      : { error: `invalid --rig "${rigArg}": use lower case letters, digits and hyphens (1-32)` };
+  }
+  const rigs = Array.isArray(index?.rigs)
+    ? index.rigs.map((g) => g?.rig).filter((n) => validRigName(n))
+    : [];
+  if (rigs.length === 0) return { rig: null };
+  if (rigs.length === 1) return { rig: rigs[0] };
+  return { error: `the site lists several rigs (${rigs.join(", ")}); pass --rig=<name>` };
+}
+
+/** Relative paths to try, in order, for a published run. */
+export function publishedPaths(date, slug, rig) {
+  const rigged = `data/runs/${date}-${rig}-${slug}.json`;
+  const legacy = `data/runs/${date}-${slug}.json`;
+  if (rig === null) return [legacy];
+  // A pre-rig site's rows belong to the default rig, and only to it.
+  return rig === "rig-1" ? [rigged, legacy] : [rigged];
+}
+
+const isUrl = (from) => /^https:\/\//i.test(from);
+const siteRoot = (from) => resolve(from.replace(/^~(?=\/|$)/, homedir()));
+
+async function fetchJson(from, rel) {
+  if (isUrl(from)) {
     const url = `${from.replace(/\/+$/, "")}/${rel}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-    return { where: url, run: await res.json() };
+    return { where: url, json: await res.json() };
   }
-  const file = join(resolve(from.replace(/^~(?=\/|$)/, homedir())), rel);
-  return { where: file, run: JSON.parse(readFileSync(file, "utf8")) };
+  const file = join(siteRoot(from), rel);
+  return { where: file, json: JSON.parse(readFileSync(file, "utf8")) };
+}
+
+/** data/index.json of the site, or null when it cannot be read. */
+async function loadIndex(from) {
+  try {
+    return (await fetchJson(from, "data/index.json")).json;
+  } catch {
+    return null;
+  }
+}
+
+async function loadPublished(from, date, slug, rig) {
+  let first = null;
+  for (const rel of publishedPaths(date, slug, rig)) {
+    try {
+      const { where, json } = await fetchJson(from, rel);
+      return { where, run: json };
+    } catch (e) {
+      first ??= e;
+    }
+  }
+  throw first;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -184,7 +242,7 @@ export async function main(argv = process.argv.slice(2)) {
   const slug = arg(argv, "variant");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !slug) {
     console.error(
-      "usage: observatory-reproduce.mjs --date=YYYY-MM-DD --variant=<slug> [--from=<site dir or https URL>] [--seconds=60] [--limit=N] [--keep] [--dry-run]",
+      "usage: observatory-reproduce.mjs --date=YYYY-MM-DD --variant=<slug> [--rig=<name>] [--from=<site dir or https URL>] [--seconds=60] [--limit=N] [--keep] [--dry-run]",
     );
     return 2;
   }
@@ -193,6 +251,12 @@ export async function main(argv = process.argv.slice(2)) {
     console.error("--from must be an https:// URL or a local path");
     return 2;
   }
+  const picked = resolveRig(arg(argv, "rig"), arg(argv, "rig") ? null : await loadIndex(from));
+  if (picked.error) {
+    console.error(picked.error);
+    return 2;
+  }
+  const rig = picked.rig;
   const seconds = Number(arg(argv, "seconds", "60"));
   const limit = Number(arg(argv, "limit", "0"));
   if (!Number.isFinite(seconds) || seconds <= 0 || !Number.isInteger(limit) || limit < 0) {
@@ -240,11 +304,13 @@ export async function main(argv = process.argv.slice(2)) {
   };
 
   console.log(
-    `variant ${slug}: browser=${v.browser} device=${v.device || "(desktop)"} etp-off=${v.etpOff} sites=${v.sitesPath}`,
+    `${rig ? `rig ${rig}, ` : ""}variant ${slug}: browser=${v.browser} device=${v.device || "(desktop)"} etp-off=${v.etpOff} sites=${v.sitesPath}`,
   );
   if (dry) {
     const { build, run } = plan(work);
-    console.log(`published run: ${from.replace(/\/+$/, "")}/data/runs/${date}-${slug}.json`);
+    console.log(
+      `published run: ${from.replace(/\/+$/, "")}/${publishedPaths(date, slug, rig).join(" or ")}`,
+    );
     console.log(`cwd: ${ROOT}`);
     console.log(shown(build));
     console.log(shown(run));
@@ -254,7 +320,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   let published;
   try {
-    published = await loadPublished(from, date, slug);
+    published = await loadPublished(from, date, slug, rig);
   } catch (e) {
     console.error(`cannot load the published run: ${e.message}`);
     return 2;
