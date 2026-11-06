@@ -583,6 +583,7 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`rig\` | Name of the rig that made the run. Absent in runs from before rigs existed; those are attributed to \`rig-1\`. |
 | \`rigCountry\` | Optional. ISO 3166-1 alpha-2 country declared by the rig owner. Not verified. |
 | \`rigNetwork\` | Optional. Network class declared by the rig owner: \`home\`, \`mobile\`, \`office\` or \`datacentre\`. Not verified. |
+| \`presentation\` | Optional, from 2026-11-07. \`{ userAgent, webdriver }\` as the sites saw this visitor; the harness does not disguise itself. |
 | \`browser\` | \`firefox\` or \`chromium\`. |
 | \`device\` | Emulated device name, or \`null\` for a desktop profile. |
 | \`sites\` | Path of the site list used (relative to the repository). |

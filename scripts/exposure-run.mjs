@@ -25,7 +25,7 @@
  * export (default redaction profile) for the detections of this run is written next to it as
  * <json path without .json>.evidence.json.
  */
-/* global document, window, location, getComputedStyle */
+/* global document, window, location, getComputedStyle, navigator */
 // (the globals above are used only inside page.evaluate callbacks that run in the browser)
 import puppeteer, { KnownDevices } from "puppeteer-core";
 import { execFileSync } from "node:child_process";
@@ -357,6 +357,7 @@ async function main() {
   );
 
   const results = [];
+  let presentation = null;
   let prev = start;
   for (const [i, url] of sites.entries()) {
     const host = new URL(url).hostname;
@@ -385,6 +386,12 @@ async function main() {
     });
     try {
       if (MOBILE) await page.emulate(KnownDevices[DEVICE]);
+      // Record once what the sites see this visitor as (the harness does not disguise itself).
+      if (!presentation)
+        presentation = await page.evaluate(() => ({
+          userAgent: navigator.userAgent,
+          webdriver: navigator.webdriver === true,
+        }));
       try {
         await page.setExtraHTTPHeaders({ "Accept-Language": ACCEPT_LANGUAGE });
       } catch {
@@ -594,6 +601,7 @@ async function main() {
           rig: RIG,
           ...(RIG_COUNTRY ? { rigCountry: RIG_COUNTRY } : {}),
           ...(RIG_NETWORK ? { rigNetwork: RIG_NETWORK } : {}),
+          ...(presentation ? { presentation } : {}),
           totals,
           results,
         },

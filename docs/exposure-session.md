@@ -45,7 +45,9 @@ and the observatory build. `ADTRIPWIRE_EXPOSURE_PARALLEL` (1-4, default 2; one h
 about 1.5 GB), `ADTRIPWIRE_EXPOSURE_SECONDS` and `ADTRIPWIRE_EXPOSURE_DIR` override the defaults;
 the whole run takes about 4-5 h. Each variant writes its console output to
 `~/.cache/adtripwire-exposure/live/<date>-<variant>.log` and the script prints one
-`done <variant> exit=<n>` line per variant. Everything is written outside the
+`done <variant> exit=<n>` line per variant. The profiles do not disguise themselves (desktop
+Chromium presents as HeadlessChrome, Firefox sets `navigator.webdriver`), so sites that filter
+automated visitors may show fewer auctions; each run records what it presented as. Everything is written outside the
 repository: JSON per run in `~/.cache/adtripwire-exposure/`, per-run reports in its
 `reports/`, and the cumulative view in `trend.md` (documented hosts with first/last seen,
 distinct days, variants and sites; runs by day and severity). It cannot stand in for your own

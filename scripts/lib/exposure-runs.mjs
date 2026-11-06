@@ -266,6 +266,7 @@ export function readingNotes() {
   return [
     "Contacts with documented infrastructure show exposure to the ad-delivery path described in public reporting; they do not show targeting or anything delivered to a device. Selective responses, validator or C2 contact and correlated chains would be the stronger signals.",
     "Runs before 2026-11-03 used the pre-retune redirect_chain rule and an unreliable third-party counter; compare severities and counts from later runs only.",
+    "The profiles do not disguise themselves: desktop Chromium runs present as HeadlessChrome and Firefox runs set navigator.webdriver, so sites and ad exchanges that filter automated visitors may show them fewer or no auctions; the phone emulations present the emulated device's user agent. Each run from 2026-11-07 records what it presented as (`presentation`).",
     `The severity columns leave out ${[...NOISY_RULES].map((r) => `\`${r}\``).join(", ")}: it fires on ordinary ad slots on most sites and is counted separately under "Hidden iframes". Any of those detections that is elevated or above still appears under "Signals that matter".`,
     "Absence of signals means the automated profiles were not shown the documented infrastructure in these auctions; it says nothing about other profiles or devices.",
   ];

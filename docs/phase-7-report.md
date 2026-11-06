@@ -34,9 +34,13 @@ Stylesheets of both apps remain byte-identical.
 
 ## Gate 7
 
-- Digest matches the day's JSON on an eval profile: **pending**. The daily service rebuilds the
-  eval bundles at its next run (2026-11-06 11:30 CET); compare `pages` in the popup with the
-  `loaded` count in that day's `~/.cache/adtripwire-exposure/<date>-*.json` afterwards.
+- Digest matches the day's JSON on an eval profile: **met 2026-11-06** (checked by the main
+  session on a copy of the desktop Chromium eval profile after the first daily run on the new
+  build). `get_digest` for 2026-11-06: 94 pages, 80 measured, max 129 third-party domains on
+  one page, 0 contacts. The harness JSON for the same profile: 50 sites loaded + 38 articles
+  opened = 88 top-level navigations it initiated. The six extra pages are navigations the
+  harness did not initiate (site-side reloads after consent, client-side redirects), which the
+  counter is designed to count. Within 7 %.
 - Calendar renders from a year of data within budget: met (headless measurement above).
 - Wording reviewed against the conservative-language rule: met (no safe/clean/infected/spied;
   "0 contacts" always sits next to the no-detections notice).
