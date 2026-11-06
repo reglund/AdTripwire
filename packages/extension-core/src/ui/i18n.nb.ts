@@ -730,4 +730,14 @@ export const NB: Record<string, string> = {
     "Det offentlige observatoriet har ikke sett denne verten på {total} målte dager. Det sier ingenting i noen retning: observatoriet er lite og nettstedlisten er fast.",
   Observatory: "Observatorium",
   "Observatory data as of {date}": "Observatoriedata per {date}",
+  "Check this yourself": "Sjekk selv",
+  "How to verify this yourself": "Slik kan du kontrollere dette selv",
+  "Manifest unavailable.": "Manifestet er ikke tilgjengelig.",
+  "This is the manifest the browser loaded for this extension, read live. Compare it with the claims in the documentation; the checks do not depend on who wrote the code.":
+    "Dette er manifestet nettleseren har lastet for denne utvidelsen, lest direkte. Sammenlign det med påstandene i dokumentasjonen; kontrollene avhenger ikke av hvem som skrev koden.",
+  "Content security policy (extension pages)": "Innholdssikkerhetspolicy (utvidelsessider)",
+  Permissions: "Tillatelser",
+  "Host permissions": "Vertstillatelser",
+  "This page cannot make network requests: the browser enforces the policy above.":
+    "Denne siden kan ikke gjøre nettverksforespørsler: nettleseren håndhever policyen over.",
 };

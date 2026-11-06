@@ -161,3 +161,17 @@ describe("observatory strings", () => {
     }
   });
 });
+
+describe("verify-yourself card strings", () => {
+  it("carry no verdict wording (safe, clean, infected, spied) and are translated", () => {
+    const keys = [...extractKeys().entries()]
+      .filter(([, file]) => file.endsWith("verify-card.ts"))
+      .map(([k]) => k);
+    expect(keys.length).toBeGreaterThanOrEqual(8);
+    for (const key of keys) {
+      expect(key).not.toMatch(/\b(safe|clean|infected|spied)\b/i);
+      expect(NB[key], key).toBeDefined();
+      expect(NB[key]).not.toMatch(FORBIDDEN);
+    }
+  });
+});

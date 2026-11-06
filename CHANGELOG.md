@@ -7,6 +7,10 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Check this yourself**: `docs/verify-yourself.md` (CSP, permissions, a grep for network code,
+  zero runtime dependencies, stored data, reproducible build, and a plain statement that the
+  code is largely AI-written) and a Settings card that shows the manifest the browser loaded
+  (version, CSP, permissions) with a link to it. No network request. Norwegian strings included.
 - **Observatory in the Exposure view**: each documented host now carries a note from a snapshot
   of the public observatory bundled at build time (on how many measured days generic automated
   profiles saw it, last seen, on which sites), or a statement that it was not seen, which says

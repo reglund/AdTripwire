@@ -113,6 +113,13 @@ Run one test file: `pnpm vitest run packages/indicators/src/matcher.test.ts`.
 Dev build with synthetic test indicators and a local fixture server: see
 `docs/testing.md`.
 
+## Verify it yourself
+
+The code is largely written by AI models under the maintainer's direction, so the privacy claims
+should not rest on trust. `docs/verify-yourself.md` lists checks (policy, permissions, a grep over
+the built bundles, storage, reproducible build) that take about ten minutes and do not depend on
+who wrote the code. The Settings view shows the manifest the browser loaded.
+
 ## Documentation
 
 - `docs/architecture.md` – packages and data flow
@@ -120,6 +127,7 @@ Dev build with synthetic test indicators and a local fixture server: see
 - `docs/detection-methodology.md` – rules, severities, confidence
 - `docs/browser-capabilities.md` – Firefox vs Chromium visibility matrix
 - `docs/privacy.md` – what is stored, what never is, permissions
+- `docs/verify-yourself.md` – checks a sceptical reader can run without trusting the author
 - `docs/limitations.md` – known gaps
 - `docs/testing.md` – automated and manual verification
 - `docs/indicator-updates.md` – design for signed, optional indicator updates

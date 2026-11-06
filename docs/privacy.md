@@ -1,6 +1,7 @@
 # Privacy
 
 AdTripwire processes sensitive browsing signals and must itself be trustworthy.
+To check these claims without trusting the author, see `docs/verify-yourself.md`.
 
 ## Guarantees in this version
 

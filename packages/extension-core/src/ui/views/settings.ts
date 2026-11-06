@@ -6,6 +6,7 @@ import { requestHostPermission, rpc } from "../rpc.js";
 import { card, uid, type View, type ViewContext } from "./common.js";
 import { exportGroup } from "./export-actions.js";
 import { assistSettingsCard } from "../assist/settings-card.js";
+import { verifyCard } from "./verify-card.js";
 
 const LIMITS = {
   maxBytes: { min: 1024, max: 16 * 1024 * 1024 },
@@ -518,5 +519,6 @@ export const renderSettings: View = async (ctx) => {
         ),
       ),
     ),
+    verifyCard(),
   );
 };
