@@ -41,6 +41,7 @@
     "exposure:daily": "sh scripts/exposure-daily.sh",
     "observatory:build": "node scripts/observatory-build.mjs",
     "observatory:publish": "sh scripts/observatory-publish.sh",
+    "observatory:notify": "node scripts/observatory-notify.mjs",
     "observatory:reproduce": "node scripts/observatory-reproduce.mjs"
   },
   "devDependencies": {

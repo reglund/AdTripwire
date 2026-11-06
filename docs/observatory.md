@@ -170,6 +170,47 @@ Ad auctions are stochastic, so only what is deterministic is held to a tolerance
 
 The verdict is "within tolerance" (exit 0) or "outside tolerance" (exit 1). Errors exit 2.
 
+## Notifications
+
+The primary rig (`ADTRIPWIRE_OBSERVATORY_ROLE=primary`) ends each daily run by comparing the
+site it just built with what it last told you: `node scripts/observatory-notify.mjs
+--index=<cache>/site/data/index.json --state=<cache>/notify-state.json` (`pnpm
+observatory:notify`). Other rigs do not send notifications. The step runs after the root
+publish whether or not the publish worked, and never changes the script's exit status.
+
+The text has one line per change and a closing summary:
+
+```
+New documented host: <host>, first seen <date> on <site> (<rig>, <variant>)
+New site carrying <host>: <site> (<rig>, <variant>, <date>)
+Elevated or above: <ruleId> [<severity>] on <site> (<rig>, <variant>, <date>)
+Observatory <date>: <n> run(s), <n> contact(s), <n> documented host(s), <n> rig(s)
+```
+
+A contact is exposure to a documented ad-delivery path; the lines say no more than that. The
+first run, with no state file yet, records the current index and sends only the summary and
+"Notification state initialised; future runs report changes only." The history is not replayed.
+
+| Variable                     | Effect                                                                                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADTRIPWIRE_NOTIFY_CMD`      | Shell command run with `sh -c`; the text arrives on its standard input and is never part of the command line. Unset: nothing is sent, the log is still written. |
+| `ADTRIPWIRE_NOTIFY_ALWAYS=1` | Send the summary even when nothing changed (`--always`). Without it a day with only the summary line sends nothing.                                             |
+
+Examples (in the environment of the timer, e.g. a drop-in for the service):
+
+```
+ADTRIPWIRE_NOTIFY_CMD='mail -s "AdTripwire observatory" you@example.org'
+ADTRIPWIRE_NOTIFY_CMD='curl -s -d @- https://ntfy.sh/<topic>'
+```
+
+Only the message text is sent: no run files, evidence, reports or paths. Every delivered text
+is also appended, with a UTC timestamp, to `notifications.log` next to the state file. The state
+is saved (as a whole file, temp file then rename) only after the command succeeded, so a failed
+delivery is retried at the next run; the log then marks the attempt "(delivery failed)". `--dry-run`
+prints the text and writes and runs nothing. The exit status is 0, or 2 when the index cannot
+be read. Anything you send to a public topic such as ntfy.sh is public: choose a topic name
+nobody can guess, or use a channel you control.
+
 ## Wording rule
 
 Everything shown by the site and these tools describes observed traffic and documented

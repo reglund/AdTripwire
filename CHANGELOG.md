@@ -7,6 +7,11 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Observatory notifications**: the primary rig's daily run ends with
+  `scripts/observatory-notify.mjs`, which sends a plain-text digest (new documented hosts, new
+  sites carrying a known host, new elevated or correlated detections, a one-line summary)
+  through `ADTRIPWIRE_NOTIFY_CMD` (message on stdin), logs it and keeps a state file so only
+  changes are reported. See `docs/observatory.md`.
 - **Morning line and calendar**: the popup and the Exposure view say what yesterday looked like
   ("Yesterday: N page(s), N contact(s) with documented infrastructure"), compare yesterday's
   third-party domains per page with the 30-day normal, and show a 53-week calendar (one button

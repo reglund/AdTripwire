@@ -19,10 +19,13 @@
 #                                 pulls every rig's rows, builds the site over them and publishes
 #                                 the root. Anything but "primary" is treated as rig, so a typo or
 #                                 an omission never writes the site root.
+#   ADTRIPWIRE_NOTIFY_CMD         primary only: a shell command that receives the day's notification
+#                                 text on stdin (see docs/observatory.md, Notifications)
+#   ADTRIPWIRE_NOTIFY_ALWAYS      1: send the notification even when nothing changed
 #
 # A failing variant never stops the others (so no `set -e`); its status is only in the log line
 # "done <name> exit=<n>". The script's own exit status is that of the trend step. A failing
-# observatory export, sync, build or publish never changes it.
+# observatory export, sync, build, publish or notification never changes it.
 set -u
 
 c=${ADTRIPWIRE_EXPOSURE_DIR:-$HOME/.cache/adtripwire-exposure}
@@ -115,6 +118,10 @@ else
     { sh scripts/observatory-sync.sh "$c/remote" &&
       node scripts/observatory-build.mjs --rigs="$c/remote/rigs" --out="$c/site" &&
       sh scripts/observatory-publish.sh "$c/site"; } || true
+    # The day's notification text, whether or not the publish worked: it reads the built site.
+    set -- --index="$c/site/data/index.json" --state="$c/notify-state.json"
+    [ "${ADTRIPWIRE_NOTIFY_ALWAYS:-}" = 1 ] && set -- "$@" --always
+    node scripts/observatory-notify.mjs "$@" || true
   fi
 fi
 
