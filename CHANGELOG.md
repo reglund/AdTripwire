@@ -7,6 +7,8 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **AMO submission guide**: `docs/amo-submission.md` (what to upload, reproducible source-review
+  instructions verified in clean clones, listing text, reviewer notes, privacy text, checklist).
 - **Check this yourself**: `docs/verify-yourself.md` (CSP, permissions, a grep for network code,
   zero runtime dependencies, stored data, reproducible build, and a plain statement that the
   code is largely AI-written) and a Settings card that shows the manifest the browser loaded

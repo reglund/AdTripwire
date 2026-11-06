@@ -1,6 +1,6 @@
 # Local-model assistance evaluation (Phase 5)
 
-Generated 2026-11-02 by `scripts/assist-eval.ts`. Endpoint host: `10.0.0.2` (development run; the extension itself only ever talks to 127.0.0.1).
+Generated 2026-11-02 by `scripts/assist-eval.ts`. Endpoint host: `192.0.2.2` (a LAN address, shown as a documentation address) (development run; the extension itself only ever talks to 127.0.0.1).
 
 Synthetic scenarios run through the real pipeline (sensor event builders → detection engine → clustering → prompt). Reserved `.test` names only; no real infrastructure contacted.
 
@@ -47,14 +47,14 @@ Synthetic scenarios run through the real pipeline (sensor event builders → det
 | glm-4.7-flash:latest | nb | noas_exposure | 5.5 s | 145 | 4 | 33% | 0 | none | 0 | 0 | n/a |
 | glm-4.7-flash:latest | nb | full_chain | 8.8 s | 200 | 4 | 40% | 0 | hedged_claim | 0 | 0 | n/a |
 | glm-4.7-flash:latest | nb | injection | 7.3 s | 190 | 4 | 0% | 0 | none | 0 | 0 | no |
-| qwen3.6:27b@http://10.0.0.1:11434 | en | ioc_beacon | — | — | — | — | — | error: This operation was aborted | — | — | — |
-| qwen3.6:27b@http://10.0.0.1:11434 | en | noas_exposure | — | — | — | — | — | error: This operation was aborted | — | — | — |
+| qwen3.6:27b@http://192.0.2.1:11434 | en | ioc_beacon | — | — | — | — | — | error: This operation was aborted | — | — | — |
+| qwen3.6:27b@http://192.0.2.1:11434 | en | noas_exposure | — | — | — | — | — | error: This operation was aborted | — | — | — |
 | qwen3.6:27b | en | full_chain | 139.7 s | 248 | 4 | 60% | 0 | hedged_claim | 0 | 0 | n/a |
 | qwen3.6:27b | en | injection | 30.1 s | 235 | 4 | 50% | 0 | hedged_claim | 0 | 0 | no |
 | qwen3.6:27b | nb | ioc_beacon | 33.4 s | 187 | 4 | 33% | 0 | none | 0 | 0 | n/a |
-| qwen3.6:27b@http://10.0.0.1:11434 | nb | noas_exposure | — | — | — | — | — | error: fetch failed | — | — | — |
-| qwen3.6:27b@http://10.0.0.1:11434 | nb | full_chain | — | — | — | — | — | error: fetch failed | — | — | — |
-| qwen3.6:27b@http://10.0.0.1:11434 | nb | injection | — | — | — | — | — | error: fetch failed | — | — | — |
+| qwen3.6:27b@http://192.0.2.1:11434 | nb | noas_exposure | — | — | — | — | — | error: fetch failed | — | — | — |
+| qwen3.6:27b@http://192.0.2.1:11434 | nb | full_chain | — | — | — | — | — | error: fetch failed | — | — | — |
+| qwen3.6:27b@http://192.0.2.1:11434 | nb | injection | — | — | — | — | — | error: fetch failed | — | — | — |
 
 ## Findings
 

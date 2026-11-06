@@ -31,9 +31,13 @@ sorted entries and fixed timestamps (`scripts/zip.mjs`) instead of relying on fi
 
 - **AMO (Firefox):** upload `adtripwire-firefox-<v>.zip` as a listed add-on; AMO requires the
   source archive because the bundle is built: upload `adtripwire-source-<v>.zip` and point
-  reviewers to `docs/release.md` (build: `pnpm install --frozen-lockfile && pnpm build`,
-  Node 20, pnpm 10). Listing texts and permission justifications: `docs/store-listing.md`.
+  reviewers to `docs/amo-submission.md` (build from the repository root with
+  `pnpm install --frozen-lockfile && node apps/extension-firefox/build.mjs`, Node 20, pnpm 10;
+  `pnpm build` from a package directory writes different path comments and `web-ext build`
+  stores mtimes, so neither is byte-reproducible). Listing texts and permission
+  justifications: `docs/store-listing.md`.
   `web-ext sign --channel listed` can automate the upload with AMO API credentials.
+  Step-by-step submission guide (artefact, reproducible source instructions, listing, reviewer notes, privacy text): `docs/amo-submission.md`
 - **Chrome Web Store:** upload `adtripwire-chromium-<v>.zip`; the listing must state the
   reduced capabilities (no response-body inspection) as in `docs/browser-capabilities.md`.
 - The `--assist` variants are separate listings or self-distributed builds; their listing

@@ -9,7 +9,7 @@
  *   pnpm eval:assist -- --endpoint http://127.0.0.1:11434 --models qwen3:8b,mistral-nemo:12b
  *   options: --languages en,nb  --timeout 300  --out docs/evaluations/assist-eval.md  --json path
  *            --rescreen path.json   re-run screening on saved raw answers without calling models
- *   A model may carry its own endpoint: --models qwen3:8b@http://10.0.0.2:11434,other-model
+ *   A model may carry its own endpoint: --models qwen3:8b@http://192.0.2.2:11434,other-model
  */
 import { writeFileSync, readFileSync } from "node:fs";
 import type {
