@@ -5,6 +5,10 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.3.0] — 2026-11-06
+
 ### Added
 
 - **AMO submission guide**: `docs/amo-submission.md` (what to upload, reproducible source-review
