@@ -15,8 +15,11 @@
  * Build the evaluation bundle first (production indicators, dashboard opens on install):
  *   node apps/extension-<browser>/build.mjs --eval --out=<dir>
  * Nothing here contacts known malicious infrastructure on purpose; the sites are mainstream
- * publishers. Reports contain counts, rule ids, severities and, for elevated or higher,
- * the detection's sanitized subject hostnames.
+ * publishers. Reports contain counts, rule ids, severities and, for every detection, its
+ * sanitized subject hostnames, evidence strings and summary (the JSON keeps all of it; the
+ * Markdown report lists rule, severity and hostnames). With --json the extension's own evidence
+ * export (default redaction profile) for the detections of this run is written next to it as
+ * <json path without .json>.evidence.json.
  */
 /* global document, window, location, getComputedStyle */
 // (the globals above are used only inside page.evaluate callbacks that run in the browser)
@@ -242,8 +245,10 @@ async function launch() {
     userDataDir: PROFILE,
     protocolTimeout: 120_000,
     // WebDriver BiDi refuses to evaluate inside extension pages (reported as about:blank)
-    // unless system access is allowed; needed only for this evaluation harness.
+    // unless system access is allowed; needed only for this evaluation harness. Firefox 159
+    // moved the switch from the command-line flag to an environment variable; both are set.
     args: ["-remote-allow-system-access"],
+    env: { ...process.env, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1" },
     extraPrefsFirefox: {
       "intl.accept_languages": ACCEPT_LANGUAGE,
       "intl.locale.requested": "nb-NO",
@@ -413,12 +418,14 @@ async function main() {
       row.detections.push({
         ruleId: d.ruleId,
         severity: d.severity,
-        // Hosts are shown for elevated and above and for every contact with documented
-        // infrastructure; routine ad-tech rules keep their hosts out of the report.
-        hostnames:
-          ["elevated", "high_priority"].includes(d.severity) || d.ruleId.startsWith("known_infra.")
-            ? d.subjectHostnames
-            : undefined,
+        detectionId: d.detectionId,
+        timestamp: d.timestamp,
+        confidence: d.confidence,
+        hostnames: d.subjectHostnames,
+        matchedIndicatorIds: d.matchedIndicatorIds,
+        occurrenceCount: d.occurrenceCount,
+        summary: d.summary,
+        evidence: d.evidence.map((e) => e.observed),
       });
     }
     prev = cur;
@@ -428,6 +435,41 @@ async function main() {
     );
   }
   const end = await status(dash);
+
+  // Evidence export for the detections recorded in this run, taken through the extension's own
+  // protocol while the dashboard page is still open. Best effort: never fails the run.
+  let evidenceOut = "";
+  if (JSON_OUT) {
+    const runIds = results.flatMap((r) => r.detections.map((d) => d.detectionId));
+    if (runIds.length > 0) {
+      try {
+        const res = await rpc(dash, {
+          type: "export_evidence",
+          profile: "default",
+          detectionIds: runIds,
+        });
+        if (!res?.ok) throw new Error(res?.error ?? "no response");
+        // The background answers { filename, json } (a string); ExportFile uses { text }.
+        const data = res.data;
+        const text =
+          typeof data === "string"
+            ? data
+            : typeof data?.text === "string"
+              ? data.text
+              : typeof data?.json === "string"
+                ? data.json
+                : null;
+        if (text === null) throw new Error("unexpected export response shape");
+        evidenceOut = JSON_OUT.replace(/\.json$/, "") + ".evidence.json";
+        writeFileSync(evidenceOut, text);
+      } catch (err) {
+        evidenceOut = "";
+        console.warn(
+          `could not write the evidence export: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
   await browser.close();
 
   const totals = {
@@ -497,9 +539,7 @@ async function main() {
   L.push("");
   if (totals.detections.length === 0) L.push("None during this run.");
   else {
-    L.push(
-      "| Rule | Severity | Site | Subject hostnames (documented infrastructure, elevated and above) |",
-    );
+    L.push("| Rule | Severity | Site | Subject hostnames |");
     L.push("|---|---|---|---|");
     for (const r of results)
       for (const d of r.detections)
@@ -539,6 +579,7 @@ async function main() {
       ),
     );
   console.log(`report → ${OUT}`);
+  if (evidenceOut) console.log(`evidence → ${evidenceOut}`);
 }
 
 await main();

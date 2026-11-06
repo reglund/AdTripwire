@@ -63,8 +63,16 @@ export function exportGroup(opts: {
   const evidence = action(t("Evidence JSON (default / strict)"), async () => {
     const p = profile.value();
     const data = await rpc<unknown>({ type: "export_evidence", profile: p, ...scope });
-    const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-    downloadText(opts.evidenceFilename(p), text);
+    // The background answers { filename, json } where json is the serialised export; save the
+    // export itself, never the wrapper.
+    const json =
+      data !== null &&
+      typeof data === "object" &&
+      typeof (data as { json?: unknown }).json === "string"
+        ? (data as { json: string }).json
+        : null;
+    if (json === null) throw new Error(t("The background returned an unexpected export."));
+    downloadText(opts.evidenceFilename(p), json);
     return t("Export downloaded.");
   });
   const stix = action(t("STIX 2.1 bundle"), () =>

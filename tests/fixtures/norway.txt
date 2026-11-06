@@ -1,0 +1,36 @@
+# Norwegian daily reading: national and regional news, business and consumer sites with
+# programmatic ad slots (Schibsted, Amedia, Polaris, Aller). Ordinary publishers, not threat
+# infrastructure. Complements exposure-sites.txt, which keeps only the ad-heaviest Norwegian
+# sites; this list is the "a normal day in Norway" variant. One URL per line.
+
+# -- National
+https://www.aftenposten.no/
+https://www.dagsavisen.no/
+https://www.abcnyheter.no/
+https://www.vl.no/
+https://www.nationen.no/
+https://www.klassekampen.no/
+
+# -- Business and finance
+https://e24.no/
+https://www.dn.no/
+https://www.finansavisen.no/
+
+# -- Regional (Schibsted, Polaris, Amedia)
+https://www.bt.no/
+https://www.adressa.no/
+https://www.fvn.no/
+https://www.aftenbladet.no/
+https://www.nordlys.no/
+https://www.itromso.no/
+https://www.sa.no/
+https://www.oa.no/
+https://www.rb.no/
+
+# -- Consumer, tech and lifestyle
+https://www.tek.no/
+https://www.side3.no/
+https://www.hegnar.no/
+https://www.kk.no/
+https://www.seher.no/
+https://www.godt.no/

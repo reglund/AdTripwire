@@ -37,7 +37,11 @@
     "exposure:build": "node apps/extension-firefox/build.mjs --eval --out=$HOME/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=$HOME/snap/chromium/common/adtripwire-eval-dist",
     "exposure:firefox": "node scripts/exposure-run.mjs --browser=firefox",
     "exposure:chromium": "node scripts/exposure-run.mjs --browser=chromium",
-    "exposure:trend": "node scripts/exposure-trend.mjs"
+    "exposure:trend": "node scripts/exposure-trend.mjs",
+    "exposure:daily": "sh scripts/exposure-daily.sh",
+    "observatory:build": "node scripts/observatory-build.mjs",
+    "observatory:publish": "sh scripts/observatory-publish.sh",
+    "observatory:reproduce": "node scripts/observatory-reproduce.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

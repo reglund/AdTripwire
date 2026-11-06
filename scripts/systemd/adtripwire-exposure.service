@@ -5,17 +5,20 @@ Description=AdTripwire daily interactive exposure run (Firefox and Chromium, per
 Type=oneshot
 WorkingDirectory=%h/git/AdTripwire
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:/snap/bin
+# Optional publishing settings (ADTRIPWIRE_OBSERVATORY_REMOTE, ADTRIPWIRE_OBSERVATORY_BRANCH);
+# see docs/observatory.md. Without the file, or without a remote in it, nothing is published.
+EnvironmentFile=-%h/.config/adtripwire/observatory.env
 # Rebuild the evaluation bundles from the checked-out tree so the run always uses the current
 # indicator set (pull the repository to pick up merged indicator refreshes).
 ExecStartPre=/bin/sh -c 'node scripts/refresh-indicators.mjs --check || true'
 ExecStartPre=/bin/sh -c 'node apps/extension-firefox/build.mjs --eval --out=%h/snap/firefox/common/adtripwire-eval-dist && node apps/extension-chromium/build.mjs --eval --out=%h/snap/chromium/common/adtripwire-eval-dist'
-# Four variants, one after another (each ~60-90 min). A failing variant does not stop the
-# others. Reports and JSON stay outside the repository; the trend report is rebuilt last.
-ExecStart=/bin/sh -c 'd=$(date +%%F); c=%h/.cache/adtripwire-exposure; mkdir -p $$c/reports; \
-  node scripts/exposure-run.mjs --browser=firefox --seconds=60 --json=$$c/$$d-firefox.json --out=$$c/reports/$$d-firefox.md; \
-  node scripts/exposure-run.mjs --browser=chromium --seconds=60 --json=$$c/$$d-chromium.json --out=$$c/reports/$$d-chromium.md; \
-  node scripts/exposure-run.mjs --browser=chromium --device="iPhone 15" --seconds=60 --json=$$c/$$d-chromium-iphone-15.json --out=$$c/reports/$$d-chromium-iphone-15.md; \
-  node scripts/exposure-run.mjs --browser=chromium --device="Pixel 5" --seconds=60 --json=$$c/$$d-chromium-pixel-5.json --out=$$c/reports/$$d-chromium-pixel-5.md; \
-  node scripts/exposure-trend.mjs --dir=$$c'
+# Eight variants (desktop Firefox and Chromium, two phone emulations, and the Norway and
+# Middle East/Africa site lists), two at a time: about 4-5 h in all. The logic lives in
+# scripts/exposure-daily.sh. A failing variant does not stop the others; reports and JSON stay
+# outside the repository, per-variant logs go to live/; the trend report is rebuilt, then the
+# observatory site is built and published when a remote is configured (a failing build or publish
+# never fails the unit; the unit's status is the trend step's). Parallelism: 1-4, default 2.
+Environment=ADTRIPWIRE_EXPOSURE_PARALLEL=2
+ExecStart=/bin/sh scripts/exposure-daily.sh
 TimeoutStartSec=8h
 Nice=10

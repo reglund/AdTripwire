@@ -1,0 +1,42 @@
+# Middle East and Africa: mainstream news publishers in markets the AdFection reporting names
+# (Eskimi reach, regional SSPs, Arabic-language and Nigerian/Kenyan/South African programmatic
+# inventory). Ordinary publishers, not threat infrastructure. Exposure from a European vantage
+# point is expected to be lower than in-region; the list exists so in-region rigs can run the
+# same visits. One URL per line.
+
+# -- Egypt
+https://www.youm7.com/
+https://www.masrawy.com/
+https://www.almasryalyoum.com/
+https://www.elwatannews.com/
+
+# -- Gulf and Levant
+https://www.alarabiya.net/
+https://www.albayan.ae/
+https://www.alittihad.ae/
+https://www.okaz.com.sa/
+https://sabq.org/
+https://www.alghad.com/
+https://www.annahar.com/
+
+# -- Maghreb
+https://www.hespress.com/
+https://www.elkhabar.com/
+
+# -- Nigeria
+https://punchng.com/
+https://www.vanguardngr.com/
+https://www.legit.ng/
+https://www.pulse.ng/
+https://www.nairaland.com/
+
+# -- Kenya
+https://www.tuko.co.ke/
+https://nation.africa/
+https://www.the-star.co.ke/
+
+# -- South Africa
+https://www.news24.com/
+https://www.iol.co.za/
+https://www.timeslive.co.za/
+https://www.sowetanlive.co.za/

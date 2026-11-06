@@ -14,3 +14,5 @@ cp "$(dirname "$0")/systemd/adtripwire-exposure.service" "$(dirname "$0")/system
 systemctl --user daemon-reload
 systemctl --user enable --now adtripwire-exposure.timer
 systemctl --user list-timers adtripwire-exposure.timer --no-pager
+echo "To publish the observatory site after each run, set ADTRIPWIRE_OBSERVATORY_REMOTE in"
+echo "$HOME/.config/adtripwire/observatory.env (see docs/observatory.md); without it nothing is published."

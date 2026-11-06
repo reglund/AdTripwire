@@ -60,7 +60,7 @@ puts it where you look every day, in the browser, for every profile you run the 
 calendar renders from a profile with a year of data within the dashboard's performance
 budget; wording reviewed against the conservative-language rule; keyboard walkthrough done.
 
-### Phase 8 — The observatory (public contribution) · size M
+### Phase 8 — The observatory (public contribution) · size M ✅ delivered 2026-11-05
 
 **The moment.** A page on the web, updated every evening by the timer, shows which sites and
 which browsers put a generic visitor in contact with documented infrastructure, day by day,
@@ -80,6 +80,14 @@ Nothing on that page is about you: the profiles are synthetic by construction.
   named profile in `scripts/systemd/`. New lists are proposed as PRs with a reason.
 - A one-command "reproduce today's run" so anyone can verify a day's row on their own box.
 
+**Delivered 2026-11-05.** Public dataset and page at
+[reglund.github.io/adtripwire-observatory](https://reglund.github.io/adtripwire-observatory/)
+(repository `reglund/adtripwire-observatory`), built and published by the daily service; eight
+variants two at a time with Norway and Middle East/Africa lists; `pnpm observatory:reproduce`.
+The data is published in full by decision (synthetic profiles). Report: `docs/phase-8-report.md`.
+Deviation: "your normal" per-site baseline was never part of this phase; new site lists ship as
+files in `tests/fixtures/`, not as PR-only proposals.
+
 **Why it matters to you.** The daily runs already exist and already cost nothing to keep. This
 turns them from a private cache into a citable, continuously updated public dataset on a
 topic where almost no independent measurement exists, with your name on it.
@@ -87,6 +95,14 @@ topic where almost no independent measurement exists, with your name on it.
 **Gate 8.** The page is produced only from harness output; a reviewer confirms no field in
 the published JSON can identify a person or device; a day's row reproduces from a clean
 checkout within the stated tolerance; the legend passes the conservative-language rule.
+
+### Phase 8b — Many rigs, one observatory · size M (planned 2026-11-05)
+
+**The moment.** Friends in other countries run the same daily harness on their own home or
+mobile connections, each publishing under a rig name to its own directory; your rig aggregates
+them into one page with a rigs table and a rig column on every signal. Vantage points, not
+speed, are what raise the catch: datacentre IPs are filtered out of the auctions. Plan and trust
+model in `docs/phase-8b-plan.md`; starts after Phase 8 is gated.
 
 ### Phase 9 — Your phone (mobile reality) · size M–L
 

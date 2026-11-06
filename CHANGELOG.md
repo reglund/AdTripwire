@@ -24,11 +24,23 @@ semantic versioning for the extension packages.
   watched, or what was contacted with a button straight to the story.
 - Signed indicator bundles, upstream refresh workflow and stale-indicator notice; interactive
   exposure runner with consent, device emulation and long-term trend reports.
+- **Observatory**: the daily exposure run now also builds a static site (documented hosts over
+  time, sites, browsers and devices side by side, full per-run data), optionally published to a
+  git branch by `scripts/observatory-publish.sh` (off unless `ADTRIPWIRE_OBSERVATORY_REMOTE` is
+  set), and `pnpm observatory:reproduce` re-runs one published day and compares it within a
+  stated tolerance. See `docs/observatory.md`.
+- **Daily run**: the logic moved from the systemd unit to `scripts/exposure-daily.sh`
+  (`pnpm exposure:daily`); eight variants run two at a time (`ADTRIPWIRE_EXPOSURE_PARALLEL`),
+  with per-variant logs and two new regional site lists (Norway, Middle East and Africa).
 
-### Changed
+### Fixed
 
-- `ad_delivery.redirect_chain` is informational by default and reported once per tab; it
-  escalates to suspicious only when a hop reaches documented infrastructure.
+- **Evidence export button**: the dashboard saved the background's `{ filename, json }` wrapper
+  with the export as an escaped string; it now saves the evidence export itself.
+- **Exposure harness on Firefox 159**: the snap update of 2026-11-05 moved WebDriver BiDi's
+  system-access switch from the `-remote-allow-system-access` flag to the
+  `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1` environment variable, so the harness could no longer reach
+  the extension's dashboard; the run script now sets both.
 
 ## [0.2.0] — 2026-11-02
 

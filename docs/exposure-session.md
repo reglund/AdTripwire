@@ -36,14 +36,25 @@ this session automatically with a persistent profile: consent accepted, scrollin
 article per site, 75 s dwell, report with auction evidence per site. Run it daily for at
 least three days to let the repeated-exposure rule fire; `sh scripts/install-exposure-timer.sh`
 installs a user-level systemd timer, `--remove` uninstalls it. Each day (11:30 ± 30 min) it
-rebuilds the evaluation bundles, then runs desktop Firefox, desktop Chromium, Chromium with
-iPhone 15 emulation and Chromium with Pixel 5 (Android) emulation one after another (60 s per site, persistent profiles, detections kept for
-a year, page sensor on), and finally `pnpm exposure:trend`. Everything is written outside the
+rebuilds the evaluation bundles, then runs `scripts/exposure-daily.sh` (also `pnpm exposure:daily`
+by hand): eight variants, two at a time (60 s per site, persistent profiles, detections kept for
+a year, page sensor on): desktop Firefox, desktop Chromium, Chromium with iPhone 15 and with
+Pixel 5 (Android) emulation, and Chromium desktop and Pixel 5 on each of two regional lists
+(`norway.txt`, `mena-africa.txt`), and finally `pnpm exposure:trend`
+and the observatory build. `ADTRIPWIRE_EXPOSURE_PARALLEL` (1-4, default 2; one headless run uses
+about 1.5 GB), `ADTRIPWIRE_EXPOSURE_SECONDS` and `ADTRIPWIRE_EXPOSURE_DIR` override the defaults;
+the whole run takes about 4-5 h. Each variant writes its console output to
+`~/.cache/adtripwire-exposure/live/<date>-<variant>.log` and the script prints one
+`done <variant> exit=<n>` line per variant. Everything is written outside the
 repository: JSON per run in `~/.cache/adtripwire-exposure/`, per-run reports in its
 `reports/`, and the cumulative view in `trend.md` (documented hosts with first/last seen,
 distinct days, variants and sites; runs by day and severity). It cannot stand in for your own
 profile (logins, history, your consent choices), so keep the manual session below as the
 reference.
+
+The results can also be published as a static site, the observatory: a page and full per-run
+data per day and variant, with a one-command way to reproduce any day. See
+[observatory.md](observatory.md).
 
 ## Session
 
