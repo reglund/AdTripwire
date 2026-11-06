@@ -211,6 +211,25 @@ prints the text and writes and runs nothing. The exit status is 0, or 2 when the
 be read. Anything you send to a public topic such as ntfy.sh is public: choose a topic name
 nobody can guess, or use a channel you control.
 
+## Refreshing the bundled snapshot
+
+The extension ships a small copy of the observatory's host table so the Exposure view can say
+what the public observatory saw for a documented host without any network request
+(`packages/correlation/data/observatory-snapshot.json`; generated, never edited by hand). Before
+a release:
+
+```bash
+pnpm observatory:snapshot                 # fetch the public data/index.json, validate, rewrite the file
+pnpm observatory:snapshot -- --from=<site dir or index.json>   # from a local copy instead
+pnpm observatory:snapshot:check           # compare only; exit 1 on drift (generatedAt is ignored)
+```
+
+The script validates every field (hostnames, dates, integer counts), refuses reserved names
+(`.test`, `.invalid`, `.example`, `.localhost`), caps the table at 500 hosts and 10 sites per host
+and sorts by host. `validateObservatorySnapshot` in `packages/correlation` applies the same
+rules at load time and in a test on the committed file. The wording in the UI states that a host
+that was not seen says nothing either way.
+
 ## Wording rule
 
 Everything shown by the site and these tools describes observed traffic and documented

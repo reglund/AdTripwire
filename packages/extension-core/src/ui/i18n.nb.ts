@@ -724,4 +724,10 @@ export const NB: Record<string, string> = {
   "{date}: {pages} page(s) counted; {contacts} contact(s) with documented infrastructure: {hosts}.":
     "{date}: {pages} side(r) talt; {contacts} kontakt(er) med dokumentert infrastruktur: {hosts}.",
   "{n} detection(s) at elevated priority.": "{n} deteksjon(er) med forhøyet prioritet.",
+  "The public observatory saw this host on {days} of {total} measured days (last {date}), on {sites}, in generic automated profiles. Seeing it in this browser is consistent with ordinary exposure to that ad-delivery path, not evidence of targeting.":
+    "Det offentlige observatoriet så denne verten på {days} av {total} målte dager (sist {date}), på {sites}, i generiske automatiserte profiler. At den ses i denne nettleseren er forenlig med vanlig eksponering for den annonseleveringsveien, ikke bevis på målretting.",
+  "The public observatory has not seen this host in {total} measured days. That says nothing either way: the observatory is small and its site list is fixed.":
+    "Det offentlige observatoriet har ikke sett denne verten på {total} målte dager. Det sier ingenting i noen retning: observatoriet er lite og nettstedlisten er fast.",
+  Observatory: "Observatorium",
+  "Observatory data as of {date}": "Observatoriedata per {date}",
 };

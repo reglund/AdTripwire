@@ -7,6 +7,11 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Observatory in the Exposure view**: each documented host now carries a note from a snapshot
+  of the public observatory bundled at build time (on how many measured days generic automated
+  profiles saw it, last seen, on which sites), or a statement that it was not seen, which says
+  nothing either way. No network request; refresh with `pnpm observatory:snapshot` before a
+  release. Norwegian strings included.
 - **Observatory notifications**: the primary rig's daily run ends with
   `scripts/observatory-notify.mjs`, which sends a plain-text digest (new documented hosts, new
   sites carrying a known host, new elevated or correlated detections, a one-line summary)

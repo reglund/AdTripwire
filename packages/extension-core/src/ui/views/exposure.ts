@@ -5,7 +5,10 @@
  */
 import type { Digest, MonitoringStatus } from "@adtripwire/shared";
 import {
+  OBSERVATORY_URL,
   exposureStory,
+  observatoryLookup,
+  observatorySummary,
   sightingText,
   type ExposureContact,
   type ExposureSummary,
@@ -83,6 +86,33 @@ function copyButton(text: string): HTMLElement {
   return h("div", { class: "copy-row" }, btn, status, pre);
 }
 
+/** What the bundled public observatory snapshot says about a host; absence says nothing either way. */
+function observatoryNote(host: string): HTMLElement {
+  const summary = observatorySummary();
+  const entry = observatoryLookup(host);
+  const text = entry
+    ? t(
+        "The public observatory saw this host on {days} of {total} measured days (last {date}), on {sites}, in generic automated profiles. Seeing it in this browser is consistent with ordinary exposure to that ad-delivery path, not evidence of targeting.",
+        {
+          days: entry.days,
+          total: summary.days,
+          date: entry.last,
+          sites: entry.sites.join(", "),
+        },
+      )
+    : t(
+        "The public observatory has not seen this host in {total} measured days. That says nothing either way: the observatory is small and its site list is fixed.",
+        { total: summary.days },
+      );
+  return h(
+    "p",
+    { class: "observatory-note" },
+    text,
+    " ",
+    externalLink(OBSERVATORY_URL, t("Observatory")),
+  );
+}
+
 function contactCard(c: ExposureContact, status: MonitoringStatus): HTMLElement {
   const story = exposureStory(c);
   return h(
@@ -102,6 +132,7 @@ function contactCard(c: ExposureContact, status: MonitoringStatus): HTMLElement 
     chain(c),
     h("p", null, story.body),
     h("p", { class: "contact-meaning" }, story.meaning),
+    observatoryNote(c.host),
     kv([
       [t("First seen"), formatTimestamp(c.firstSeen)],
       [t("Last seen"), `${formatTimestamp(c.lastSeen)} (${relativeTime(c.lastSeen)})`],
@@ -319,6 +350,11 @@ export const renderExposure: View = async () => {
     "div",
     { class: "view" },
     h("h2", null, t("Exposure")),
+    h(
+      "p",
+      { class: "muted small" },
+      t("Observatory data as of {date}", { date: observatorySummary().asOf }),
+    ),
     digest ? morningSection(digest) : null,
     hero,
     summary.strongSignals > 0

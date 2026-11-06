@@ -23,3 +23,17 @@ export type {
 } from "./assist/provider.js";
 export { summarizeExposure, exposureStory, sightingText, badgeFor } from "./exposure-summary.js";
 export type { ExposureContact, ExposureSummary, IndicatorInfo } from "./exposure-summary.js";
+export {
+  validateObservatorySnapshot,
+  observatoryLookup,
+  observatorySummary,
+  OBSERVATORY_URL,
+  OBSERVATORY_MAX_HOSTS,
+  OBSERVATORY_MAX_SITES,
+} from "./observatory.js";
+export type {
+  ObservatoryHost,
+  ObservatorySnapshot,
+  ObservatorySummary,
+  ObservatoryValidation,
+} from "./observatory.js";

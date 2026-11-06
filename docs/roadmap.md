@@ -128,7 +128,15 @@ measurement the project can offer.
 **Gate 9.** Synthetic suite passes on the Android capability subset; installed from AMO on a
 real device; one exposure session recorded from that device.
 
-### Phase 10 — Fresh eyes (living indicators) · size M
+### Phase 10 — Fresh eyes (living indicators) · size M · first half delivered 2026-11-06
+
+**Delivered 2026-11-06 (first half).** The observatory's host table is bundled into the
+extension (`packages/correlation/data/observatory-snapshot.json`, refreshed per release with
+`pnpm observatory:snapshot`); each contact card in the Exposure view says on how many measured
+days, last when and on which sites the public observatory saw that host, in generic automated
+profiles, with a link to the page. No network: the snapshot ships with the build. Plan:
+`docs/observatory-in-extension-plan.md`. Still open: signed bundles per merge and co-occurrence
+observations.
 
 **The moment.** On a Monday the weekly refresh opens a pull request: upstream added nine
 hosts. You merge, sign, and every installation that imports the bundle is current. In the

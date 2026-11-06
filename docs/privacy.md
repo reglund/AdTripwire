@@ -29,6 +29,12 @@ AdTripwire processes sensitive browsing signals and must itself be trustworthy.
   script runs only inside embedded sub-frames and reports hidden-iframe insertion, late
   third-party script/image insertion and a documented SDK message type. It never reads page
   text, form values, cookies or full URLs. See `docs/threat-model.md` → Page sensor.
+- **Bundled public observatory data.** The Exposure view shows, next to each documented host,
+  what the public observatory (synthetic automated profiles, not people) saw for it. That is a
+  small JSON file (`packages/correlation/data/observatory-snapshot.json`: hosts, dates, counts,
+  mainstream site names) compiled into the extension at build time and refreshed per release.
+  It is public data, contains nothing from any user, and is never fetched at runtime; the
+  lookup happens on the device and nothing about the lookup leaves it.
 - **Retention.** 7 days by default, with caps on detections and events; configurable.
   "Delete all collected data" clears `storage.local` and `storage.session`.
 - **Exports are redacted.** The default profile keeps sanitized hostnames; the strict

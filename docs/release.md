@@ -8,6 +8,9 @@ sorted entries and fixed timestamps (`scripts/zip.mjs`) instead of relying on fi
 
 1. Update `CHANGELOG.md`; bump `version` in `package.json` and `apps/*/package.json`
    (the manifests take their version from the app package).
+   Refresh the bundled observatory snapshot first: `pnpm observatory:snapshot`, review the diff of
+   `packages/correlation/data/observatory-snapshot.json` and commit it (see `docs/observatory.md`
+   → "Refreshing the bundled snapshot"). `pnpm observatory:snapshot:check` reports drift.
 2. `pnpm release:check` — builds default and `--assist` variants for Firefox and Chromium
    twice, verifies byte-identity, then writes `dist-release/`:
    - `adtripwire-firefox-<v>.zip`, `adtripwire-chromium-<v>.zip`

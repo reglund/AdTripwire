@@ -7,3 +7,4 @@ packages/indicators/upstream/
 LICENSE
 packages/indicators/data/public-suffix-list.json
 docs/evaluations/
+packages/correlation/data/observatory-snapshot.json

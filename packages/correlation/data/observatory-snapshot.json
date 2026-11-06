@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "source": "https://reglund.github.io/adtripwire-observatory/data/index.json",
+  "generatedAt": "2026-11-06T05:18:45.652Z",
+  "period": {
+    "from": "2026-11-02",
+    "to": "2026-11-05",
+    "days": 4
+  },
+  "rigs": 1,
+  "runs": 19,
+  "hosts": [
+    {
+      "host": "events.myweb3id.io",
+      "first": "2026-11-02",
+      "last": "2026-11-02",
+      "days": 1,
+      "runs": 3,
+      "sites": [
+        "lenta.ru",
+        "ria.ru",
+        "www.gazeta.ru"
+      ],
+      "variants": 3,
+      "rigs": 1
+    },
+    {
+      "host": "tracookiepixel.xyz",
+      "first": "2026-11-02",
+      "last": "2026-11-04",
+      "days": 2,
+      "runs": 2,
+      "sites": [
+        "www.goal.com",
+        "www.independent.co.uk"
+      ],
+      "variants": 2,
+      "rigs": 1
+    }
+  ]
+}

@@ -53,6 +53,13 @@ Bundles: `popup.ts` -> `dist/popup.js`, `dashboard.ts` -> `dist/dashboard.js`. S
   second click ("Confirm removal"). The import card reads the chosen file in the page with `FileReader`
   (max 5 MB) and sends its text; the UI never fetches anything. Pure helpers are in `exports.ts`.
 
+- Exposure: each contact card has a `p.observatory-note` built from the bundled observatory snapshot
+  (`observatoryLookup`, `observatorySummary` in `@adtripwire/correlation`; no network): how many measured
+  days the public observatory saw the host, or that it has not (which says nothing either way), plus an
+  external link to the observatory. "Observatory data as of {date}" is shown once under the heading.
+  The library returns structured values; the strings live in `views/exposure.ts` with Norwegian entries,
+  and `i18n.test.ts` checks them for verdict wording.
+
 ## Helpers
 
 - `format.ts`: labels, relative time, URL/size/ms formatting, visibility summary, validation, page-signal

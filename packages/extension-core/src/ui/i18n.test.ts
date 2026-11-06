@@ -145,3 +145,19 @@ describe("NB dictionary", () => {
     expect(nbVis.cannotSee.filter((s) => !Object.values(NB).includes(s))).toEqual([]);
   });
 });
+
+describe("observatory strings", () => {
+  it("carry no verdict wording (safe, clean, infected, spied)", () => {
+    const text = readFileSync(join(uiDir, "views", "exposure.ts"), "utf8");
+    const keys = [...extractKeys().entries()]
+      .filter(([, file]) => file.endsWith("exposure.ts"))
+      .map(([k]) => k)
+      .filter((k) => /observatory/i.test(k));
+    expect(keys.length).toBeGreaterThanOrEqual(4);
+    expect(text).toContain("observatoryLookup");
+    for (const key of keys) {
+      expect(key).not.toMatch(/\b(safe|clean|infected|spied)\b/i);
+      expect(NB[key]).not.toMatch(FORBIDDEN);
+    }
+  });
+});
