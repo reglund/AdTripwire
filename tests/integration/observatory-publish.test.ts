@@ -134,7 +134,7 @@ describe("observatory-publish.sh", () => {
     const log = git(remote, "log", "observatory", "--format=%an <%ae> %ad", "--date=iso-strict");
     expect(log.out.trim()).toMatch(
       new RegExp(
-        `^${IDENTITY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\d{4}-\\d{2}-\\d{2}T[\\d:]+\\+00:00$`,
+        `^${IDENTITY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\d{4}-\\d{2}-\\d{2}T[\\d:]+(?:\\+00:00|Z)$`,
       ),
     );
     const committer = git(
@@ -145,7 +145,7 @@ describe("observatory-publish.sh", () => {
       "--date=iso-strict",
     );
     expect(committer.out.trim()).toContain(IDENTITY);
-    expect(committer.out.trim()).toMatch(/\+00:00$/);
+    expect(committer.out.trim()).toMatch(/(?:\+00:00|Z)$/);
     const files = git(remote, "ls-tree", "-r", "--name-only", "observatory").out.split("\n");
     expect(files).toEqual(expect.arrayContaining([".nojekyll", "index.html", "data/index.json"]));
   });
