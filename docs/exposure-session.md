@@ -37,7 +37,7 @@ article per site, 75 s dwell, report with auction evidence per site. Run it dail
 least three days to let the repeated-exposure rule fire; `sh scripts/install-exposure-timer.sh`
 installs a user-level systemd timer, `--remove` uninstalls it. Each day (11:30 ± 30 min) it
 rebuilds the evaluation bundles, then runs `scripts/exposure-daily.sh` (also `pnpm exposure:daily`
-by hand): eight variants, two at a time (60 s per site, persistent profiles, detections kept for
+by hand): nine variants, two at a time (60 s per site, persistent profiles, detections kept for
 a year, page sensor on): desktop Firefox, desktop Chromium, Chromium with iPhone 15 and with
 Pixel 5 (Android) emulation, and Chromium desktop and Pixel 5 on each of two regional lists
 (`norway.txt`, `mena-africa.txt`), and finally `pnpm exposure:trend`

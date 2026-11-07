@@ -49,7 +49,7 @@ example `firefox-etp-off-yandex-ad-sites`).
 
 ### Variants
 
-`scripts/exposure-daily.sh` runs eight variants each day, two at a time. Published slugs:
+`scripts/exposure-daily.sh` runs nine variants each day, two at a time. Published slugs:
 
 - `firefox`, `chromium`, `chromium-iphone-15`, `chromium-pixel-5`: the default list,
   `exposure-sites.txt` (the ad-heaviest mainstream sites).
@@ -60,6 +60,10 @@ example `firefox-etp-off-yandex-ad-sites`).
   Middle East and Africa list, `mena-africa.txt`, mainstream publishers in the
   markets the AdFection reporting names; from a European vantage point lower exposure is
   expected than in-region, and the list exists so in-region rigs can run the same visits.
+- `firefox-norway-sector`: the Norwegian knowledge-sector list, `norway-sector.txt`: trade and
+  professional media read in universities, research, education and public administration
+  (tu.no, forskning.no, Khrono, Morgenbladet, …), plus a control group without ad auctions
+  (Samordna opptak, regjeringen.no, UiO). Firefox, because it reports frame ancestry.
 
 Build by hand with `pnpm observatory:build [--dir=<run output dir>] [--out=<site dir>]`.
 

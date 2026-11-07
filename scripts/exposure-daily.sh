@@ -1,5 +1,5 @@
 #!/bin/sh
-# The daily exposure run: eight variants, P at a time, then the trend report and the observatory
+# The daily exposure run: nine variants, P at a time, then the trend report and the observatory
 # site. Started by scripts/systemd/adtripwire-exposure.service (working directory: the checkout);
 # also runnable by hand (`pnpm exposure:daily`) once the evaluation bundles are built.
 #
@@ -66,7 +66,7 @@ run() {
 # waits for all of it (POSIX sh has no `wait -n`). Two variants that share a browser profile must
 # never run at the same time. exposure-run.mjs derives the default profile from browser + device,
 # so the first four variants keep those (history carries over) and the regional lists each get an
-# explicit profile of their own. All eight profiles are therefore distinct; the order below also
+# explicit profile of their own. All nine profiles are therefore distinct; the order below also
 # keeps profile-sharing variants (the same browser and device) in different groups for P <= 2.
 # P is clamped to 4 because of memory.
 n=0
@@ -82,6 +82,8 @@ launch() {
 PROF=$HOME/snap/chromium/common/adtripwire-exposure-profile
 NO=tests/fixtures/norway.txt
 MENA=tests/fixtures/mena-africa.txt
+SECTOR=tests/fixtures/norway-sector.txt
+FPROF=$HOME/snap/firefox/common/adtripwire-exposure-profile
 
 start=$(date +%s)
 echo "exposure-daily $d parallel=$P seconds=$S dir=$c rig=$RIG role=$ROLE"
@@ -96,6 +98,9 @@ launch chromium-pixel-5-norway --browser=chromium --device="Pixel 5" --sites="$N
 launch chromium-mena-africa --browser=chromium --sites="$MENA" --profile="$PROF-chromium-mena-africa"
 launch chromium-pixel-5-mena-africa --browser=chromium --device="Pixel 5" --sites="$MENA" \
   --profile="$PROF-chromium-pixel-5-mena-africa"
+# Firefox, not Chromium: desktop headless Chromium is filtered by most exchanges, and only
+# Firefox reports the frame ancestry that "Seen alongside" needs.
+launch firefox-norway-sector --browser=firefox --sites="$SECTOR" --profile="$FPROF-norway-sector"
 wait
 
 node scripts/exposure-trend.mjs --dir="$c"

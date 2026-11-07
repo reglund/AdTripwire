@@ -1,0 +1,20 @@
+# Norwegian knowledge sector: the trade and professional media people in universities,
+# research, education and public administration read, chosen because they carry programmatic
+# ad slots (checked 2026-11-07: Prebid, Google Ad Manager, Adnuntius, Xandr). Ordinary
+# publishers, not threat infrastructure. The last three lines are a control group with no ad
+# auction (expected: few third parties, no detections). One URL per line.
+https://www.tu.no/
+https://www.forskning.no/
+https://www.morgenbladet.no/
+https://www.khrono.no/
+https://www.kommunal-rapport.no/
+https://www.digi.no/
+https://www.dagensperspektiv.no/
+https://www.dagensmedisin.no/
+https://www.utdanningsnytt.no/
+https://www.altinget.no/
+https://www.universitetsavisa.no/
+https://www.kode24.no/
+https://www.samordnaopptak.no/
+https://www.regjeringen.no/
+https://www.uio.no/

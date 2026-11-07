@@ -7,6 +7,9 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Knowledge-sector variant**: `firefox-norway-sector` in the daily run, over
+  `tests/fixtures/norway-sector.txt` (Norwegian trade media with ad auctions plus a no-auction
+  control group).
 - **Seen alongside**: a dashboard tab listing hostnames that appeared in the same ad frame as
   a host from the indicator set (surveillance or malicious, currently valid). Ranked by the
   share of days a host was seen alongside a documented host out of the days its domain was

@@ -1,6 +1,6 @@
 # Running the exposure rig in Docker
 
-The same daily run as `docs/rig-setup.md` (eight variants, Firefox and Chromium, headless), packaged
+The same daily run as `docs/rig-setup.md` (nine variants, Firefox and Chromium, headless), packaged
 as one container so it can run on a home server instead of a laptop. This page is for the person
 (or the Claude Code session) on the server; the example server is called `motor`
 (10.0.0.103, Linux x86_64, Docker with the compose plugin). Nothing about what is measured or
@@ -97,7 +97,7 @@ sites from a throwaway profile, but do not reuse this image or these flags for a
    `docker stats` its memory. The container removes itself at the end (`--rm`); the results stay in
    `docker/data/exposure/`.
 
-8. **Check the result.** The observatory page shows the new day (rows for all eight variants,
+8. **Check the result.** The observatory page shows the new day (rows for all nine variants,
    under the rig name from the env file), the `observatory:` lines in the journal say what was
    published, and the ntfy message arrives (the primary only; the text is also in
    `docker/data/exposure/notifications.log`).
