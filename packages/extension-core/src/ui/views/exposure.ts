@@ -28,7 +28,7 @@ import { formatTimestamp, relativeTime } from "../format.js";
 import { t } from "../i18n.js";
 import { detectionHash } from "../route.js";
 import { rpc } from "../rpc.js";
-import { card, kv, type View } from "./common.js";
+import { bulletList, card, kv, type View } from "./common.js";
 
 const CLASS_LABEL: Record<ExposureContact["classification"], string> = {
   malicious: "Spyware delivery path",
@@ -295,6 +295,46 @@ function morningSection(digest: Digest): HTMLElement {
   );
 }
 
+const SECURITY_PLANNER = "https://securityplanner.consumerreports.org/";
+
+/**
+ * What a person who is worried can do. AdTripwire only observes; these steps reduce exposure.
+ * Source: Citizen Lab, Exposing AdFection (15 Oct 2026), recommendations for individuals.
+ */
+function reduceExposureCard(): HTMLElement {
+  return card(
+    t("If you are concerned"),
+    h(
+      "p",
+      null,
+      t(
+        "AdTripwire only observes. It does not reduce what ads can do. The researchers who documented this technique recommend these steps to people who may be targeted:",
+      ),
+    ),
+    bulletList(
+      [
+        t(
+          "iPhone: Settings, Privacy and Security, Tracking: turn off Allow Apps to Request to Track.",
+        ),
+        t("Android: Settings, Privacy, Ads: delete the advertising ID."),
+        t("Reset or delete the advertising ID regularly, and use the opt-out settings in apps."),
+        t(
+          "Use a trusted ad-blocking extension or a privacy-focused browser, or block ads on the home router or through a trusted VPN.",
+        ),
+      ],
+      "",
+    ),
+    h(
+      "p",
+      { class: "muted small" },
+      t(
+        "Blocking ads also means AdTripwire has less to observe. Fewer recorded contacts after that is the intended effect, not a sign that the risk was never there.",
+      ),
+    ),
+    h("p", null, externalLink(SECURITY_PLANNER, t("Security Planner: personalised advice"))),
+  );
+}
+
 export const renderExposure: View = async () => {
   const [summary, status, digest] = await Promise.all([
     rpc<ExposureSummary>({ type: "get_exposure" }),
@@ -370,5 +410,6 @@ export const renderExposure: View = async () => {
         )
       : null,
     ...summary.contacts.map((c) => contactCard(c, status)),
+    reduceExposureCard(),
   );
 };

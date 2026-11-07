@@ -740,4 +740,18 @@ export const NB: Record<string, string> = {
   "Host permissions": "Vertstillatelser",
   "This page cannot make network requests: the browser enforces the policy above.":
     "Denne siden kan ikke gjøre nettverksforespørsler: nettleseren håndhever policyen over.",
+  "If you are concerned": "Hvis du er bekymret",
+  "AdTripwire only observes. It does not reduce what ads can do. The researchers who documented this technique recommend these steps to people who may be targeted:":
+    "AdTripwire bare observerer. Den begrenser ikke hva annonser kan gjøre. Forskerne som dokumenterte teknikken, anbefaler disse stegene for personer som kan være mål:",
+  "iPhone: Settings, Privacy and Security, Tracking: turn off Allow Apps to Request to Track.":
+    "iPhone: Innstillinger, Personvern og sikkerhet, Sporing: slå av La apper be om å spore.",
+  "Android: Settings, Privacy, Ads: delete the advertising ID.":
+    "Android: Innstillinger, Personvern, Annonser: slett annonse-ID-en.",
+  "Reset or delete the advertising ID regularly, and use the opt-out settings in apps.":
+    "Nullstill eller slett annonse-ID-en jevnlig, og bruk innstillingene for å reservere deg i apper.",
+  "Use a trusted ad-blocking extension or a privacy-focused browser, or block ads on the home router or through a trusted VPN.":
+    "Bruk en pålitelig annonseblokkerer eller en personvernvennlig nettleser, eller blokker annonser i hjemmeruteren eller gjennom en pålitelig VPN.",
+  "Blocking ads also means AdTripwire has less to observe. Fewer recorded contacts after that is the intended effect, not a sign that the risk was never there.":
+    "Når annonser blokkeres, har AdTripwire også mindre å observere. Færre registrerte kontakter etterpå er den tilsiktede effekten, ikke et tegn på at risikoen aldri var der.",
+  "Security Planner: personalised advice": "Security Planner: personlige råd",
 };

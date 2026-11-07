@@ -7,6 +7,9 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **If you are concerned**: the Exposure view and the README list the steps the Citizen Lab
+  report recommends to people who may be targeted (advertising ID, ad blocking), with a link
+  to Security Planner, and say that AdTripwire itself only observes.
 - **Docker rig**: `docker/` (Dockerfile with Debian Chromium and Firefox from Mozilla's apt
   repository, entrypoint with a `smoke` mode, compose file, host systemd timer and installer) and
   `docs/rig-docker.md` for moving the daily exposure run to a home server. `exposure-run.mjs`

@@ -117,6 +117,15 @@ Run one test file: `pnpm vitest run packages/indicators/src/matcher.test.ts`.
 Dev build with synthetic test indicators and a local fixture server: see
 `docs/testing.md`.
 
+## If you are concerned
+
+AdTripwire observes; it does not reduce exposure. The Citizen Lab report recommends, for people
+who may be targeted: turn off app tracking on iPhone (Settings → Privacy & Security → Tracking)
+and delete the advertising ID on Android (Settings → Privacy → Ads), reset it regularly, and use
+a trusted ad blocker, a privacy-focused browser, or ad blocking on the home router or a trusted
+VPN. Blocking ads also leaves AdTripwire less to observe; that is the intended effect. Personal
+advice: [Security Planner](https://securityplanner.consumerreports.org/).
+
 ## Verify it yourself
 
 The code is largely written by AI models under the maintainer's direction, so the privacy claims
