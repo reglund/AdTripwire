@@ -5,6 +5,8 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-07
+
 ### Added
 
 - **Norwegian detection and rule text**: every rule writes bokmål next to the English

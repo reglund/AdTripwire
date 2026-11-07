@@ -1,6 +1,6 @@
 {
   "name": "adtripwire",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Detect the threat behind the ad. Privacy-preserving browser sensor for advertising-based surveillance and spyware delivery.",
