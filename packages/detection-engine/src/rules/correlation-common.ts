@@ -21,6 +21,11 @@ export const CORRELATION_LIMITATIONS = [
   "Browser request ids and frame ids do not survive restarts, and a single tab may host unrelated ad activity.",
 ];
 
+export const CORRELATION_LIMITATIONS_NB = [
+  "Tidsmessig nærhet beviser ikke årsak; hendelsene er koblet bare ut fra rammehierarki (eller, når det ikke er tilgjengelig, fanen eller korrelasjons-ID) og tid.",
+  "Forespørsels-ID-er og ramme-ID-er i nettleseren overlever ikke omstart, og én fane kan ha uavhengig annonseaktivitet.",
+];
+
 // Moved to @adtripwire/shared (lineage.ts) so packages/correlation can reuse it; re-exported here.
 export { lineageRelation };
 export type { LineageRelation };

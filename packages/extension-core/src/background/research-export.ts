@@ -1,6 +1,7 @@
 import type {
   Detection,
   ExportFile,
+  HandoffPreview,
   IndicatorSet,
   NormalizedEvent,
   SensorCapabilities,
@@ -13,6 +14,7 @@ import {
   serializeExport,
 } from "@adtripwire/privacy";
 import type { AlongsideListing, AlongsideRow } from "@adtripwire/correlation";
+import { buildCoverNote } from "./cover-note.js";
 import {
   addAlongsideToStix,
   detectionsToEcsNdjson,
@@ -76,6 +78,33 @@ function seenAlongsideSection(
   };
 }
 
+/** What a hand-off package for this input would contain (shared by the preview and the cover note). */
+export function handoffPreview(
+  profile: "default" | "strict",
+  input: Pick<ResearchExportInput, "detections" | "events" | "alongside">,
+): HandoffPreview {
+  const strict = profile === "strict";
+  const preview: HandoffPreview = {
+    detections: input.detections.length,
+    events: input.events.length,
+    seenAlongsideRows: strict
+      ? 0
+      : (input.alongside?.rows.length ?? 0) + (input.alongside?.pageOnly.length ?? 0),
+    seenAlongsideOmitted: strict,
+  };
+  if (input.detections.length > 0) {
+    preview.firstTimestamp = Math.min(...input.detections.map((d) => d.firstEventTimestamp));
+    preview.lastTimestamp = Math.max(...input.detections.map((d) => d.timestamp));
+  }
+  return preview;
+}
+
+function randomSalt(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 const stamp = (now: Date) => now.toISOString().replace(/[:.]/g, "-");
 
 /** Builds the Phase 4 research exports (STIX 2.1, ECS NDJSON, hand-off package). */
@@ -117,7 +146,12 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
       };
     }
     case "export_handoff": {
+      const strict = req.profile === "strict";
+      // One salt for the whole package, so the same host has the same pseudonym in the evidence
+      // part and in the STIX part. It is never exported.
+      const salt = randomSalt();
       const evidence = buildEvidenceExport({
+        salt,
         productVersion: input.productVersion,
         browser: input.browser,
         rulesetVersion: input.rulesetVersion,
@@ -127,9 +161,16 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
         profile: req.profile,
         now,
       });
-      const stix = detectionsToStix(detections, events, indicatorSets, stixOpts);
+      // The STIX part goes through the same redaction profile as the evidence part.
+      const stix = detectionsToStix(detections, events, indicatorSets, {
+        ...stixOpts,
+        profile: req.profile,
+        salt,
+      });
+      // Analyst notes are free text typed by the user and cannot be redacted reliably, so the
+      // strict profile leaves them out.
       const notes = Object.fromEntries(
-        detections
+        (strict ? [] : detections)
           .map((d) => [d.detectionId, input.notes.get(d.detectionId)] as const)
           .filter(
             (x): x is readonly [string, { note: string; updatedAt: number }] => x[1] !== undefined,
@@ -141,10 +182,18 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
         `Generated ${now.toISOString()} by AdTripwire ${input.productVersion} (${input.browser.browser}), ruleset ${input.rulesetVersion}.`,
         `Redaction profile: ${req.profile}.`,
         "",
+        ...(strict
+          ? [
+              "Strict profile: the evidence and STIX parts pseudonymise hostnames that are not central to",
+              "a detection, analyst notes are left out, and the Seen-alongside hostnames are omitted.",
+              "",
+            ]
+          : []),
         "Contents: evidence (sanitized detections and the events that support them), stix (the same",
         "detections as a STIX 2.1 bundle), notes (analyst notes typed by the user), capabilities (what",
         "the sensor could and could not observe), observations.seenAlongside (hostnames seen in the",
-        "same ad frame as a documented host; leads, not detections).",
+        "same ad frame as a documented host; leads, not detections), coverNote (a Markdown cover note",
+        "with the date range, counts, what the recipient can and cannot conclude, and the sender's note).",
         "",
         "How to read it: each detection lists what was observed, why it matters, which rule fired,",
         "the evidence, benign explanations, limitations and references. Severity is an investigation",
@@ -161,6 +210,14 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
         schema: "adtripwire.handoff",
         schemaVersion: "1.0.0",
         readme,
+        // Markdown text. The user's free-text note lives only here, quoted; it is never stored.
+        coverNote: buildCoverNote({
+          profile: req.profile,
+          languages: req.coverLanguages ?? "en",
+          counts: handoffPreview(req.profile, input),
+          generatedAt: now,
+          ...(req.note !== undefined ? { note: req.note } : {}),
+        }),
         evidence,
         stix,
         notes,

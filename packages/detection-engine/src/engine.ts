@@ -1,5 +1,6 @@
 import {
   fnv1a,
+  withSanitizedNb,
   type Detection,
   type IndicatorMatch,
   type MonitoringSettings,
@@ -321,7 +322,10 @@ export class DetectionEngine {
           typeof d.firstFired === "number" &&
           isDetectionLike(d.detection)
         ) {
-          engine.#dedup.set(d.key, { firstFired: d.firstFired, detection: d.detection });
+          engine.#dedup.set(d.key, {
+            firstFired: d.firstFired,
+            detection: withSanitizedNb(d.detection),
+          });
         }
       }
     }

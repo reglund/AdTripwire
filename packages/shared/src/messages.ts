@@ -26,7 +26,10 @@ export interface MonitoringStatus {
     detectionsTotal: number;
     eventsStored: number;
   };
-  lastSignificant?: Pick<Detection, "detectionId" | "timestamp" | "severity" | "summary">;
+  lastSignificant?: Pick<Detection, "detectionId" | "timestamp" | "severity" | "summary"> & {
+    /** Norwegian summary when the detection has nb text; display only. */
+    summaryNb?: string;
+  };
   /** Aggregate, privacy-safe runtime metrics (no URLs). */
   metrics?: {
     eventsObserved: number;
@@ -81,7 +84,17 @@ export type UiRequest =
   | { type: "set_indicator_set_enabled"; setId: string; enabled: boolean }
   | { type: "set_detection_note"; detectionId: string; note: string }
   | { type: "get_timeline"; tabId?: number; since?: number; limit?: number }
-  | { type: "export_handoff"; detectionIds?: string[]; profile: "default" | "strict" }
+  | {
+      type: "export_handoff";
+      detectionIds?: string[];
+      profile: "default" | "strict";
+      /** Optional free-text note for the recipient; goes into the cover note only, never stored. */
+      note?: string;
+      /** Cover-note languages; English is always included. Defaults to "en". */
+      coverLanguages?: HandoffCoverLanguages;
+    }
+  // Dry run of export_handoff: what would be included, without producing a file
+  | { type: "preview_handoff"; detectionIds?: string[]; profile: "default" | "strict" }
   // Phase 5: deterministic correlation and optional local-model assistance
   | { type: "get_clusters" }
   | { type: "get_cluster"; clusterId: string }
@@ -105,6 +118,25 @@ export type UiRequest =
   | { type: "activate_signed_bundle"; text: string }
   | { type: "remove_signed_bundle" };
 
+/** Maximum length (UTF-16 units) of the free-text note on a hand-off package. */
+export const HANDOFF_NOTE_MAX_LENGTH = 2000;
+
+export type HandoffCoverLanguages = "en" | "en+nb";
+
+/** What a hand-off package with the given scope and profile would contain. */
+export interface HandoffPreview {
+  detections: number;
+  /** Supporting events referenced by the selected detections that are still stored. */
+  events: number;
+  /** Seen-alongside rows that would be included (0 when omitted by the strict profile). */
+  seenAlongsideRows: number;
+  /** True when the strict profile leaves the Seen-alongside hostnames out. */
+  seenAlongsideOmitted: boolean;
+  /** Earliest first-event and latest detection timestamps (epoch ms); absent without detections. */
+  firstTimestamp?: number;
+  lastTimestamp?: number;
+}
+
 export interface DetectionFilter {
   categories?: string[];
   severities?: string[];
@@ -127,6 +159,8 @@ export interface TimelineEntry {
   severity?: Detection["severity"];
   ruleId?: string;
   summary: string;
+  /** Norwegian summary of a detection entry when it has nb text; display only. */
+  summaryNb?: string;
   hostname?: string;
   tabId?: number;
   frameId?: number;

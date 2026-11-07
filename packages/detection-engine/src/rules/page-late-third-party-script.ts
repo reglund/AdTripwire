@@ -1,16 +1,36 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { buildDetection } from "./common.js";
 import { linkEvidence } from "./correlation-common.js";
 import {
   PAGE_FALSE_POSITIVES,
+  PAGE_FALSE_POSITIVES_NB,
   PAGE_LIMITATIONS,
+  PAGE_LIMITATIONS_NB,
   lineageNoasContact,
   pageSignalOf,
   signalFrameHost,
   timing,
 } from "./page-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Tredjepartsskript satt inn etter innlasting",
+  description:
+    "Nettsidesensoren (valgfri) observerte et skriptelement fra en annen opprinnelse som ble satt inn etter at rammen var lastet, etter en forespørsel med NOAS/getAd-mønster i samme rammehierarki. Uten denne forespørselen gis ingen oppdagelse (hendelsen blir liggende i vinduet for korrelasjon), fordi sene tredjepartsskript er vanlig oppførsel for annonsekoder.",
+  confidenceBasis:
+    "Ingen oppdagelse alene: sen innsetting av skript er slik de fleste annonsekoder fungerer. Middels med NOAS-kontakt i samme rammehierarki, i samsvar med det dokumenterte trinnet der enheter som ble valgt ut fikk kode som lastet flere skript.",
+  limitations: PAGE_LIMITATIONS_NB,
+  falsePositiveConsiderations: [
+    ...PAGE_FALSE_POSITIVES_NB,
+    "Tagghåndteringssystemer og header bidding-moduler setter inn mange tredjepartsskript etter innlasting.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "page.late_third_party_script",
@@ -34,6 +54,7 @@ export const definition: RuleDefinition = {
     ...PAGE_FALSE_POSITIVES,
     "Tag managers and header-bidding wrappers insert many third-party scripts after load.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -75,6 +96,17 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
       alternativeExplanations: [
         "An ordinary ad tag, tag manager or header-bidding wrapper loading its components.",
       ],
+      nb: {
+        confidenceRationale:
+          "Innsettingen av skriptet ble observert direkte og fulgte en forespørsel om annonseutvelgelse i samme rammehierarki; koblingen er utledet fra hierarki og tid.",
+        summary:
+          "En forespørsel om annonseutvelgelse ble i samme rammehierarki fulgt av innsetting av et tredjepartsskript.",
+        significance:
+          "I den dokumenterte kjeden lastet kode som ble returnert til enheter som ble valgt ut flere skript mot valideringsinfrastruktur. Alene er sen innsetting av skript svært vanlig.",
+        alternativeExplanations: [
+          "En vanlig annonsekode, tagghåndteringssystem eller header bidding-modul som laster sine komponenter.",
+        ],
+      },
     }),
   ];
 }

@@ -4,6 +4,7 @@ import {
   type Confidence,
   type Detection,
   type DetectionReference,
+  type DetectionTextNb,
   type EvidenceItem,
   type IndicatorMatch,
   type NormalizedEvent,
@@ -16,6 +17,13 @@ import type { RuleContext } from "./types.js";
 import { registrableDomain, publicSuffix, normalizeHostname } from "@adtripwire/indicators";
 
 export const RULE_VERSION = "1.0.0";
+
+/** Norwegian adjective for a confidence level, for "<x> tillit". */
+export const CONFIDENCE_NB: Record<Confidence, string> = {
+  high: "høy",
+  medium: "middels",
+  low: "lav",
+};
 
 export const SEVERITY_RANK: Record<Severity, number> = {
   informational: 0,
@@ -71,6 +79,46 @@ const CAPABILITY_TEXT: Record<SensorCapability, string> = {
   response_size: "Response sizes are not observable by this browser sensor.",
 };
 
+const LIMITATION_TEXT_NB: Record<ObservationLimitation, string> = {
+  no_response_body_access: "Innholdet i svaret kunne ikke inspiseres for denne forespørselen.",
+  response_body_truncated: "Bare begynnelsen av svaret ble analysert.",
+  response_body_unsupported_encoding: "Kodingen av svaret kunne ikke dekodes for analyse.",
+  frame_ancestry_unavailable:
+    "Rammehierarkiet (hvilke rammer som ligger i hvilke) var ikke tilgjengelig for denne forespørselen.",
+  url_classification_unavailable:
+    "Firefox sin sporingsklassifisering var ikke tilgjengelig for denne forespørselen.",
+  response_size_unknown: "Størrelsen på svaret kunne ikke observeres.",
+  from_cache:
+    "Svaret kom fra hurtigbufferen, så størrelse og tidspunkt gjenspeiler ikke nødvendigvis en ny avgjørelse fra serveren.",
+  incognito_excluded: "Aktivitet i privat nettlesing er utelatt fra observasjonen.",
+  sensor_restarted_during_request:
+    "Sensoren ble startet på nytt under forespørselen; tidligere trinn kan mangle.",
+  page_sensor_disabled:
+    "Den valgfrie nettsidesensoren var slått av, så signaler inne på siden (iframes som settes inn, SDK-meldinger) ble ikke observert.",
+  response_body_skipped_budget:
+    "Innholdet i svaret ble ikke inspisert fordi for mange inspeksjoner allerede pågikk (minnegrense).",
+};
+
+const CAPABILITY_TEXT_NB: Record<SensorCapability, string> = {
+  page_signals:
+    "Signaler inne på siden fra underrammer (iframes som settes inn, SDK-meldinger) observeres ikke fordi den valgfrie nettsidesensoren er slått av.",
+  request_metadata:
+    "Grunnleggende metadata om forespørsler er ikke tilgjengelig fra denne nettlesersensoren.",
+  redirect_chain: "Omdirigeringskjeder er ikke synlige for denne nettlesersensoren.",
+  frame_ancestry:
+    "Rammehierarkiet (hvilke rammer som ligger i hvilke) er ikke synlig for denne nettlesersensoren.",
+  third_party_flag:
+    "Opplysninger om tredjepartskontekst er ikke tilgjengelige fra denne nettlesersensoren.",
+  url_classification:
+    "Firefox sin klassifisering fra sporingsbeskyttelsen er ikke tilgjengelig fra denne nettlesersensoren.",
+  response_headers: "Svarhoder er ikke synlige for denne nettlesersensoren.",
+  response_body_inspection: "Innholdet i svar kan ikke inspiseres av denne nettlesersensoren.",
+  response_size: "Størrelsen på svar kan ikke observeres av denne nettlesersensoren.",
+};
+
+export const BASELINE_MISSING_VISIBILITY_NB =
+  "Hva koden faktisk gjorde inne på siden, og hvilken virkning den hadde på enheten, observeres ikke; bare nettverksmetadata og, der det er slått på, avgrenset analyse av utvalgt svartekst er tilgjengelig.";
+
 export const BASELINE_MISSING_VISIBILITY =
   "What code actually executed inside the page, and its effect on the device, is not observed; only network metadata and, where enabled, bounded analysis of selected response text are available.";
 
@@ -79,17 +127,36 @@ export function missingVisibilityFor(
   capabilities: readonly SensorCapability[],
   extra: readonly ObservationLimitation[] = [],
 ): string[] {
-  const out = new Set<string>();
-  for (const e of events) for (const l of e.observationLimitations) out.add(LIMITATION_TEXT[l]);
-  for (const l of extra) out.add(LIMITATION_TEXT[l]);
-  for (const c of ALL_CAPABILITIES) if (!capabilities.includes(c)) out.add(CAPABILITY_TEXT[c]);
-  out.add(BASELINE_MISSING_VISIBILITY);
-  return [...out];
+  return missingVisibilityBoth(events, capabilities, extra).en;
+}
+
+/** English and Norwegian missingVisibility, built in lockstep so the two lists stay the same length. */
+export function missingVisibilityBoth(
+  events: readonly NormalizedEvent[],
+  capabilities: readonly SensorCapability[],
+  extra: readonly ObservationLimitation[] = [],
+): { en: string[]; nb: string[] } {
+  const out = new Map<string, string>();
+  const add = (en: string, nb: string): void => {
+    if (!out.has(en)) out.set(en, nb);
+  };
+  for (const e of events)
+    for (const l of e.observationLimitations) add(LIMITATION_TEXT[l], LIMITATION_TEXT_NB[l]);
+  for (const l of extra) add(LIMITATION_TEXT[l], LIMITATION_TEXT_NB[l]);
+  for (const c of ALL_CAPABILITIES)
+    if (!capabilities.includes(c)) add(CAPABILITY_TEXT[c], CAPABILITY_TEXT_NB[c]);
+  add(BASELINE_MISSING_VISIBILITY, BASELINE_MISSING_VISIBILITY_NB);
+  return { en: [...out.keys()], nb: [...out.values()] };
 }
 
 export const DEFAULT_ACTIONS = [
   "Review the listed events and the cited research before drawing conclusions.",
   "If you have reason to believe you are personally targeted, seek help from a digital-security helpline (for example Access Now's Digital Security Helpline) rather than acting on this alert alone.",
+];
+
+export const DEFAULT_ACTIONS_NB = [
+  "Gå gjennom hendelsene i listen og forskningen det vises til før du trekker noen konklusjoner.",
+  "Hvis du har grunn til å tro at du er utsatt for målrettet overvåking, kontakt en hjelpetjeneste for digital sikkerhet (for eksempel Access Now Digital Security Helpline) i stedet for å handle bare ut fra dette varselet.",
 ];
 
 /** "/getAd" or "/cplatform/getAd" (exact segments; "getAd" is case-sensitive; trailing slash tolerated). */
@@ -231,6 +298,22 @@ export function classMatches(matches: IndicatorMatch[], cls: string): IndicatorM
   return matches.filter((m) => m.indicator.classification === cls);
 }
 
+/**
+ * Norwegian text for a detection, written next to the English with the same interpolated values.
+ * Array fields must have the same length as their English twins. `recommendedActions` and
+ * `limitations` default to DEFAULT_ACTIONS_NB / `definition.nb.limitations`, mirroring the
+ * English defaults; when the English side is overridden, override the Norwegian side too.
+ * missingVisibility is derived automatically.
+ */
+export interface DetectionArgsNb {
+  confidenceRationale: string;
+  summary: string;
+  significance: string;
+  alternativeExplanations: string[];
+  recommendedActions?: string[];
+  limitations?: string[];
+}
+
 export interface DetectionArgs {
   subject: string;
   severity?: Severity;
@@ -249,6 +332,8 @@ export interface DetectionArgs {
   references?: DetectionReference[];
   /** Additional observation limitations to describe in missingVisibility (e.g. frame ancestry). */
   extraLimitations?: ObservationLimitation[];
+  /** Norwegian counterpart of the text fields; omitted for rules that are not yet translated. */
+  nb?: DetectionArgsNb;
 }
 
 export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: DetectionArgs): Detection {
@@ -258,6 +343,10 @@ export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: Detecti
   const tabId = trigger?.tabId;
   const eventIds: string[] = [];
   for (const e of events) if (!eventIds.includes(e.eventId)) eventIds.push(e.eventId);
+  const mv = missingVisibilityBoth(events, ctx.capabilities, a.extraLimitations);
+  const recommendedActions = a.recommendedActions ?? DEFAULT_ACTIONS;
+  const limitations = a.limitations ?? def.limitations;
+  const nb = buildNb(def, a, recommendedActions, limitations, mv.nb);
   return {
     detectionId: newId(),
     timestamp: trigger?.timestamp ?? ctx.now,
@@ -274,15 +363,52 @@ export function buildDetection(def: RuleDefinition, ctx: RuleContext, a: Detecti
     evidence: a.evidence,
     eventIds,
     matchedIndicatorIds: [...new Set(a.matchedIndicatorIds ?? [])],
-    missingVisibility: missingVisibilityFor(events, ctx.capabilities, a.extraLimitations),
+    missingVisibility: mv.en,
     alternativeExplanations: a.alternativeExplanations,
-    recommendedActions: a.recommendedActions ?? DEFAULT_ACTIONS,
-    limitations: a.limitations ?? def.limitations,
+    recommendedActions,
+    limitations,
     references: a.references ?? def.references,
     dedupKey: fnv1a(def.id + "|" + a.subject),
     occurrenceCount: 1,
     subjectHostnames: [...new Set(a.subjectHostnames)],
     ...(tabId !== undefined ? { tabId } : {}),
+    ...(nb ? { nb } : {}),
+  };
+}
+
+/**
+ * Assembles `Detection.nb`. Returns undefined (so `nb` is omitted rather than half-filled) when
+ * the rule gave no Norwegian text, or when an array does not mirror its English twin; the
+ * rule tests assert that translated rules never take that path.
+ */
+function buildNb(
+  def: RuleDefinition,
+  a: DetectionArgs,
+  recommendedActionsEn: readonly string[],
+  limitationsEn: readonly string[],
+  missingVisibilityNb: string[],
+): DetectionTextNb | undefined {
+  const n = a.nb;
+  if (!n) return undefined;
+  const recommendedActions =
+    n.recommendedActions ?? (a.recommendedActions === undefined ? DEFAULT_ACTIONS_NB : undefined);
+  const limitations =
+    n.limitations ?? (a.limitations === undefined ? def.nb?.limitations : undefined);
+  if (!recommendedActions || !limitations) return undefined;
+  if (
+    n.alternativeExplanations.length !== a.alternativeExplanations.length ||
+    recommendedActions.length !== recommendedActionsEn.length ||
+    limitations.length !== limitationsEn.length
+  )
+    return undefined;
+  return {
+    summary: n.summary,
+    significance: n.significance,
+    confidenceRationale: n.confidenceRationale,
+    alternativeExplanations: n.alternativeExplanations,
+    recommendedActions: [...recommendedActions],
+    limitations: [...limitations],
+    missingVisibility: missingVisibilityNb,
   };
 }
 

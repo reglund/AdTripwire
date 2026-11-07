@@ -1,9 +1,28 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH, MDN_URL_CLASSIFICATION } from "./references.js";
 import { buildDetection, hasAnyFlag, isFirstObservation, relatedEvents } from "./common.js";
 import { isNoasContact } from "./noas.js";
 import { lineageRelation } from "./correlation-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Forespørsel klassifisert som fingeravtrykkssporing nær dokumentert annonseinfrastruktur",
+  description:
+    "Firefox klassifiserte en forespørsel som fingeravtrykkssporing i nettleseren, og samme rammehierarki (foretrukket) eller fane kontaktet NOAS/getAd-mønster eller dokumentert infrastruktur innenfor korrelasjonsvinduet.",
+  confidenceBasis:
+    "Lav: Firefox sin liste over fingeravtrykkssporing er bred, og sammenfall i tid i en fane viser ikke at de to henger sammen. Regelen styrker bare andre signaler.",
+  limitations: [
+    "Firefox sin klassifisering er listebasert og gjenspeiler bare forespørselens vert, ikke skriptets oppførsel.",
+  ],
+  falsePositiveConsiderations: [
+    "Mange ordinære annonse- og svindelforebyggende skript er klassifisert som fingeravtrykkssporing.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "profiling.fingerprinting_classified_in_ad_context",
@@ -28,6 +47,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Many mainstream ad and anti-fraud scripts are classified as fingerprinting.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -84,6 +104,19 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Unrelated anti-fraud or analytics fingerprinting on the same page.",
         "Coincidental timing on an ad-heavy page.",
       ],
+      nb: {
+        confidenceRationale: lineage
+          ? "Begge observasjonene er direkte og skjedde i samme rammehierarki, men koblingen mellom dem er utledet bare fra hierarki og tid."
+          : "Begge observasjonene er direkte, men koblingen mellom dem er utledet bare fra fane og tid (ikke samme rammehierarki).",
+        summary:
+          "En forespørsel klassifisert som fingeravtrykkssporing skjedde i samme fane som kontakt med dokumentert infrastruktur for annonseutvelgelse.",
+        significance:
+          "Den dokumenterte operasjonen profilerte enheter før den bestemte om den skulle levere mer kode. Dette sammenfallet styrker, men fastslår ikke, slik profilering.",
+        alternativeExplanations: [
+          "Urelatert fingeravtrykkssporing i nettleseren til svindelforebygging eller analyse på samme side.",
+          "Tilfeldig sammenfall i tid på en side med mye annonser.",
+        ],
+      },
     }),
   ];
 }

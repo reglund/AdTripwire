@@ -1,8 +1,9 @@
 /**
  * Minimal UI localisation. English source strings are the keys; `t()` returns the active
  * language's translation or the English text when none exists, so a missing entry degrades
- * to English instead of breaking the page. Rule content (summaries, significance, actions,
- * evidence sentences) is data from the detection engine and stays English in this phase.
+ * to English instead of breaking the page. Rule content (summaries, significance, actions) is
+ * data from the detection engine: its Norwegian twin is chosen by detection-text.ts; evidence
+ * sentences have no twin and stay English.
  */
 import type { Settings } from "@adtripwire/shared";
 import { NB } from "./i18n.nb.js";

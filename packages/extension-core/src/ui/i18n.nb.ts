@@ -3,7 +3,57 @@
  * observed traffic and documented infrastructure, never "infisert", "spionert på" or "trygg".
  * Placeholders such as {n} must be kept exactly as in the key.
  */
+import {
+  CANNOT_CONCLUDE_EN,
+  CANNOT_CONCLUDE_NB,
+  CAN_CONCLUDE_EN,
+  CAN_CONCLUDE_NB,
+  PROFILE_EXPLANATION_EN,
+  PROFILE_EXPLANATION_NB,
+} from "../handoff-text.js";
+
+/** Sheet checklist and profile explanations: the cover note uses the same Norwegian text. */
+function handoffTextEntries(): Record<string, string> {
+  const out: Record<string, string> = {};
+  CAN_CONCLUDE_EN.forEach((en, i) => (out[en] = CAN_CONCLUDE_NB[i] ?? en));
+  CANNOT_CONCLUDE_EN.forEach((en, i) => (out[en] = CANNOT_CONCLUDE_NB[i] ?? en));
+  out[PROFILE_EXPLANATION_EN.default] = PROFILE_EXPLANATION_NB.default;
+  out[PROFILE_EXPLANATION_EN.strict] = PROFILE_EXPLANATION_NB.strict;
+  return out;
+}
+
 export const NB: Record<string, string> = {
+  "Share with a specialist…": "Del med en spesialist …",
+  "Share with a specialist": "Del med en spesialist",
+  "Counting…": "Teller …",
+  English: "Engelsk",
+  "English and Norwegian": "Engelsk og norsk",
+  "Nothing is created until you press the button at the bottom. The file is saved on this computer; AdTripwire does not send it anywhere.":
+    "Ingenting opprettes før du trykker på knappen nederst. Filen lagres på denne datamaskinen; AdTripwire sender den ikke noe sted.",
+  "What will be included": "Hva som tas med",
+  "What the recipient can conclude": "Hva mottakeren kan slutte",
+  "What the recipient cannot conclude": "Hva mottakeren ikke kan slutte",
+  "Optional note to the recipient": "Valgfritt notat til mottakeren",
+  "Plain text, up to 2000 characters. It goes only into this file as a quoted block and is never saved by AdTripwire. It is not checked or redacted, so leave out anything you do not want the recipient to see.":
+    "Bare tekst, opptil 2000 tegn. Den havner bare i denne filen som en sitert blokk og lagres aldri av AdTripwire. Den kontrolleres eller redigeres ikke, så utelat alt du ikke vil at mottakeren skal se.",
+  "Cover note language": "Språk for følgenotatet",
+  "Download the cover note (.md)": "Last ned følgenotatet (.md)",
+  "Create hand-off package": "Opprett overleveringspakke",
+  "Where to send it": "Hvor du kan sende den",
+  "Access Now Digital Security Helpline": "Access Now Digital Security Helpline",
+  "(free help for people at risk)": "(gratis hjelp til personer i risikogrupper)",
+  "Your organisation's IT security team or CERT":
+    "Organisasjonens IT-sikkerhetsavdeling eller CERT",
+  "Citizen Lab": "Citizen Lab",
+  "These links open in a new tab. Attach the saved file yourself; AdTripwire sends nothing.":
+    "Disse lenkene åpnes i en ny fane. Legg ved den lagrede filen selv; AdTripwire sender ingenting.",
+  "{n} detection(s)": "{n} deteksjon(er)",
+  "{n} supporting event(s)": "{n} støttende hendelse(r)",
+  "{n} Seen-alongside row(s)": "{n} rad(er) under Sett sammen med",
+  "Seen-alongside hostnames are left out by the strict profile.":
+    "Vertsnavnene under Sett sammen med er utelatt av den strenge profilen.",
+  "Period: {from} to {to}": "Tidsrom: {from} til {to}",
+  ...handoffTextEntries(),
   Exposure: "Eksponering",
   "Strong signals need review": "Sterke signaler må gjennomgås",
   "Documented infrastructure contacted": "Dokumentert infrastruktur kontaktet",
@@ -778,4 +828,6 @@ export const NB: Record<string, string> = {
   "Documented host(s)": "Dokumentert(e) vert(er)",
   "{n} day(s)": "{n} dag(er)",
   "{a} of {b} days": "{a} av {b} dager",
+  "Shown in English: stored before Norwegian text existed.":
+    "Vises på engelsk: lagret før norsk tekst fantes.",
 };

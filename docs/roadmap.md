@@ -164,7 +164,12 @@ for the people who wrote the original reports.
 browsers; co-occurrence export reviewed for privacy (hostnames only, sanitised, no paths);
 a documented rule that co-occurrence never changes a detection's severity, with a test.
 
-### Phase 11 — Ask the evidence (explanation that stays honest) · size M
+### Phase 11 — Ask the evidence (explanation that stays honest) · size M · implemented 2026-11-07, unreleased
+
+**Implemented 2026-11-07.** Plan and status: `docs/phase-11-plan.md`. Norwegian text for all 22
+rules (native-reader terminology applied), share-with-a-specialist sheet with cover note, strict
+profile applied to the whole hand-off, Norwegian assist red-team cases. Still English: evidence
+lines and cluster/timeline prose.
 
 **The moment.** You open a detection and press "Explain". A local model, on your machine
 only, writes three sentences in Norwegian about what was observed, what it usually means and

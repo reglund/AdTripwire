@@ -1,16 +1,34 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
-import { buildDetection, classMatches, lowerConfidence } from "./common.js";
+import { CONFIDENCE_NB, buildDetection, classMatches, lowerConfidence } from "./common.js";
 import {
   EXPIRED_LIMITATION,
+  EXPIRED_LIMITATION_NB,
   INFRA_FALSE_POSITIVES,
+  INFRA_FALSE_POSITIVES_NB,
   allExpired,
   INFRA_LIMITATIONS,
+  INFRA_LIMITATIONS_NB,
   contactMatches,
   describeMatch,
   indicatorReferences,
 } from "./known-infra-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Kontakt med dokumentert skadelig infrastruktur",
+  description:
+    "Det ble sendt en forespørsel til et vertsnavn som publisert forskning dokumenterer som kommando-og-kontroll-, validerings- eller utnyttelsesinfrastruktur (C2) for spionprogramvare.",
+  confidenceBasis:
+    "Tilliten arves fra indikatoroppføringen (hvor tydelig forskerne tilskrev infrastrukturen), ett steg lavere når alle treff er utenfor sitt dokumenterte gyldighetsvindu. Det er tillit til tilskrivingen av infrastrukturen, ikke til målrettet angrep eller til at spionprogramvare ble kjørt.",
+  limitations: INFRA_LIMITATIONS_NB,
+  falsePositiveConsiderations: INFRA_FALSE_POSITIVES_NB,
+};
 
 export const definition: RuleDefinition = {
   id: "known_infra.malicious_contact",
@@ -30,6 +48,7 @@ export const definition: RuleDefinition = {
   references: BOTH,
   limitations: INFRA_LIMITATIONS,
   falsePositiveConsiderations: INFRA_FALSE_POSITIVES,
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -67,6 +86,24 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Export the evidence and consult a digital-security helpline if you believe you may be a target.",
       ],
       references: indicatorReferences(matches, definition.references),
+      nb: {
+        ...(expired ? { limitations: [...NB.limitations, EXPIRED_LIMITATION_NB] } : {}),
+        confidenceRationale: `Indikator ${top.indicator.id} er vurdert til ${CONFIDENCE_NB[top.indicator.confidence]} tillit av kilden${expired ? ", satt ett steg lavere her fordi den er utenfor sitt dokumenterte gyldighetsvindu" : ""}. Tilskriving av infrastruktur er ikke det samme som målrettet angrep: dette viser bare at målet var dokumentert som skadelig infrastruktur, ikke at noe ble levert til eller kjørt på denne enheten.`,
+        summary:
+          "Observert trafikk til infrastruktur som publisert forskning dokumenterer som knyttet til spionprogramvare.",
+        significance:
+          "Forskere har dokumentert denne infrastrukturen som del av en leverings- eller kontrollkjede for spionprogramvare. Én enkelt kontakt kan ha uskyldige årsaker, men bør gjennomgås sammen med annen aktivitet rundt.",
+        alternativeExplanations: [
+          "Domenet kan ha blitt registrert på nytt eller tatt i bruk til noe annet etter at det ble dokumentert.",
+          "En lenkeforhåndsvisning, en sikkerhetsskanner eller en annen utvidelse kan ha forårsaket forespørselen.",
+          "Du kan ha åpnet en lenke til domenet mens du leste om forskningen.",
+        ],
+        recommendedActions: [
+          "Noter tidspunktet og siden du var på da dette skjedde.",
+          "Se om andre oppdagelser i samme fane skjedde omtrent samtidig.",
+          "Eksporter bevisene og ta kontakt med en hjelpetjeneste for digital sikkerhet hvis du tror du kan være et mål.",
+        ],
+      },
     }),
   ];
 }

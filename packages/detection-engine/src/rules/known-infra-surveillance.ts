@@ -1,16 +1,37 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
-import { buildDetection, classMatches, lowerConfidence } from "./common.js";
+import { CONFIDENCE_NB, buildDetection, classMatches, lowerConfidence } from "./common.js";
 import {
   EXPIRED_LIMITATION,
+  EXPIRED_LIMITATION_NB,
   INFRA_FALSE_POSITIVES,
+  INFRA_FALSE_POSITIVES_NB,
   allExpired,
   INFRA_LIMITATIONS,
+  INFRA_LIMITATIONS_NB,
   contactMatches,
   describeMatch,
   indicatorReferences,
 } from "./known-infra-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Kontakt med dokumentert annonseinfrastruktur knyttet til overvåkingsoperasjonen",
+  description:
+    "Det ble sendt en forespørsel til annonse- eller sporingsinfrastruktur som publisert forskning knytter til AdFection-operasjonen. Kontakt med server for annonsevalg (NOAS) vurderes høyere enn kontakt med sporingsverter.",
+  confidenceBasis:
+    "Tilliten arves fra indikatoroppføringen (ett steg lavere når alle treff er utenfor sitt dokumenterte gyldighetsvindu) og gjelder bare tilskrivingen av infrastrukturen. Utløpte indikatorer løfter aldri alvorlighetsgraden over «mistenkelig». Kontakt med denne typen infrastruktur er vanlig eksponering og et svakt bevis for målrettet angrep.",
+  limitations: INFRA_LIMITATIONS_NB,
+  falsePositiveConsiderations: [
+    ...INFRA_FALSE_POSITIVES_NB,
+    "Verter for ID-synkronisering via informasjonskapsler og sporing av annonsevisninger kontaktes i svært stor skala under vanlig surfing.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "known_infra.surveillance_contact",
@@ -33,6 +54,7 @@ export const definition: RuleDefinition = {
     ...INFRA_FALSE_POSITIVES,
     "Cookie-sync and impression-tracking hosts are contacted at very large scale during ordinary browsing.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -57,6 +79,16 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
     : isTracking
       ? "This is very common exposure: documented tracking hosts are contacted at very large scale by ordinary ad traffic. It is not evidence of targeting on its own."
       : "This infrastructure was documented as part of the operator's ad-delivery footprint. Contact alone is exposure, not evidence of targeting.";
+  const summaryNb = isNoas
+    ? "Observert trafikk til en server for annonsevalg (NOAS/getAd) som er dokumentert i AdFection-undersøkelsen."
+    : isTracking
+      ? "Observert trafikk til annonsesporingsinfrastruktur som er dokumentert i AdFection-undersøkelsen. Dette er svært vanlig eksponering."
+      : "Observert trafikk til infrastruktur som er dokumentert i AdFection-undersøkelsen.";
+  const significanceNb = isNoas
+    ? "De dokumenterte serverne for annonsevalg avgjør per enhet om de skal returnere noe. Kontakt viser eksponering mot infrastrukturen for annonsevalg, ikke at denne enheten ble valgt ut."
+    : isTracking
+      ? "Dette er svært vanlig eksponering: dokumenterte sporingsverter kontaktes i svært stor skala av vanlig annonsetrafikk. Det er ikke i seg selv bevis på målretting."
+      : "Denne infrastrukturen er dokumentert som en del av operatørens annonseleveranse. Kontakt alene er eksponering, ikke bevis på målretting.";
   return [
     buildDetection(definition, ctx, {
       subject: host,
@@ -83,6 +115,20 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Look for follow-on detections (JavaScript responses, hidden frames, or malicious infrastructure) in the same tab.",
       ],
       references: indicatorReferences(matches, definition.references),
+      nb: {
+        ...(expired ? { limitations: [...NB.limitations, EXPIRED_LIMITATION_NB] } : {}),
+        confidenceRationale: `Indikator ${top.indicator.id} er vurdert til ${CONFIDENCE_NB[top.indicator.confidence]} tillit av kilden${expired ? ", satt ett steg lavere her fordi den er utenfor sitt dokumenterte gyldighetsvindu" : ""}. Det er tillit til tilskrivingen av infrastrukturen; som bevis på målrettet angrep har denne kontakten lav tillit${isTracking ? " (svært vanlig eksponering)" : ""}.`,
+        summary: summaryNb,
+        significance: significanceNb,
+        alternativeExplanations: [
+          "Vanlig programmatisk annonsering sender forespørsler gjennom mange mellomledd, deriblant dette.",
+          "Siden du besøkte kan rett og slett ha inneholdt en annonse levert gjennom dette nettverket.",
+        ],
+        recommendedActions: [
+          "Vurder en annonse- eller sporingsblokkerer for å redusere eksponeringen mot annonseinfrastruktur.",
+          "Se etter oppfølgende oppdagelser (JavaScript-svar, skjulte rammer eller skadelig infrastruktur) i samme fane.",
+        ],
+      },
     }),
   ];
 }

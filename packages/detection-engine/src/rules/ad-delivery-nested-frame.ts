@@ -1,8 +1,27 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { RULE_VERSION, buildDetection, isFirstObservation } from "./common.js";
 import { describeMatch } from "./known-infra-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Innebygd ramme som laster dokumentert infrastruktur",
+  description:
+    "En iframe inne på siden (rammedybde 1 eller mer) lastet et dokument fra en vert som er dokumentert som skadelig eller overvåkingsrelatert infrastruktur, som i det dokumenterte leveringstrinnet med skjult iframe.",
+  confidenceBasis:
+    "Middels: indikatortreffet er direkte, og konteksten med innebygd ramme samsvarer med det dokumenterte leveringstrinnet, men rammens formål og innhold er ikke observert.",
+  limitations: [
+    "Størrelsen på og synligheten til en ramme kan ikke observeres fra nettverksmetadata.",
+  ],
+  falsePositiveConsiderations: [
+    "Annonsenettverk viser rutinemessig annonsemateriell i iframes, også på dokumenterte annonseteknologiverter.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "ad_delivery.nested_frame_to_indicator",
@@ -24,6 +43,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Ad networks routinely render creatives inside iframes, including on documented ad-tech hosts.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -64,6 +84,15 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
       alternativeExplanations: [
         "An ordinary ad creative rendered in an iframe served by this network.",
       ],
+      nb: {
+        confidenceRationale:
+          "Indikatortreffet og konteksten med innebygd ramme er observert direkte; rammens synlighet og innhold er ikke observert.",
+        summary:
+          "En innebygd ramme lastet innhold fra infrastruktur som er dokumentert i AdFection-undersøkelsen.",
+        significance:
+          "Den dokumenterte leveringskjeden setter inn små rammer som laster mer innhold fra operatørens infrastruktur.",
+        alternativeExplanations: ["Vanlig annonsemateriell vist i en iframe fra dette nettverket."],
+      },
     }),
   ];
 }

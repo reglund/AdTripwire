@@ -17,6 +17,16 @@ export const definition = jsDefinition({
   falsePositiveConsiderations: [
     "Tracking pixels, ad-verification and consent tools commonly use invisible 1x1 iframes.",
   ],
+  nb: {
+    name: "Skript lager en 1x1-iframe",
+    description:
+      "Et inspisert skript lager en iframe og bruker dimensjoner på 1x1 piksel, den skjulte rammeinnsettingen som er dokumentert for enheter som ble valgt ut.",
+    confidenceBasis:
+      "Lav med bare oppretting av iframe og 1x1-størrelse; middels når skriptet også setter inn flere skriptelementer, som dokumentert.",
+    falsePositiveConsiderations: [
+      "Sporingspiksler, annonseverifisering og samtykkeverktøy bruker ofte usynlige 1x1-iframes.",
+    ],
+  },
 });
 
 export const rule = makeJsRule(definition, {
@@ -32,5 +42,19 @@ export const rule = makeJsRule(definition, {
     "An ordinary tracking pixel or ad-verification frame.",
     "A consent-management or analytics helper frame.",
   ],
+  nb: {
+    summary: () =>
+      "Et inspisert skript lager en 1x1-iframe, en teknikk som brukes for å laste skjult innhold.",
+    significance:
+      "I den dokumenterte kjeden satte kode som ble returnert til enheter som ble valgt ut inn en 1x1-iframe som lastet neste trinn.",
+    confidenceRationale: (o) =>
+      o.confidence === "medium"
+        ? "Oppretting av iframe, 1x1-størrelse og dynamisk innsetting av skript forekommer alle, i samsvar med den dokumenterte injiserte koden."
+        : "Oppretting av iframe med 1x1-størrelse er også vanlig i ordinær annonsesporing.",
+    alternativeExplanations: [
+      "En vanlig sporingspiksel eller annonseverifiserings-frame.",
+      "En hjelperamme for samtykkehåndtering eller analyse.",
+    ],
+  },
 });
 export const evaluate = rule.evaluate;

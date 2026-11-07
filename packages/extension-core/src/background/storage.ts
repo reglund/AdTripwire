@@ -6,7 +6,7 @@ import type {
   RetentionSettings,
   Settings,
 } from "@adtripwire/shared";
-import { DEFAULT_SETTINGS } from "@adtripwire/shared";
+import { DEFAULT_SETTINGS, withSanitizedNb } from "@adtripwire/shared";
 import { validateIndicatorSet } from "@adtripwire/indicators";
 import { MAX_DAY_ENTRIES, emptyDay, isDateKey, normaliseDay, sanitiseDay } from "./daily.js";
 
@@ -127,7 +127,7 @@ export class LocalStore {
     );
     this.settings = mergeSettings(data[KEY_SETTINGS]);
     this.detections = Array.isArray(data[KEY_DETECTIONS])
-      ? (data[KEY_DETECTIONS] as Detection[])
+      ? (data[KEY_DETECTIONS] as Detection[]).map(withSanitizedNb)
       : [];
     const evs = Array.isArray(data[KEY_EVENTS]) ? (data[KEY_EVENTS] as NormalizedEvent[]) : [];
     this.events = new Map(evs.map((e) => [e.eventId, e]));

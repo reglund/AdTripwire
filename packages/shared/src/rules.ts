@@ -2,6 +2,15 @@ import type { Confidence } from "./indicators.js";
 import type { DetectionCategory, Severity } from "./detections.js";
 import type { SensorCapability } from "./capabilities.js";
 
+/** Norwegian (bokmål) counterparts of the RuleDefinition text fields. */
+export interface RuleDefinitionNb {
+  name: string;
+  description: string;
+  confidenceBasis: string;
+  limitations: string[];
+  falsePositiveConsiderations: string[];
+}
+
 /** Static, documentation-grade metadata every rule must declare. */
 export interface RuleDefinition {
   id: string;
@@ -20,4 +29,5 @@ export interface RuleDefinition {
   references: Array<{ title: string; url: string }>;
   limitations: string[];
   falsePositiveConsiderations: string[];
+  nb?: RuleDefinitionNb;
 }

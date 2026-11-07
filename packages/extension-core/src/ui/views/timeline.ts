@@ -1,7 +1,7 @@
 import type { TimelineEntry } from "@adtripwire/shared";
 import { errorState, h, loadingState, replaceChildren, severityBadge } from "../dom.js";
 import { formatTimestamp, severityLabel } from "../format.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
 import { detectionHash } from "../route.js";
 import { rpc } from "../rpc.js";
 import {
@@ -19,10 +19,14 @@ import { uid, tableWrap, type View } from "./common.js";
 const COLUMNS = ["Time", "Kind", "Severity", "Rule", "Summary", "Hostname", "Frame"];
 
 function entryRow(entry: TimelineEntry): HTMLElement {
+  const text =
+    currentLanguage() === "nb" && entry.kind === "detection" && entry.summaryNb
+      ? entry.summaryNb
+      : entry.summary;
   const summary =
     entry.kind === "detection" && entry.detectionId !== undefined
-      ? h("a", { href: detectionHash(entry.detectionId) }, entry.summary)
-      : entry.summary;
+      ? h("a", { href: detectionHash(entry.detectionId) }, text)
+      : text;
   return h(
     "tr",
     null,

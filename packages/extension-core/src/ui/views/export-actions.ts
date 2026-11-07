@@ -4,6 +4,7 @@ import { isExportFile, safeFilename } from "../exports.js";
 import { t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { profileSelect, uid } from "./common.js";
+import { shareSheet } from "./share-sheet.js";
 
 export const HANDOFF_EXPLANATION =
   "A hand-off package is a single JSON file with the evidence, a STIX bundle, your notes and a plain-language README for a helpline or analyst.";
@@ -59,7 +60,6 @@ export function exportGroup(opts: {
     });
   };
 
-  const handoffId = uid("handoff-help");
   const evidence = action(t("Evidence JSON (default / strict)"), async () => {
     const p = profile.value();
     const data = await rpc<unknown>({ type: "export_evidence", profile: p, ...scope });
@@ -81,22 +81,13 @@ export function exportGroup(opts: {
   const siem = action(t("SIEM NDJSON (ECS)"), () =>
     saveFile({ type: "export_siem", ...scope }, "adtripwire-siem.ndjson"),
   );
-  const handoff = action(
-    t("Hand-off package"),
-    () =>
-      saveFile(
-        { type: "export_handoff", ...scope, profile: profile.value() },
-        "adtripwire-handoff.json",
-      ),
-    handoffId,
-  );
-
   return h(
     "div",
     { class: "export-controls", role: "group", "aria-label": t("Export") },
     profile.el,
-    h("div", { class: "button-row" }, evidence, stix, siem, handoff),
-    h("p", { id: handoffId, class: "muted small" }, t(HANDOFF_EXPLANATION)),
+    h("div", { class: "button-row" }, evidence, stix, siem),
+    h("p", { class: "muted small" }, t(HANDOFF_EXPLANATION)),
+    shareSheet({ ...scope, initialProfile: profile.value() }),
     status,
   );
 }

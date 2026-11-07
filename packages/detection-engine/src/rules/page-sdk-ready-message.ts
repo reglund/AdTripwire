@@ -1,8 +1,34 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { buildDetection } from "./common.js";
-import { PAGE_LIMITATIONS, isSubFrame, pageSignalOf, signalFrameHost } from "./page-common.js";
+import {
+  PAGE_LIMITATIONS,
+  PAGE_LIMITATIONS_NB,
+  isSubFrame,
+  pageSignalOf,
+  signalFrameHost,
+} from "./page-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Melding mellom vinduer med den dokumenterte SDK-ready-typen",
+  description:
+    "Nettsidesensoren (valgfri) observerte en melding mellom vinduer med typen «analytics_sdk_ready», strengen som er spesifikk for den dokumenterte AdFection-leverings-SDK-en, i en underramme. Generelle typede meldinger (postmessage_wildcard_like) gir ingen oppdagelse; de blir liggende i korrelasjonsvinduet bare som støtte.",
+  confidenceBasis:
+    "Høy for SDK-ready-typen i en underramme: strengen er spesifikk for den dokumenterte SDK-en, og meldingen ble observert direkte i stedet for utledet fra skripttekst. Middels i toppdokumentet (den dokumenterte SDK-en kjørte i annonserammer); lav for en melding fra samme opprinnelse.",
+  limitations: [
+    ...PAGE_LIMITATIONS_NB,
+    "Bare meldingstypen kontrolleres; meldingens opprinnelse, mål og innhold lagres ikke.",
+  ],
+  falsePositiveConsiderations: [
+    "En side som omtaler eller gjengir den dokumenterte SDK-en kan sende den samme meldingstypen.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "page.sdk_ready_message",
@@ -27,6 +53,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "A page that discusses or replays the documented SDK could post the same message type.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -63,6 +90,19 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         recommendedActions: [
           "No action is needed unless other detections occurred in the same frame.",
         ],
+        nb: {
+          confidenceRationale:
+            "Meldingen kom fra rammens egen opprinnelse og ikke fra en annen ramme, i motsetning til den dokumenterte SDK-kunngjøringen mellom rammer.",
+          summary: `En ramme på ${host} sendte en melding fra samme opprinnelse med typen «analytics_sdk_ready» som er dokumentert for AdFection-leverings-SDK-en.`,
+          significance:
+            "Den dokumenterte SDK-en meldte at den var klar til rammen som bygde den inn, på tvers av opprinnelser. En melding fra samme opprinnelse med denne typen registreres bare som kontekst.",
+          alternativeExplanations: [
+            "En side eller testrigg som gjenbruker den dokumenterte meldingstypen innenfor sin egen opprinnelse.",
+          ],
+          recommendedActions: [
+            "Ingen tiltak er nødvendig med mindre andre oppdagelser skjedde i samme ramme.",
+          ],
+        },
       }),
     ];
   }
@@ -95,6 +135,22 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Look for NOAS/getAd requests, inserted frames or contact with documented infrastructure in the same tab.",
         "Export the evidence bundle before clearing browser data.",
       ],
+      nb: {
+        confidenceRationale: sub
+          ? "Meldingstypen er en streng som er spesifikk for den dokumenterte SDK-en, og den ble observert direkte i en underramme. Det slår fast at SDK-meldingen ble sendt, ikke hva SDK-en gjorde etterpå."
+          : "Meldingstypen er spesifikk for den dokumenterte SDK-en, men ble observert i toppnivådokumentet, mens den dokumenterte SDK-en kjørte i annonserammer.",
+        summary: `En ramme på ${host} utvekslet en melding mellom vinduer med typen «analytics_sdk_ready» som er dokumentert for AdFection-leverings-SDK-en.`,
+        significance:
+          "I den dokumenterte kjeden meldte leverings-SDK-en at den var klar med denne meldingen før den lastet mer kode. At den observeres, kan tyde på at SDK-en, eller noe som etterligner den, kjørte i denne rammen; det viser ikke at noe mer ble levert.",
+        alternativeExplanations: [
+          "En forsknings- eller testside som gjenskaper den dokumenterte SDK-meldingen.",
+          "Et annet skript som tilfeldigvis bruker den samme meldingstypen.",
+        ],
+        recommendedActions: [
+          "Se etter NOAS/getAd-forespørsler, innsatte rammer eller kontakt med dokumentert infrastruktur i samme fane.",
+          "Eksporter bevispakken før du tømmer nettleserdata.",
+        ],
+      },
     }),
   ];
 }

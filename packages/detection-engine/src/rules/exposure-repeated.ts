@@ -1,9 +1,28 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { RULE_VERSION, buildDetection, dayKeyUtc, isFirstObservation } from "./common.js";
 
 export const REPEATED_EXPOSURE_MIN_DAYS = 3;
+
+const NB: RuleDefinitionNb = {
+  name: "Gjentatt kontakt med infrastruktur knyttet til overvåkingsoperasjonen",
+  description: `En vert klassifisert som overvåkingsrelatert ble kontaktet på ${REPEATED_EXPOSURE_MIN_DAYS} eller flere ulike dager. Dette måler eksponering over tid og holdes atskilt fra målrettet levering.`,
+  confidenceBasis:
+    "Middels tillit til at gjentatt kontakt fant sted (tellingene er direkte); det sier ikke noe om målretting, og gjentatt kontakt kan være vanlig annonseadferd.",
+  limitations: [
+    "Dagtellinger lagres per vertsnavn bare lokalt og nullstilles hvis lagringen tømmes.",
+    "Aktivitet i privat nettlesing kan være utelatt.",
+  ],
+  falsePositiveConsiderations: [
+    "Annonsenettverk når de fleste brukere gjentatte ganger; gjentatt eksponering er forventet for mye brukt annonseinfrastruktur.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "exposure.repeated_surveillance_contact",
@@ -27,6 +46,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Ad networks reach most users repeatedly; repeated exposure is expected for widely used ad infrastructure.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -70,6 +90,21 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Consider an ad or tracker blocker to reduce exposure.",
         "No other action is needed unless stronger detections appear.",
       ],
+      nb: {
+        confidenceRationale:
+          "Antall ulike kontaktdager ble talt direkte; dette måler eksponering, ikke målretting.",
+        summary: `Observert gjentatt kontakt med infrastruktur som er dokumentert i AdFection-undersøkelsen, på ${days} ulike dager. Gjentatt kontakt kan være vanlig annonseadferd.`,
+        significance:
+          "Gjentatt eksponering kan skyldes vanlig annonselevering, profilering fra operatørens annonsenettverk, eller begge deler. Det er ikke bevis på et målrettet angrep.",
+        alternativeExplanations: [
+          "Vanlig gjentatt annonselevering fra et mye brukt nettverk.",
+          "Et nettsted du besøker ofte bruker dette annonsenettverket.",
+        ],
+        recommendedActions: [
+          "Vurder en annonse- eller sporingsblokkerer for å redusere eksponeringen.",
+          "Ingen andre tiltak er nødvendig med mindre sterkere oppdagelser dukker opp.",
+        ],
+      },
     }),
   ];
 }

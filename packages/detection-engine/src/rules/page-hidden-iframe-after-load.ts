@@ -1,16 +1,36 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { buildDetection } from "./common.js";
 import { linkEvidence } from "./correlation-common.js";
 import {
   PAGE_FALSE_POSITIVES,
+  PAGE_FALSE_POSITIVES_NB,
   PAGE_LIMITATIONS,
+  PAGE_LIMITATIONS_NB,
   lineageNoasContact,
   pageSignalOf,
   signalFrameHost,
   timing,
 } from "./page-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Skjult iframe fra annen opprinnelse satt inn etter innlasting",
+  description:
+    "Nettsidesensoren (valgfri) observerte en skjult (høyst 2x2 px eller display:none) iframe fra en annen opprinnelse som ble satt inn etter at rammen var lastet. Etter en forespørsel med NOAS/getAd-mønster i samme rammehierarki er dette den observerte formen av innlastingsrammen som responsinspeksjon bare kan utlede.",
+  confidenceBasis:
+    "Lav alene: usynlige rammer for måling og synkronisering er vanlige. Middels med NOAS-kontakt i samme rammehierarki, fordi innsettingen er observert direkte og samsvarer med det dokumenterte innlastingstrinnet; koblingen til forespørselen er fortsatt utledet fra hierarki og tid.",
+  limitations: PAGE_LIMITATIONS_NB,
+  falsePositiveConsiderations: [
+    ...PAGE_FALSE_POSITIVES_NB,
+    "Rammer for ID-synkronisering via informasjonskapsler og synlighetsmåling er skjulte rammer fra andre opprinnelser av design.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "page.hidden_iframe_after_load",
@@ -34,6 +54,7 @@ export const definition: RuleDefinition = {
     ...PAGE_FALSE_POSITIVES,
     "Cookie-sync and viewability frames are hidden cross-origin frames by design.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -91,6 +112,20 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "A viewability, verification or cookie-sync frame inserted by an ordinary ad.",
         "A consent or login helper frame.",
       ],
+      nb: {
+        confidenceRationale: noas
+          ? "Innsettingen av den skjulte rammen ble observert direkte og fulgte en forespørsel om annonseutvelgelse i samme rammehierarki; koblingen mellom de to er utledet fra hierarki og tid."
+          : "En skjult ramme fra en annen opprinnelse ble observert, men ingen forespørsel om annonseutvelgelse gikk foran den i samme rammehierarki, og slike rammer er vanlige i vanlig annonsering.",
+        summary: noas
+          ? "En forespørsel om annonseutvelgelse ble i samme rammehierarki fulgt av innsetting av en skjult iframe fra en annen opprinnelse."
+          : "En skjult iframe fra en annen opprinnelse ble satt inn etter innlasting.",
+        significance:
+          "I den dokumenterte kjeden fikk enheter som ble valgt ut kode som satte inn en 1x1-ramme for å laste neste trinn. En skjult ramme alene er vanlig; sammen med en foregående forespørsel om annonseutvelgelse samsvarer den med dette trinnet.",
+        alternativeExplanations: [
+          "En ramme for synlighetsmåling, verifisering eller ID-synkronisering via informasjonskapsler satt inn av en vanlig annonse.",
+          "En hjelperamme for samtykke eller pålogging.",
+        ],
+      },
     }),
   ];
 }

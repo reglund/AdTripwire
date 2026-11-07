@@ -163,6 +163,9 @@ export function redactDetection(
   options?: Partial<RedactOptions>,
 ): Detection {
   const copy = structuredClone(d);
+  // Exports are English-only: the Norwegian display text is never exported, and under the strict
+  // profile it would carry hostnames that were not pseudonymised.
+  delete copy.nb;
   const opts = profile === "strict" ? requireStrictOptions(options) : null;
 
   let transform: (s: string) => string = scrubText;

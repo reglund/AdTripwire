@@ -17,6 +17,16 @@ export const definition = jsDefinition({
   falsePositiveConsiderations: [
     "Error-monitoring libraries and anti-piracy scripts use similar traps.",
   ],
+  nb: {
+    name: "Feilsporing med Error.stack-getter som felle mot feilsøking",
+    description:
+      "Et inspisert skript definerer en getter på en stack-egenskap i Error, den dokumenterte fellen mot feilsøking. Alene er det informasjonsnivå; sammen med tilsløringsmarkører er det mistenkelig.",
+    confidenceBasis:
+      "Lav: stack-gettere brukes også av kode for feilrapportering og for å oppdage utviklerverktøy; at tilsløring forekommer sammen med den, hever alvorlighetsgraden, ikke tilliten.",
+    falsePositiveConsiderations: [
+      "Biblioteker for feilovervåking og skript mot piratkopiering bruker lignende feller.",
+    ],
+  },
 });
 
 export const rule = makeJsRule(definition, {
@@ -32,5 +42,19 @@ export const rule = makeJsRule(definition, {
     "Error-reporting or devtools-detection code in ordinary sites.",
     "Anti-piracy protection on media players.",
   ],
+  nb: {
+    summary: (o) =>
+      o.severity === "suspicious"
+        ? "Et inspisert, tilslørt skript inneholder en felle mot feilsøking."
+        : "Et inspisert skript inneholder et mønster som brukes som felle mot feilsøking.",
+    significance:
+      "Den dokumenterte koden brukte en Error.stack-getter for å oppdage åpne utviklerverktøy. Dette er et svakt signal alene.",
+    confidenceRationale: () =>
+      "Stack-getter-feller har vanlige bruksområder; dette er én enkelt teknikk, ikke en kombinasjon.",
+    alternativeExplanations: [
+      "Kode for feilrapportering eller oppdagelse av utviklerverktøy på vanlige nettsteder.",
+      "Beskyttelse mot piratkopiering i mediespillere.",
+    ],
+  },
 });
 export const evaluate = rule.evaluate;

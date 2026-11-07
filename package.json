@@ -23,6 +23,7 @@
     "indicators:validate": "node scripts/validate-indicators.mjs",
     "audit": "pnpm audit --prod",
     "docs:rules": "esbuild scripts/dump-rules.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/dump-rules.mjs --log-level=warning --alias:@adtripwire/detection-engine=./packages/detection-engine/src/index.ts --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts --alias:@adtripwire/privacy=./packages/privacy/src/index.ts && node node_modules/.cache/adtripwire/dump-rules.mjs",
+    "nb:review": "esbuild scripts/nb-review.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/adtripwire/nb-review.mjs --log-level=warning --alias:@adtripwire/detection-engine=./packages/detection-engine/src/index.ts --alias:@adtripwire/shared=./packages/shared/src/index.ts --alias:@adtripwire/indicators=./packages/indicators/src/index.ts --alias:@adtripwire/privacy=./packages/privacy/src/index.ts && node node_modules/.cache/adtripwire/nb-review.mjs && prettier --write docs/phase-11-nb-review.md",
     "e2e:firefox": "node scripts/e2e-firefox.mjs",
     "eval:benign": "node scripts/benign-eval.mjs",
     "e2e:chromium": "node scripts/e2e-chromium.mjs",

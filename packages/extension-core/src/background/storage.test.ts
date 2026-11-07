@@ -90,6 +90,38 @@ describe("LocalStore", () => {
     expect(s2.getEvents(["e1", "missing"]).length).toBe(1);
   });
 
+  it("round-trips detections with and without nb, and drops a malformed nb but keeps the detection", async () => {
+    const nb = {
+      summary: "Observert trafikk.",
+      significance: "s",
+      confidenceRationale: "c",
+      alternativeExplanations: ["a"],
+      recommendedActions: ["r"],
+      limitations: ["l"],
+      missingVisibility: ["m"],
+    };
+    const s = new LocalStore();
+    await s.load();
+    s.addDetection({ ...det("with", 1000, []), nb }, []);
+    s.addDetection(det("without", 1001, []), []);
+    const bad = { ...det("bad", 1002, []), nb: { ...nb, summary: 42 } } as unknown as Detection;
+    const long = { ...det("long", 1003, []), nb: { ...nb, limitations: ["x".repeat(5000)] } };
+    const partial = { ...det("partial", 1004, []), nb: { summary: "x" } } as unknown as Detection;
+    s.addDetection(bad, []);
+    s.addDetection(long, []);
+    s.addDetection(partial, []);
+    await s.flush();
+    const s2 = new LocalStore();
+    await s2.load();
+    const by = (id: string) => s2.getDetection(id)!;
+    expect(by("with").nb).toEqual(nb);
+    expect("nb" in by("without")).toBe(false);
+    for (const id of ["bad", "long", "partial"]) {
+      expect(by(id)).toBeDefined();
+      expect("nb" in by(id)).toBe(false);
+    }
+  });
+
   it("applies retention by age, count, and removes orphaned events", async () => {
     const s = new LocalStore();
     await s.load();

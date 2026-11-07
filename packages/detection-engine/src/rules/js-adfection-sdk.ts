@@ -17,6 +17,16 @@ export const definition = jsDefinition({
   falsePositiveConsiderations: [
     "Security research pages and indicator feeds may quote these strings.",
   ],
+  nb: {
+    name: "Strenger som er spesifikke for den dokumenterte AdFection-SDK-en",
+    description:
+      "Et inspisert skript inneholder minst to strenger som er spesifikke for SDK-en Confiant har dokumentert (SDK_AUTH/remainingRequests, analytics_sdk_ready, script_tok=, getAdScript).",
+    confidenceBasis:
+      "Høy: at to eller flere særegne strenger fra den dokumenterte SDK-en forekommer sammen, er lite sannsynlig som tilfeldighet. Dette er tillit til at koden ligner, ikke til målrettet angrep.",
+    falsePositiveConsiderations: [
+      "Sider med sikkerhetsforskning og indikatorfeeder kan sitere disse strengene.",
+    ],
+  },
 });
 
 export const rule = makeJsRule(definition, {
@@ -30,5 +40,17 @@ export const rule = makeJsRule(definition, {
     "A research write-up, test page or indicator feed quoting the strings.",
     "Unrelated code that happens to reuse the same names.",
   ],
+  nb: {
+    summary: (o) =>
+      `Et inspisert skript inneholder ${o.matched.length} strenger som er spesifikke for SDK-en Confiant har dokumentert.`,
+    significance:
+      "Disse strengene forekommer i leverings-SDK-en som er dokumentert i AdFection-undersøkelsen. At de finnes, kan tyde på nært beslektet kode; det viser ikke hva koden gjorde på denne enheten.",
+    confidenceRationale: (o) =>
+      `Samsvar med ${o.matched.join(", ")}; disse strengene er særegne for den dokumenterte SDK-en. At koden ligner, er ikke bevis for målretting.`,
+    alternativeExplanations: [
+      "En forskningsartikkel, testside eller indikatorfeed som siterer strengene.",
+      "Urelatert kode som tilfeldigvis bruker de samme navnene.",
+    ],
+  },
 });
 export const evaluate = rule.evaluate;

@@ -10,8 +10,10 @@ import {
   relativeTime,
   severityLabel,
 } from "../format.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
+import { anyFallback, detectionSummary, ruleNameMap } from "../detection-text.js";
 import { detectionHash } from "../route.js";
+import { rpc } from "../rpc.js";
 
 export interface ViewContext {
   /** Re-render the current route from scratch (re-fetching data). */
@@ -85,8 +87,28 @@ export function newestFirst(detections: readonly Detection[]): Detection[] {
   return [...detections].sort((a, b) => b.timestamp - a.timestamp);
 }
 
+/** One-line note for nb mode: some or all shown text predates Norwegian detection text. */
+export function englishFallbackNote(): HTMLElement {
+  return h(
+    "p",
+    { class: "muted small" },
+    t("Shown in English: stored before Norwegian text existed."),
+  );
+}
+
+/** ruleId -> display name for the current language; empty (stored English names) outside nb. */
+export async function loadRuleNames(): Promise<Map<string, string>> {
+  if (currentLanguage() !== "nb") return new Map();
+  try {
+    return ruleNameMap(await rpc<Parameters<typeof ruleNameMap>[0]>({ type: "list_rules" }), "nb");
+  } catch {
+    return new Map();
+  }
+}
+
 /** Detection list table. Each summary is a real link so rows are keyboard reachable. */
 export function detectionsTable(detections: readonly Detection[], caption: string): HTMLElement {
+  const lang = currentLanguage();
   const head = h(
     "tr",
     null,
@@ -113,7 +135,7 @@ export function detectionsTable(detections: readonly Detection[], caption: strin
       h(
         "td",
         null,
-        h("a", { href: detectionHash(d.detectionId) }, d.summary),
+        h("a", { href: detectionHash(d.detectionId) }, detectionSummary(d, lang)),
         d.occurrenceCount > 1
           ? h("span", { class: "muted" }, ` ${t("(seen {n} times)", { n: d.occurrenceCount })}`)
           : null,
@@ -121,7 +143,7 @@ export function detectionsTable(detections: readonly Detection[], caption: strin
       h("td", { class: "mono" }, formatHostnames(d.subjectHostnames)),
     );
   });
-  return tableWrap(
+  const table = tableWrap(
     caption,
     h(
       "table",
@@ -131,6 +153,7 @@ export function detectionsTable(detections: readonly Detection[], caption: strin
       h("tbody", null, rows),
     ),
   );
+  return anyFallback(detections, lang) ? h("div", null, table, englishFallbackNote()) : table;
 }
 
 /** Redaction profile chooser shared by the detection and settings exports. */

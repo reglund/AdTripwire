@@ -1,4 +1,9 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { identifierParams } from "../params.js";
@@ -9,6 +14,21 @@ import {
   isFirstObservation,
   isThirdParty,
 } from "./common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Tredjepartsforespørsel med parametere i identifikatorstil",
+  description:
+    "En tredjepartsforespørsel hadde tre eller flere parameternavn i identifikatorkategorier (enhets-ID-er, nettverksidentitet, posisjon, enhetsprofil, kontakt) eller et parameternavn som tyder på innhold fra informasjonskapsler. Bare navn undersøkes; verdier lagres aldri.",
+  confidenceBasis:
+    "Lav: parameternavn viser hva en forespørsel er merket som å inneholde, ikke hva den faktisk inneholder. Hevet til «mistenkelig» bare når navn som tyder på innhold fra informasjonskapsler forekommer i en forespørsel Firefox klassifiserer som annonsering.",
+  limitations: [
+    "Parameternavn er ikke standardiserte; de samme navnene brukes til urelaterte formål.",
+    "Parameterverdier undersøkes og lagres bevisst aldri.",
+  ],
+  falsePositiveConsiderations: [
+    "Vanlige annonse- og analyseforespørsler har rutinemessig parametere for enhet og posisjon.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "profiling.identifier_rich_request",
@@ -34,6 +54,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Ordinary ad and analytics requests routinely carry device and location parameters.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -70,6 +91,20 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Ordinary ad targeting or analytics parameters.",
         "A parameter name coincides with an identifier label but carries something else.",
       ],
+      nb: {
+        confidenceRationale: escalate
+          ? "Et parameternavn som tyder på innhold fra informasjonskapsler forekom i en forespørsel Firefox klassifiserer som annonsering; den dokumenterte operasjonen sendte innsamlede informasjonskapsler i slike parametere. Verdiene ble ikke undersøkt, så tilliten er fortsatt lav."
+          : "Parameternavn i identifikatorstil er vanlige i vanlig annonse- og analysetrafikk.",
+        summary: escalate
+          ? "En tredjeparts annonseforespørsel hadde et parameternavn som tyder på innhold fra informasjonskapsler."
+          : "En tredjepartsforespørsel hadde flere parameternavn i identifikatorstil.",
+        significance:
+          "Den dokumenterte operasjonen samlet inn enhetsidentifikatorer og førsteparts informasjonskapsler gjennom annonseforespørsler. Dette registrerer bare mønsteret i parameternavnene.",
+        alternativeExplanations: [
+          "Vanlige parametere for annonsemålretting eller analyse.",
+          "Et parameternavn som tilfeldigvis ligner en identifikatoretikett, men inneholder noe annet.",
+        ],
+      },
     }),
   ];
 }

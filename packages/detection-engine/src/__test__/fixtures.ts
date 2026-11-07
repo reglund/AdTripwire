@@ -5,6 +5,7 @@
  */
 import type {
   Detection,
+  DetectionTextNb,
   EventType,
   IndicatorRecord,
   IndicatorSet,
@@ -13,6 +14,7 @@ import type {
   ObservationLimitation,
   PageSignal,
   ResourceType,
+  RuleDefinitionNb,
   ResponseInspection,
   SensorCapability,
   UrlClassificationFlag,
@@ -20,6 +22,7 @@ import type {
 import { IndicatorMatcher } from "@adtripwire/indicators";
 import { DetectionEngine, type DetectionEngineOptions, type IngestResult } from "../engine.js";
 import type { Rule } from "../rules/types.js";
+import { ALL_RULES } from "../rules/index.js";
 
 const rec = (
   id: string,
@@ -231,6 +234,92 @@ export function stage(
 
 const FORBIDDEN = /infected|spied|\bis safe\b|\bare safe\b|compromised/i;
 
+/**
+ * Norwegian verdict words (phase 11, D3). Letter-aware boundaries: JS `\b` does not treat
+ * æ, ø, å as word characters, and "sikker" must not hit "sikkerhet" or "usikker".
+ */
+const FORBIDDEN_NB = new RegExp(
+  "(?<!\\p{L})(?:infiser\\p{L}*|smitt\\p{L}*|kompromitter\\p{L}*|spioner\\p{L}*|trygg\\p{L}*|trygt|sikker|sikkert|ren|rent|rene|hacket|hacka|overvåket|angrepet|rammet|berørt|ufarlig|harmløs|uskadelig)(?!\\p{L})" +
+    "|overvåker deg|overvåkes av|uten fare|ingen grunn til bekymring",
+  "iu",
+);
+
+/** Throws when Norwegian text contains a verdict word. */
+export function assertConservativeNb(label: string, text: string): void {
+  const m = FORBIDDEN_NB.exec(text);
+  if (m) throw new Error(`Forbidden Norwegian wording «${m[0]}» in ${label}: ${text}`);
+}
+
+function nbTexts(nb: DetectionTextNb): string[] {
+  return [
+    nb.summary,
+    nb.significance,
+    nb.confidenceRationale,
+    ...nb.alternativeExplanations,
+    ...nb.recommendedActions,
+    ...nb.limitations,
+    ...nb.missingVisibility,
+  ];
+}
+
+export function ruleDefinitionNbTexts(nb: RuleDefinitionNb): string[] {
+  return [
+    nb.name,
+    nb.description,
+    nb.confidenceBasis,
+    ...nb.limitations,
+    ...nb.falsePositiveConsiderations,
+  ];
+}
+
+/**
+ * Rules whose Norwegian text is still to be written. Empty: every shipped rule has `nb`. A new
+ * rule must either carry `nb` or be listed here explicitly.
+ */
+export const PENDING_NB_RULE_IDS: readonly string[] = [];
+
+/** Rule ids that must emit complete Norwegian text: every shipped rule not in the pending list. */
+export function nbRequiredRuleIds(): string[] {
+  return ALL_RULES.map((r) => r.definition.id).filter((id) => !PENDING_NB_RULE_IDS.includes(id));
+}
+
+const HOSTNAME_RE = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:test|invalid|com|net|org|io)\b/gi;
+const digitRuns = (t: string): string => (t.match(/\d+/g) ?? []).sort().join(",");
+const hostnames = (t: string): string[] => t.match(HOSTNAME_RE) ?? [];
+
+/**
+ * Every English text field has a Norwegian counterpart: same array lengths, non-empty strings,
+ * and the same hostnames and numbers in each pair.
+ */
+export function assertNbMirrorsEnglish(d: Detection): void {
+  const nb = d.nb;
+  if (!nb) throw new Error(`${d.ruleId} detection has no nb text`);
+  const pairs: Array<[string, string, string]> = [];
+  const one = (name: string, en: string, no: string): void => {
+    pairs.push([name, en, no]);
+  };
+  const list = (name: string, en: readonly string[], no: readonly string[]): void => {
+    if (en.length !== no.length)
+      throw new Error(`${d.ruleId} nb.${name} has ${no.length} items, English has ${en.length}`);
+    en.forEach((x, i) => one(`${name}[${i}]`, x, no[i]!));
+  };
+  one("summary", d.summary, nb.summary);
+  one("significance", d.significance, nb.significance);
+  one("confidenceRationale", d.confidenceRationale, nb.confidenceRationale);
+  list("alternativeExplanations", d.alternativeExplanations, nb.alternativeExplanations);
+  list("recommendedActions", d.recommendedActions, nb.recommendedActions);
+  list("limitations", d.limitations, nb.limitations);
+  list("missingVisibility", d.missingVisibility, nb.missingVisibility);
+  for (const [name, en, no] of pairs) {
+    if (no.trim().length === 0) throw new Error(`${d.ruleId} nb.${name} is empty`);
+    if (no === en) throw new Error(`${d.ruleId} nb.${name} is identical to the English text`);
+    for (const h of hostnames(en))
+      if (!no.includes(h)) throw new Error(`${d.ruleId} nb.${name} lacks hostname ${h}`);
+    if (digitRuns(en) !== digitRuns(no))
+      throw new Error(`${d.ruleId} nb.${name} numbers differ from English: ${en} | ${no}`);
+  }
+}
+
 export function assertConservativeLanguage(d: Detection): void {
   for (const field of [d.summary, d.significance, d.confidenceRationale]) {
     if (FORBIDDEN.test(field)) throw new Error(`Forbidden wording in ${d.ruleId}: ${field}`);
@@ -247,6 +336,8 @@ export function assertConservativeLanguage(d: Detection): void {
   }
   if (!d.summary || !d.significance || !d.confidenceRationale)
     throw new Error(`${d.ruleId} missing text`);
+  if (d.nb) for (const t of nbTexts(d.nb)) assertConservativeNb(`${d.ruleId} nb`, t);
+  if (nbRequiredRuleIds().includes(d.ruleId)) assertNbMirrorsEnglish(d);
 }
 
 /** Engine wrapper with a controllable clock and a language guard on every detection. */

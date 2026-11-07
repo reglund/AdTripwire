@@ -9,7 +9,7 @@ import {
   relativeTime,
   severityLabel,
 } from "./format.js";
-import { applyLanguageSetting, t } from "./i18n.js";
+import { applyLanguageSetting, currentLanguage, t } from "./i18n.js";
 import { requestHostPermission, rpc } from "./rpc.js";
 
 const root = document.getElementById("app");
@@ -187,7 +187,11 @@ function render(
         ? h(
             "div",
             null,
-            h("p", { class: "last-summary" }, last.summary),
+            h(
+              "p",
+              { class: "last-summary" },
+              currentLanguage() === "nb" && last.summaryNb ? last.summaryNb : last.summary,
+            ),
             h(
               "p",
               { class: "muted" },

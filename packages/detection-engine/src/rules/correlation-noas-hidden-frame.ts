@@ -1,4 +1,9 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import {
@@ -10,6 +15,7 @@ import {
 } from "./common.js";
 import {
   CORRELATION_LIMITATIONS,
+  CORRELATION_LIMITATIONS_NB,
   ancestryMissing,
   lineageRelation,
   linkEvidence,
@@ -20,6 +26,21 @@ import {
 import { isNoasContact } from "./noas.js";
 
 const FRAME_PARAMS = ["impid", "qq"];
+
+const NB: RuleDefinitionNb = {
+  name: "Forespørsel om annonseutvelgelse etterfulgt av en innebygd innlastingsramme",
+  description:
+    "Etter en forespørsel med NOAS/getAd-mønster i samme rammehierarki (bare samme fane: ett nivå lavere) lastet en iframe en annen tredjepartsvert med parameterne «impid» eller «qq», som samsvarer med de dokumenterte innebygde innlastingsrammene «/iframe?impid=» og «/?qq=».",
+  confidenceBasis:
+    "Middels: begge hendelsene er observert og parameternavnene samsvarer med de dokumenterte innlastingsrammene; koblingen mellom dem er utledet fra fane og tid.",
+  limitations: [
+    ...CORRELATION_LIMITATIONS_NB,
+    "Rammedimensjoner kan ikke observeres fra nettverksmetadata, så «skjult» er utledet fra det dokumenterte mønsteret.",
+  ],
+  falsePositiveConsiderations: [
+    "«impid» (annonsevisnings-ID) er et vanlig parameternavn i annonseteknologi som brukes av mange vanlige annonserammer.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "correlation.noas_then_hidden_frame",
@@ -45,6 +66,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "'impid' (impression id) is a common ad-tech parameter name used by many ordinary ad frames.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -110,6 +132,20 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "An ordinary ad frame using an impression-id parameter.",
         "Unrelated frames loaded by the same ad-heavy page.",
       ],
+      nb: {
+        confidenceRationale:
+          scope === "lineage"
+            ? "Begge forespørslene ble observert direkte, i samme rammehierarki, og rammens parameternavn samsvarer med den dokumenterte innlastingsrammen; forholdet er utledet fra hierarki og tid."
+            : "Begge forespørslene ble observert direkte og rammens parameternavn samsvarer med den dokumenterte innlastingsrammen, men de er koblet bare via fane og tid, ikke rammehierarki, så prioriteten er satt ett nivå lavere.",
+        summary:
+          "En forespørsel om annonseutvelgelse ble i samme fane fulgt av innlasting av en ramme med parametere som ligner på de dokumenterte innlastingsrammene.",
+        significance:
+          "I den dokumenterte kjeden fikk enheter som ble valgt ut kode som satte inn en 1x1-ramme med parameterne «impid» eller «qq» for å laste neste trinn.",
+        alternativeExplanations: [
+          "En vanlig annonseramme som bruker en annonsevisnings-ID-parameter.",
+          "Urelaterte rammer lastet av den samme siden med mye annonser.",
+        ],
+      },
     }),
   ];
 }

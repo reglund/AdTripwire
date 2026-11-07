@@ -9,7 +9,7 @@ import {
   severityLabel,
   summarizeVisibility,
 } from "../format.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
 import { rpc } from "../rpc.js";
 import { detectionHash } from "../route.js";
 import {
@@ -70,7 +70,7 @@ export const renderOverview: View = async () => {
           t("Last significant observation"),
           last
             ? [
-                `${last.summary} (${severityLabel(last.severity)}, `,
+                `${currentLanguage() === "nb" && last.summaryNb ? last.summaryNb : last.summary} (${severityLabel(last.severity)}, `,
                 timeEl(last.timestamp),
                 ") ",
                 h("a", { href: detectionHash(last.detectionId) }, t("View")),

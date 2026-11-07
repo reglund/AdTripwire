@@ -1,8 +1,28 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { RULE_VERSION, buildDetection, isFirstObservation, isThirdParty } from "./common.js";
 import { isNoasPattern } from "./noas.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Forespørsel som samsvarer med det dokumenterte NOAS/getAd-mønsteret for annonsevalg",
+  description:
+    "En forespørsel brukte stien «/getAd» eller «/cplatform/getAd» med spørringsparametere som beskriver enhet eller identitet, mønsteret som er dokumentert for AdFections servere for annonsevalg per enhet.",
+  confidenceBasis:
+    "Middels når forespørselen kommer fra tredjepart eller fra en underramme (som dokumentert for annonsemateriell); ellers lav. Stinavnet alene er generisk, så kravet om parameternavn snevrer det inn.",
+  limitations: [
+    "«getAd» er et vanlig endepunktnavn i urelatert annonseprogramvare; bare parameternavn, ikke verdier, undersøkes.",
+    "Om serveren valgte ut denne enheten avgjøres på serversiden og kan ikke ses av forespørselen.",
+  ],
+  falsePositiveConsiderations: [
+    "Legitime annonseservere kan bruke samme stinavn og lignende målrettingsparametere.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "ad_delivery.noas_request",
@@ -29,6 +49,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Legitimate ad servers may use the same path name and similar targeting parameters.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -42,6 +63,10 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
   const indicatorNote =
     matches.length > 0
       ? ` The destination also matches documented indicator ${matches[0]!.indicator.id}.`
+      : "";
+  const indicatorNoteNb =
+    matches.length > 0
+      ? ` Målet samsvarer også med dokumentert indikator ${matches[0]!.indicator.id}.`
       : "";
   const params = event.destination.queryParamNames.slice(0, 20).join(", ");
   return [
@@ -72,6 +97,21 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
       recommendedActions: [
         "Check whether the response was empty (typical) or contained JavaScript (less common).",
       ],
+      nb: {
+        confidenceRationale: adContext
+          ? "Forespørselen samsvarer med den dokumenterte stien og parametermønsteret og ble sendt fra en tredjeparts- eller innebygd rammekontekst, som dokumentert for annonsemateriell."
+          : "Forespørselen samsvarer med den dokumenterte stien og parametermønsteret, men ble sendt fra en førsteparts kontekst på toppnivå, noe som passer dårligere med den dokumenterte leveringen av annonsemateriell.",
+        summary: `Observert forespørsel som samsvarer med det dokumenterte NOAS/getAd-mønsteret for annonseutvelgelse.${indicatorNoteNb}`,
+        significance:
+          "Dokumenterte servere for annonsevalg avgjør per enhet om de skal returnere kode. De fleste enheter får ingenting; selve forespørselen viser eksponering mot infrastruktur for annonsevalg, ikke at enheten ble valgt ut.",
+        alternativeExplanations: [
+          "En urelatert annonseserver kan bruke samme endepunktnavn og lignende parameternavn.",
+          "Forespørselen kan være en del av vanlig programmatisk annonselevering.",
+        ],
+        recommendedActions: [
+          "Sjekk om svaret var tomt (typisk) eller inneholdt JavaScript (mindre vanlig).",
+        ],
+      },
     }),
   ];
 }

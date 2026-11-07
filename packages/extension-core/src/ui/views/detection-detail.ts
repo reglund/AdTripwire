@@ -20,9 +20,19 @@ import {
   severityLabel,
 } from "../format.js";
 import { clampNote, NOTE_MAX_LENGTH } from "../exports.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
+import { detectionRuleName, detectionText } from "../detection-text.js";
 import { rpc } from "../rpc.js";
-import { bulletList, card, kv, tableWrap, timeEl, uid } from "./common.js";
+import {
+  bulletList,
+  card,
+  englishFallbackNote,
+  kv,
+  loadRuleNames,
+  tableWrap,
+  timeEl,
+  uid,
+} from "./common.js";
 import { exportGroup } from "./export-actions.js";
 import { clusterHash } from "../route.js";
 import { assistPanel } from "../assist/panel.js";
@@ -293,10 +303,12 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
   }
 
   const { node: sequence, available } = await eventSection(d);
-  const [clusters, settings] = await Promise.all([
+  const [clusters, settings, ruleNames] = await Promise.all([
     rpc<DetectionCluster[]>({ type: "get_clusters" }).catch(() => [] as DetectionCluster[]),
     rpc<Settings>({ type: "get_settings" }),
+    loadRuleNames(),
   ]);
+  const text = detectionText(d, currentLanguage());
   const cluster = clusters.find((c) => c.detectionIds.includes(d.detectionId));
   const related = card(
     t("Related activity"),
@@ -351,7 +363,8 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
     "div",
     { class: "view detection-detail" },
     back,
-    h("h2", null, d.summary),
+    h("h2", null, text.summary),
+    text.fallback ? englishFallbackNote() : null,
     h(
       "div",
       { class: "detail-meta" },
@@ -364,7 +377,7 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
       "p",
       { class: "confidence-rationale" },
       h("strong", null, t("Confidence rationale:"), " "),
-      d.confidenceRationale,
+      text.confidenceRationale,
     ),
     card(
       t("Export"),
@@ -377,7 +390,7 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
     noteSection(d),
     card(
       t("What was observed"),
-      h("p", null, d.summary),
+      h("p", null, text.summary),
       kv([
         [t("First event"), formatTimestamp(d.firstEventTimestamp)],
         [t("Latest event"), formatTimestamp(d.timestamp)],
@@ -393,11 +406,11 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
         ],
       ]),
     ),
-    card(t("Why it matters"), h("p", null, d.significance)),
+    card(t("Why it matters"), h("p", null, text.significance)),
     card(
       t("Rule"),
       kv([
-        [t("Rule name"), d.ruleName],
+        [t("Rule name"), detectionRuleName(d, ruleNames)],
         [t("Rule ID"), h("code", null, d.ruleId)],
         [t("Rule version"), d.ruleVersion],
         [t("Category"), categoryLabel(d.category)],
@@ -412,15 +425,18 @@ export async function renderDetectionDetail(id: string): Promise<Node> {
     card(t("Source references"), references),
     card(
       t("Possible benign explanations"),
-      bulletList(d.alternativeExplanations, t("None listed.")),
+      bulletList(text.alternativeExplanations, t("None listed.")),
     ),
-    card(t("Suggested investigation steps"), bulletList(d.recommendedActions, t("None listed."))),
+    card(
+      t("Suggested investigation steps"),
+      bulletList(text.recommendedActions, t("None listed.")),
+    ),
     card(
       t("Detection limitations"),
       h("h4", null, t("Limitations")),
-      bulletList(d.limitations, t("None listed.")),
+      bulletList(text.limitations, t("None listed.")),
       h("h4", null, t("What the sensor could not see")),
-      bulletList(d.missingVisibility, t("None listed.")),
+      bulletList(text.missingVisibility, t("None listed.")),
     ),
     related,
     assistPanel({ detectionId: d.detectionId }, settings),

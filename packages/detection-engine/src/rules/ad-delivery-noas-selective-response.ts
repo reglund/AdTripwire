@@ -1,9 +1,30 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { RULE_VERSION, buildDetection, isJsContentType, responseBytes } from "./common.js";
 import { isNoasPattern } from "./noas.js";
 import { jsGrade } from "./js-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Svar på en forespørsel med NOAS/getAd-mønster",
+  description:
+    "Klassifiserer svaret på en forespørsel med NOAS/getAd-mønster. Et tomt svar er det dokumenterte utfallet for enheter som ikke er valgt ut; et JavaScript-svar med innhold er den dokumenterte grenen for enheter som ble valgt ut.",
+  confidenceBasis:
+    "Middels for et JavaScript-svar med innhold, fordi servere for annonsevalg dokumentert av Citizen Lab og Confiant bare returnerer kode til enheter som ble valgt ut; men urelaterte annonseservere returnerer også JavaScript fra lignende endepunkter.",
+  limitations: [
+    "Krever synlighet i svarstørrelse eller svarinnhold; svar delt i biter uten Content-Length kan ikke størrelsesbestemmes fra hodene alene.",
+    "Svar fra hurtigbufferen gjenspeiler ikke en ny avgjørelse fra serveren.",
+  ],
+  falsePositiveConsiderations: [
+    "Et svar på null byte er det vanlige, forventede utfallet og er ikke mistenkelig.",
+    "Et JavaScript-svar fra et annonseendepunkt er ikke skadelig i seg selv.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "ad_delivery.noas_selective_response",
@@ -30,6 +51,7 @@ export const definition: RuleDefinition = {
     "A zero-byte response is the common, expected outcome and is not suspicious.",
     "A JavaScript response from an ad endpoint is not malicious by itself.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -68,6 +90,18 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
           "Ad servers routinely return empty responses when they have no ad to fill.",
         ],
         recommendedActions: ["No action is needed for this event alone."],
+        nb: {
+          confidenceRationale:
+            "Det tomme svaret er observert direkte; ifølge forskningen det vises til er dette det typiske utfallet for enheter som ikke ble valgt ut.",
+          summary:
+            "Tomt svar: typisk for enheter som ikke er valgt ut; viser eksponering mot infrastruktur for annonsevalg, ikke at enheten ble valgt ut.",
+          significance:
+            "De fleste enheter får et tomt svar fra dokumenterte servere for annonsevalg. Dette registrerer bare eksponering.",
+          alternativeExplanations: [
+            "Annonseservere returnerer rutinemessig tomme svar når de ikke har noen annonse å fylle.",
+          ],
+          recommendedActions: ["Ingen tiltak er nødvendig for denne hendelsen alene."],
+        },
       }),
     ];
   }
@@ -111,6 +145,24 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
           "Review any JavaScript-technique and correlation detections in the same tab.",
           "Export the evidence if contact with malicious infrastructure followed.",
         ],
+        nb: {
+          confidenceRationale: corroborated
+            ? `Et JavaScript-svar med innhold fra en forespørsel med NOAS/getAd-mønster samsvarer med den dokumenterte grenen for enheter som ble valgt ut, styrket av ${hostDocumented ? "en dokumentert indikatorvert" : "mistenkelige teknikkmarkører i skriptet som ble levert"}.`
+            : "Et JavaScript-svar med innhold fra en forespørsel med NOAS/getAd-mønster samsvarer med den dokumenterte grenen for enheter som ble valgt ut, men verten er ikke en dokumentert indikator og skriptet viser ingen mistenkelig teknikkombinasjon; urelatert annonseprogramvare bruker lignende endepunktnavn.",
+          summary: corroborated
+            ? "En forespørsel med NOAS/getAd-mønster returnerte JavaScript med innhold, den mindre vanlige grenen som er dokumentert for enheter som ble valgt ut."
+            : "En forespørsel med getAd-mønster til en udokumentert vert returnerte JavaScript; dette ligner på, men bekrefter ikke, det dokumenterte mønsteret for annonsevalg.",
+          significance:
+            "I den dokumenterte operasjonen er det bare enheter som blir valgt ut som får JavaScript fra serveren for annonsevalg; den koden laster deretter skjulte rammer eller flere skript. Dette fastslår ikke hva koden gjorde.",
+          alternativeExplanations: [
+            "En urelatert annonseserver returnerte et vanlig skript for visning av annonser.",
+            "Et felles endepunktnavn faller sammen med det dokumenterte mønsteret.",
+          ],
+          recommendedActions: [
+            "Gå gjennom oppdagelser om JavaScript-teknikker og korrelasjon i samme fane.",
+            "Eksporter bevisene hvis kontakt med skadelig infrastruktur fulgte etterpå.",
+          ],
+        },
       }),
     ];
   }
@@ -142,6 +194,22 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
       recommendedActions: [
         "Enable response inspection (Firefox) to distinguish code from other content.",
       ],
+      nb: {
+        confidenceRationale:
+          insp === undefined
+            ? "Størrelsen på svaret ble observert, men innholdet ble ikke inspisert, så det er ukjent om JavaScript ble returnert."
+            : "Svaret ble inspisert og så ikke ut som JavaScript.",
+        summary:
+          "En forespørsel med NOAS/getAd-mønster returnerte et svar med innhold; innholdstypen ble ikke bekreftet som JavaScript.",
+        significance:
+          "Svar med innhold er den mindre vanlige grenen for dokumenterte servere for annonsevalg, men innholdet ble ikke bekreftet som kode.",
+        alternativeExplanations: [
+          "Serveren returnerte et vanlig annonsebilde, en sporingspiksel eller konfigurasjonsdata.",
+        ],
+        recommendedActions: [
+          "Slå på inspeksjon av svar (Firefox) for å skille kode fra annet innhold.",
+        ],
+      },
     }),
   ];
 }

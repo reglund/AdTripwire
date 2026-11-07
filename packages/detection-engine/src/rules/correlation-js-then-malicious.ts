@@ -1,9 +1,15 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { SEVERITY_RANK, buildDetection, lowerSeverity } from "./common.js";
 import {
   CORRELATION_LIMITATIONS,
+  CORRELATION_LIMITATIONS_NB,
   findChain,
   isStep3,
   linkEvidence,
@@ -12,6 +18,18 @@ import {
   step2Description,
 } from "./correlation-common.js";
 import { jsGrade } from "./js-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Mistenkelig skript etterfulgt av kontakt med skadelig infrastruktur",
+  description:
+    "Innenfor korrelasjonsvinduet og samme rammehierarki (bare samme fane: ett nivå lavere) ble et mistenkelig inspisert skript (eller JavaScript med innhold fra et NOAS-mønster) fulgt av kontakt med infrastruktur dokumentert som skadelig, uten at det først ble observert noen forespørsel om annonseutvelgelse.",
+  confidenceBasis:
+    "Lav, eller middels når skriptet i seg selv fikk nivået «forhøyet» (for eksempel dokumenterte SDK-strenger). Annonseutvelgelsen ble ikke observert først, så sekvensen er bare delvis observert, og tidsmessig nærhet beviser ikke årsak.",
+  limitations: CORRELATION_LIMITATIONS_NB,
+  falsePositiveConsiderations: [
+    "Sider som omtaler eller analyserer kampanjen kan laste begge typer innhold.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "correlation.suspicious_js_then_malicious_contact",
@@ -34,6 +52,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Pages that discuss or analyse the campaign may load both kinds of content.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -97,6 +116,21 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
         "Export the evidence bundle before clearing browser data.",
         "Contact a digital-security helpline if you believe you may be a target.",
       ],
+      nb: {
+        confidenceRationale: `${strong ? "Skriptet fikk nivået «forhøyet» i seg selv" : "Skriptet fikk nivået «mistenkelig»"}, og kontakt med dokumentert skadelig infrastruktur fulgte etterpå. Det ble ikke observert noen forespørsel om annonseutvelgelse først, og tidsmessig nærhet beviser ikke årsak.`,
+        summary:
+          "Et skript med mistenkelige teknikker ble i samme fane fulgt av kontakt med infrastruktur dokumentert som skadelig.",
+        significance:
+          "Dette ligner på den senere delen av den dokumenterte leveringskjeden. Det er høy undersøkelsesprioritet, ikke en bekreftelse på at noe ble kjørt på denne enheten.",
+        alternativeExplanations: [
+          "Skriptet og kontakten med infrastrukturen kan være urelaterte.",
+          "Siden kan være en forsknings- eller sikkerhetsressurs som omtaler infrastrukturen.",
+        ],
+        recommendedActions: [
+          "Eksporter bevispakken før du tømmer nettleserdata.",
+          "Ta kontakt med en hjelpetjeneste for digital sikkerhet hvis du tror du kan være et mål.",
+        ],
+      },
     }),
   ];
 }

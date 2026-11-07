@@ -1,3 +1,4 @@
+import { HANDOFF_NOTE_MAX_LENGTH } from "@adtripwire/shared";
 import type { Settings, UiRequest, UiResponse } from "@adtripwire/shared";
 
 /**
@@ -139,8 +140,31 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
     case "export_handoff": {
       if (r.profile !== "default" && r.profile !== "strict") return null;
       if (r.detectionIds !== undefined && !isStrArr(r.detectionIds)) return null;
+      if (
+        r.note !== undefined &&
+        (typeof r.note !== "string" || r.note.length > HANDOFF_NOTE_MAX_LENGTH)
+      )
+        return null;
+      if (
+        r.coverLanguages !== undefined &&
+        r.coverLanguages !== "en" &&
+        r.coverLanguages !== "en+nb"
+      )
+        return null;
       const req: Extract<UiRequest, { type: "export_handoff" }> = {
         type: "export_handoff",
+        profile: r.profile,
+      };
+      if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;
+      if (r.note !== undefined) req.note = r.note;
+      if (r.coverLanguages !== undefined) req.coverLanguages = r.coverLanguages;
+      return req;
+    }
+    case "preview_handoff": {
+      if (r.profile !== "default" && r.profile !== "strict") return null;
+      if (r.detectionIds !== undefined && !isStrArr(r.detectionIds)) return null;
+      const req: Extract<UiRequest, { type: "preview_handoff" }> = {
+        type: "preview_handoff",
         profile: r.profile,
       };
       if (r.detectionIds !== undefined) req.detectionIds = r.detectionIds;

@@ -12,6 +12,7 @@ import type {
   Detection,
   DetectionCluster,
   ExportFile,
+  HandoffPreview,
   ImportResult,
   IndicatorRecord,
   IndicatorSet,
@@ -40,7 +41,7 @@ import {
 } from "@adtripwire/detection-engine";
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import { stixToIndicatorSet } from "@adtripwire/interop";
-import { exportResearch } from "./research-export.js";
+import { exportResearch, handoffPreview, type ResearchExportInput } from "./research-export.js";
 import {
   PageAccounting,
   applyNewDetection,
@@ -350,6 +351,7 @@ class Background {
         ruleId: d.ruleId,
         summary: d.summary,
       };
+      if (d.nb) e.summaryNb = d.nb.summary;
       if (d.subjectHostnames[0]) e.hostname = d.subjectHostnames[0];
       if (d.tabId !== undefined) e.tabId = d.tabId;
       entries.push(e);
@@ -678,16 +680,25 @@ class Background {
     return { ...listing, anchorHosts };
   }
 
+  /** Dry run of the hand-off export: counts only, no file. */
+  private previewHandoff(req: Extract<UiRequest, { type: "preview_handoff" }>): HandoffPreview {
+    return handoffPreview(req.profile, this.researchInput(req));
+  }
+
   /** STIX / SIEM / hand-off exports over the selected detections and their events. */
   private exportResearch(
     req: Extract<UiRequest, { type: "export_stix" | "export_siem" | "export_handoff" }>,
   ): ExportFile {
+    return exportResearch(req, this.researchInput(req));
+  }
+
+  private researchInput(req: { detectionIds?: string[] }): ResearchExportInput {
     let detections = this.store.listDetections();
     if (req.detectionIds)
       detections = detections.filter((d) => req.detectionIds!.includes(d.detectionId));
     const ids = new Set<string>();
     for (const d of detections) for (const id of d.eventIds) ids.add(id);
-    return exportResearch(req, {
+    return {
       detections,
       events: this.store.getEvents(Array.from(ids)),
       indicatorSets: this.activeSets().filter((s) => !s.meta.synthetic),
@@ -700,7 +711,7 @@ class Background {
       ...(req.detectionIds
         ? {}
         : { alongside: listAlongside(this.alongside.store, this.alongsideBaseline) }),
-    });
+    };
   }
 
   /** Imports a user-supplied indicator set (local file contents) after strict validation. */
@@ -1110,6 +1121,7 @@ class Background {
         severity: significant.severity,
         summary: significant.summary,
       };
+      if (significant.nb) s.lastSignificant.summaryNb = significant.nb.summary;
     }
     return s;
   }
@@ -1228,6 +1240,8 @@ class Background {
       case "export_siem":
       case "export_handoff":
         return this.exportResearch(req);
+      case "preview_handoff":
+        return this.previewHandoff(req);
       case "get_exposure":
         return this.exposure_();
       case "get_alongside":

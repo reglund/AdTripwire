@@ -3,6 +3,7 @@ import type {
   Detection,
   NormalizedEvent,
   RuleDefinition,
+  RuleDefinitionNb,
   Severity,
 } from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
@@ -109,11 +110,31 @@ export const JS_LIMITATIONS = [
   "Markers show that code contains a technique, not that it ran or what it did.",
 ];
 
+export const JS_LIMITATIONS_NB = [
+  "Bare en avgrenset begynnelse av utvalgte svar analyseres, med leksikalske mønstre; kode som hentes senere, eller som er kraftig tilslørt, kan gå upåaktet hen.",
+  "Markørene viser at koden inneholder en teknikk, ikke at den ble kjørt eller hva den gjorde.",
+];
+
+/** Norwegian twins of JsRuleTexts (same shapes; recommendedActions defaults to the shared pair). */
+export interface JsRuleTextsNb {
+  summary: (o: JsOutcome) => string;
+  significance: string;
+  confidenceRationale: (o: JsOutcome) => string;
+  alternativeExplanations: string[];
+}
+
+export const JS_ACTIONS_NB = [
+  "Se etter hvor dette skriptet ble lastet fra, og om det kom etter en annonseforespørsel i samme fane.",
+  "Se etter oppfølgende kontakt med dokumentert infrastruktur.",
+];
+
 export interface JsRuleTexts {
   summary: (o: JsOutcome) => string;
   significance: string;
   confidenceRationale: (o: JsOutcome) => string;
   alternativeExplanations: string[];
+  /** Norwegian text; omit to leave the rule English-only for now. */
+  nb?: JsRuleTextsNb;
 }
 
 export function makeJsRule(definition: RuleDefinition, texts: JsRuleTexts): Rule {
@@ -156,6 +177,17 @@ export function makeJsRule(definition: RuleDefinition, texts: JsRuleTexts): Rule
           "Review where this script was loaded from and whether it followed an ad request in the same tab.",
           "Check for follow-on contact with documented infrastructure.",
         ],
+        ...(texts.nb
+          ? {
+              nb: {
+                confidenceRationale: texts.nb.confidenceRationale(o),
+                summary: texts.nb.summary(o),
+                significance: texts.nb.significance,
+                alternativeExplanations: texts.nb.alternativeExplanations,
+                recommendedActions: JS_ACTIONS_NB,
+              },
+            }
+          : {}),
       }),
     ];
   };
@@ -163,16 +195,25 @@ export function makeJsRule(definition: RuleDefinition, texts: JsRuleTexts): Rule
 }
 
 export function jsDefinition(
-  d: Omit<RuleDefinition, "category" | "requiredCapabilities" | "version" | "limitations"> & {
+  d: Omit<
+    RuleDefinition,
+    "category" | "requiredCapabilities" | "version" | "limitations" | "nb"
+  > & {
     limitations?: string[];
     version?: string;
+    /** Norwegian definition text; `limitations` here are added after the shared JS_LIMITATIONS_NB. */
+    nb?: Omit<RuleDefinitionNb, "limitations"> & { limitations?: string[] };
   },
 ): RuleDefinition {
+  const { nb, ...rest } = d;
   return {
-    ...d,
+    ...rest,
     version: d.version ?? "1.0.0",
     category: "javascript_technique",
     requiredCapabilities: ["request_metadata", "response_body_inspection"],
     limitations: [...JS_LIMITATIONS, ...(d.limitations ?? [])],
+    ...(nb
+      ? { nb: { ...nb, limitations: [...JS_LIMITATIONS_NB, ...(nb.limitations ?? [])] } }
+      : {}),
   };
 }

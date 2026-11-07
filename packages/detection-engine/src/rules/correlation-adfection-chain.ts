@@ -1,9 +1,16 @@
-import type { Detection, EvidenceItem, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  EvidenceItem,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import { SEVERITY_RANK, buildDetection, lowerSeverity } from "./common.js";
 import {
   CORRELATION_LIMITATIONS,
+  CORRELATION_LIMITATIONS_NB,
   findChain,
   findChainAroundSignal,
   pageSignalStep2Strength,
@@ -15,6 +22,18 @@ import {
   step2Description,
   isFirstPartyStep,
 } from "./correlation-common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Sekvens som samsvarer med den dokumenterte AdFection-leveringskjeden",
+  description:
+    "Innenfor korrelasjonsvinduet og samme rammehierarki: (1) en forespørsel med NOAS/getAd-mønster eller kontakt med NOAS-indikator, deretter (2) et JavaScript-svar med innhold på den, et mistenkelig inspisert skript eller (med den valgfrie nettsidesensoren) en observert iframe eller skriptinnsetting på tvers av opprinnelser, deretter (3) kontakt med infrastruktur dokumentert som skadelig. En sekvens som bare finnes på tvers av urelaterte rammer i én fane, eller uten rammehierarki, rapporteres ett nivå lavere.",
+  confidenceBasis:
+    "Middels: hvert trinn er observert direkte og rekkefølgen samsvarer med den dokumenterte kjeden, men koblingene mellom trinnene er utledet fra rammehierarki (eller fane) og tid, og tidsmessig nærhet beviser ikke årsak.",
+  limitations: CORRELATION_LIMITATIONS_NB,
+  falsePositiveConsiderations: [
+    "En forsker eller analytiker som besøker dokumentert infrastruktur på en side med mye annonser kan gi sekvensen ved en tilfeldighet.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "correlation.adfection_chain",
@@ -39,6 +58,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "A researcher or analyst visiting documented infrastructure on an ad-heavy page can produce the sequence by coincidence.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -156,6 +176,27 @@ function chainDetection(
       "Contact a digital-security helpline (for example Access Now's Digital Security Helpline or Amnesty Tech) and share the exported evidence.",
       "Keep the device's operating system and browser updated.",
     ],
+    nb: {
+      confidenceRationale: firstPartyStart
+        ? "De tre trinnene skjedde i den dokumenterte rekkefølgen, men forespørselen om annonseutvelgelse gikk til sidens egen vert i stedet for tredjeparts annonseinfrastruktur; dette svekker samsvaret med den dokumenterte kjeden og kan være iscenesatt av en side med vilje."
+        : scope === "lineage"
+          ? "Alle tre trinnene ble observert direkte, i den dokumenterte rekkefølgen og innenfor ett rammehierarki. Forholdet mellom dem er delvis utledet fra tid; tidsmessig nærhet beviser ikke årsak, og ingenting her viser at spionprogramvare ble kjørt."
+          : "Alle tre trinnene ble observert direkte og skjedde i den dokumenterte rekkefølgen, men de kunne bare kobles sammen via fane og tid, ikke via rammehierarki, så prioriteten er satt ett nivå lavere. Tidsmessig nærhet beviser ikke årsak, og ingenting her viser at spionprogramvare ble kjørt.",
+      summary:
+        "Observert en sekvens av hendelser som samsvarer med den dokumenterte AdFection-leveringskjeden: forespørsel om annonseutvelgelse, deretter et skriptsvar, deretter kontakt med infrastruktur dokumentert som skadelig.",
+      significance:
+        "Denne rekkefølgen samsvarer med leveringskjeden dokumentert av Citizen Lab og Confiant. Det er høy undersøkelsesprioritet, ikke en bekreftelse på at denne enheten var målrettet eller at noe ble kjørt.",
+      alternativeExplanations: [
+        "Trinnene kan være urelatert aktivitet som tilfeldigvis skjedde tett på hverandre i én fane.",
+        "En forsker eller skanner kan ha besøkt den dokumenterte infrastrukturen med vilje.",
+        "Domenet i trinn 3 kan ha skiftet eier etter at det ble dokumentert.",
+      ],
+      recommendedActions: [
+        "Ikke tøm nettleserdata ennå; eksporter først bevispakken fra AdTripwire.",
+        "Ta kontakt med en hjelpetjeneste for digital sikkerhet (for eksempel Access Now Digital Security Helpline eller Amnesty Tech) og del de eksporterte bevisene.",
+        "Hold enhetens operativsystem og nettleser oppdatert.",
+      ],
+    },
   });
 }
 

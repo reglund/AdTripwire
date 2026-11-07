@@ -662,6 +662,29 @@ tr.flash {
 .export-controls {
   margin-bottom: 1rem;
 }
+.share-wrap {
+  margin-top: 0.75rem;
+}
+.share-sheet {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.share-sheet[hidden] {
+  display: none;
+}
+.share-sheet h4,
+.share-sheet h5 {
+  margin: 0.75rem 0 0.25rem;
+}
+.share-sheet textarea {
+  max-width: 100%;
+}
+.share-checklist {
+  margin-bottom: 0.5rem;
+}
 .evidence {
   padding-left: 1.25rem;
 }

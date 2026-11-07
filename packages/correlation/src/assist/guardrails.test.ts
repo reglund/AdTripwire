@@ -113,6 +113,64 @@ describe("screenAssistOutput", () => {
     expect(r.removedSentences).toBe(2);
   });
 
+  it("removes Norwegian verdict sentences (phase 11 red-team set)", () => {
+    const nb = { ...ctx, language: "nb" as const };
+    const compromise = [
+      "Telefonen din er smittet.",
+      "Enheten er sannsynligvis kompromittert.",
+      "Du har blitt spionert på.",
+      "Maskinen ble rammet av spionvare.",
+      "Spionvare er installert på enheten.",
+      "Dette bekrefter en infeksjon.",
+      "Nettleseren din er hacket.",
+      "Enheten er ikke bare infisert.",
+      "Enheten din er også infisert.",
+      "Telefonen er nå kompromittert.",
+    ];
+    const safety = [
+      "Enheten er trygg.",
+      "Du er helt trygg.",
+      "Telefonen er ren.",
+      "Maskinen er fri for spionvare.",
+      "Det er ingen fare.",
+      "Ingen spionvare ble funnet.",
+      "Enheten din er ikke rammet.",
+      "Du er uten fare.",
+      "Enheten er nok ikke infisert.",
+      "Telefonen er også trygg.",
+    ];
+    for (const s of compromise) {
+      expect(screenAssistOutput(s, nb).flags, s).toContain("asserted_compromise");
+    }
+    for (const s of safety) {
+      expect(screenAssistOutput(s, nb).flags, s).toContain("asserted_safety");
+    }
+  });
+
+  it("does not treat a negated non-epistemic verb as a hedge", () => {
+    const nb = { ...ctx, language: "nb" as const };
+    for (const s of [
+      "Jeg vil ikke skjule at enheten er infisert.",
+      "Det er ikke tvil om hvorvidt enheten er infisert.",
+      "Det er ikke tvil om at du er trygg.",
+    ]) {
+      expect(screenAssistOutput(s, nb).removedSentences, s).toBe(1);
+    }
+  });
+
+  it("keeps hedged Norwegian sentences", () => {
+    const nb = { ...ctx, language: "nb" as const };
+    for (const s of [
+      "Bevisene kan ikke vise om enheten er infisert.",
+      "Det betyr ikke nødvendigvis at du er rammet.",
+      "Observert trafikk sier ikke noe om hvorvidt telefonen er trygg.",
+      "Hvis du frykter at du er overvåket, kontakt en spesialist.",
+    ]) {
+      const r = screenAssistOutput(s, nb);
+      expect(r.removedSentences, s).toBe(0);
+    }
+  });
+
   it("masks hostnames absent from the evidence, allowing parent domains and references", () => {
     const r = screenAssistOutput(
       "Traffic went to noas.synthetic-adfection.test and synthetic-adfection.test, then to evil.attacker.example and update.microsoft.com. See citizenlab.ca.",

@@ -1,4 +1,9 @@
-import type { Detection, NormalizedEvent, RuleDefinition } from "@adtripwire/shared";
+import type {
+  Detection,
+  NormalizedEvent,
+  RuleDefinition,
+  RuleDefinitionNb,
+} from "@adtripwire/shared";
 import type { Rule, RuleContext } from "./types.js";
 import { BOTH } from "./references.js";
 import {
@@ -7,6 +12,21 @@ import {
   buildDetection,
   hasThirdPartyFlag,
 } from "./common.js";
+
+const NB: RuleDefinitionNb = {
+  name: "Omdirigeringskjede med flere ledd fra en annonseklassifisert kontekst",
+  description:
+    "En forespørsel ble omdirigert tre eller flere ganger på tvers av minst to registrerbare domener, og startet fra en forespørsel Firefox klassifiserte som annonsering eller sporing. Rapporteres én gang per fane per korrelasjonsvindu med et antall forekomster; informasjonsnivå med mindre et ledd når dokumentert infrastruktur.",
+  confidenceBasis:
+    "Alltid lav: omdirigeringskjeder er rutine i annonselevering (ID-synkronisering via informasjonskapsler, klikksporing); med samtykke kan én enkelt side gi dusinvis. Hevet til «mistenkelig» bare når et ledd når en vert i indikatorsettet.",
+  limitations: [
+    "Registrerbare domener tilnærmes uten en fullstendig liste over offentlige suffikser.",
+    "Bare omdirigeringer av én og samme forespørsels-ID kobles sammen; navigasjon på klientsiden gjør det ikke.",
+  ],
+  falsePositiveConsiderations: [
+    "Kjeder for ID-synkronisering via informasjonskapsler og klikksporing krysser rutinemessig flere annonseteknologidomener; en eksponeringsevaluering med samtykke (2026-11-02) så 30–60 slike kjeder per side med mye annonser, og derfor samles regelen per fane og holdes på informasjonsnivå som standard.",
+  ],
+};
 
 export const definition: RuleDefinition = {
   id: "ad_delivery.redirect_chain",
@@ -34,6 +54,7 @@ export const definition: RuleDefinition = {
   falsePositiveConsiderations: [
     "Cookie-sync and click-tracking chains routinely cross several ad-tech domains; an exposure evaluation with consent (2026-11-02) saw 30-60 such chains per ad-heavy page, which is why the rule aggregates per tab and stays informational by default.",
   ],
+  nb: NB,
 };
 
 export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] {
@@ -92,6 +113,25 @@ export function evaluate(event: NormalizedEvent, ctx: RuleContext): Detection[] 
       recommendedActions: [
         "Treat as context; review alongside any other detections in the same tab.",
       ],
+      nb: {
+        confidenceRationale:
+          indicatorHosts.length > 0
+            ? "Et omdirigeringsledd nådde en vert i indikatorsettet; selve kjeden er fortsatt rutinemessig annonseteknologi, så tilliten forblir lav."
+            : "Omdirigeringer med flere ledd fra annonsekontekster er vanlige i vanlig annonsering; dette er kontekst, ikke bevis.",
+        summary:
+          indicatorHosts.length > 0
+            ? `En omdirigeringskjede for annonser i denne fanen nådde dokumentert infrastruktur (${indicatorHosts.join(", ")}).`
+            : `Observerte omdirigeringskjeder for annonser i denne fanen (første sett: ${hops.length} ledd på tvers av ${domains.size} domener); flere kjeder telles som forekomster.`,
+        significance:
+          "Dokumenterte leveringskjeder går gjennom flere annonseteknologiledd; lange kjeder gir kontekst til andre signaler, men er rutine alene.",
+        alternativeExplanations: [
+          "ID-synkronisering via informasjonskapsler mellom annonseutvekslinger.",
+          "Omdirigeringer for sporing av klikk eller annonsevisninger.",
+        ],
+        recommendedActions: [
+          "Behandle som kontekst; gå gjennom sammen med eventuelle andre oppdagelser i samme fane.",
+        ],
+      },
     }),
   ];
 }

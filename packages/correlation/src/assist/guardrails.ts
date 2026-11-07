@@ -85,8 +85,8 @@ const COMPROMISE_RES: RegExp[] = [
   /\b(?:confirms?|confirmed|proves?|proved|establishes|established)\s+(?:an?\s+|the\s+)?(?:infection|compromise|breach|intrusion|successful attack)\b/i,
   /\b(?:you|your device|the device) (?:has|have) (?:been )?(?:infected|compromised|hacked)\b/i,
   // Norwegian
-  /\b(?:du|dere|enheten|telefonen|mobilen|datamaskinen|maskinen|pc-en|nettleseren|systemet|kontoen|den|det)\s+(?:er|ble|var|har blitt|har vært|blir|vil bli|må være)\s+(?:\w+\s+){0,2}(?:infisert|kompromittert|hacket|overvåket|avlyttet|spionert på|angrepet|utsatt for spionvare)\b/i,
-  /\b(?:spionvare|skadevare|overvåkingsprogramvare|pegasus|predator)\s+(?:er|ble|har blitt|var)\s+(?:\w+\s+){0,2}(?:installert|aktiv|levert|til stede|kjørende|på enheten)\b/i,
+  /\b(?:du|dere|enheten|telefonen|mobilen|datamaskinen|maskinen|pc-en|nettleseren|systemet|kontoen|den|det)(?:\s+(?:din|ditt|dine|deres))?\s+(?:er|ble|var|har blitt|har vært|blir|vil bli|må være)\s+(?:(?!ikke\s+(?:infisert|smittet|kompromittert|hacket|overvåket|avlyttet|spionert|angrepet|rammet|utsatt)\b)[\p{L}\p{N}-]+\s+){0,2}(?:infisert|smittet|kompromittert|hacket|overvåket|avlyttet|spionert(?: på)?|angrepet|rammet|utsatt for spionvare)\b/iu,
+  /\b(?:spionvare|skadevare|overvåkingsprogramvare|pegasus|predator)\s+(?:er|ble|har blitt|var)\s+(?:[\p{L}\p{N}-]+\s+){0,2}(?:installert|aktiv|levert|til stede|kjørende|på enheten)\b/iu,
   /\b(?:bekrefter|beviser)\s+(?:en\s+|et\s+)?(?:infeksjon|kompromittering|innbrudd)\b/i,
 ];
 const SAFETY_RES: RegExp[] = [
@@ -95,7 +95,8 @@ const SAFETY_RES: RegExp[] = [
   /\bnothing (?:to worry about|harmful happened|bad happened|was installed|malicious happened)\b/i,
   /\b(?:you|your device|the device) (?:has|have) not been (?:infected|compromised|hacked)\b/i,
   // Norwegian
-  /\b(?:du|dere|enheten|telefonen|mobilen|datamaskinen|maskinen|nettleseren|systemet|kontoen|den|det)\s+(?:er|var|har vært|ble)\s+(?:\w+\s+){0,2}(?:trygg|trygt|ren|rent|sikker|sikkert|ok|i orden|ikke infisert|ikke kompromittert|ikke berørt|ikke hacket)\b/i,
+  /\b(?:du|dere|enheten|telefonen|mobilen|datamaskinen|maskinen|nettleseren|systemet|kontoen|den|det)(?:\s+(?:din|ditt|dine|deres))?\s+(?:er|var|har vært|ble)\s+(?:[\p{L}\p{N}-]+\s+){0,2}(?:trygg|trygt|ren|rent|sikker|sikkert|ok|i orden|uten fare|fri for (?:spionvare|skadevare)|ikke infisert|ikke smittet|ikke kompromittert|ikke berørt|ikke rammet|ikke hacket)\b/iu,
+  /\bdet er ingen fare\b/i,
   /\b(?:ingen|ikke noe)\s+(?:spionvare|skadevare|infeksjon)\s+(?:er|ble|har blitt)?\s*(?:funnet|oppdaget|installert|til stede)\b/i,
   /\bingenting å bekymre seg (?:for|over)\b/i,
 ];
@@ -116,7 +117,8 @@ const NB_NEG =
   "(?:kan ikke|kunne ikke|viser ikke|betyr ikke|beviser ikke|sier ikke|er ikke mulig å|ikke mulig å|ikke nok til å|ikke)";
 const NB_EPISTEMIC =
   "(?:si|fastslå|avgjøre|vise|bevise|bekrefte|vite|konkludere|anta|tolke|lese|ta dette som)";
-const NB_CONNECTOR = "(?:(?:eller\\s+)?(?:om|at|hvorvidt)\\s+)";
+// "om hvorvidt" ("sier ikke noe om hvorvidt …") is one connector.
+const NB_CONNECTOR = "(?:(?:eller\\s+)?(?:om|at|hvorvidt)\\s+(?:hvorvidt\\s+)?)";
 const HEDGE_DIRECT_RE = new RegExp(
   [
     `\\b${NEG}\\s+(?:\\w+\\s+)?${EPISTEMIC}\\s+${CONNECTOR}?`,
@@ -124,7 +126,11 @@ const HEDGE_DIRECT_RE = new RegExp(
     `\\bno (?:evidence|proof|indication|sign)s?\\s+(?:that|of|for)\\s+`,
     `\\b(?:regardless of|irrespective of|independent of)\\s+whether\\s+`,
     `\\b(?:if|when|in case|should)\\s+(?:you|they|someone|anyone)\\s+(?:think|believe|fear|suspect|worry|feel|assume|are (?:worried|concerned|afraid))\\s+(?:that\\s+)?`,
-    `\\b${NB_NEG}\\s+(?:\\w+\\s+)?${NB_EPISTEMIC}?\\s*${NB_CONNECTOR}`,
+    // "viser/betyr/beviser/sier ikke (noe) at|om …" is a caveat by itself; a bare negation
+    // ("ikke", "kan ikke", "ikke mulig å") only with a knowing verb, so "vil ikke skjule at …" and
+    // "det er ikke tvil om hvorvidt …" stay claims.
+    `\\b(?:viser ikke|betyr ikke|beviser ikke|sier ikke)\\s+(?:\\w+\\s+)?${NB_EPISTEMIC}?\\s*${NB_CONNECTOR}`,
+    `\\b${NB_NEG}\\s+(?:\\w+\\s+)?${NB_EPISTEMIC}\\s+${NB_CONNECTOR}`,
     `\\bikke nødvendigvis\\s+(?:at\\s+)?`,
     `\\bingen (?:bevis|indikasjon|tegn)\\s+(?:på|for)\\s+(?:at\\s+)?`,
     `\\bhvis\\s+du\\s+(?:tror|frykter|mistenker|er redd for|er bekymret for|føler)\\s+(?:at\\s+)?`,

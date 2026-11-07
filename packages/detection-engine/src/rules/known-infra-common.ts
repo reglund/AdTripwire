@@ -10,15 +10,29 @@ export function allExpired(matches: readonly IndicatorMatch[]): boolean {
   return matches.length > 0 && matches.every((m) => m.validity === "expired");
 }
 
+export const EXPIRED_LIMITATION_NB =
+  "Indikatoren er utenfor sitt dokumenterte gyldighetsvindu; verten kan ha blitt tildelt andre.";
+
 export const INFRA_LIMITATIONS = [
   "Indicator lists reflect what researchers published at a point in time; infrastructure changes hands and may be reused or retired.",
   "A hostname match says nothing about what was delivered, or whether anything executed.",
+];
+
+export const INFRA_LIMITATIONS_NB = [
+  "Indikatorlistene gjenspeiler det forskerne hadde publisert på et bestemt tidspunkt; infrastruktur skifter eier og kan gjenbrukes eller tas ut av bruk.",
+  "At et vertsnavn samsvarer, sier ikke noe om hva som ble levert, eller om noe ble kjørt.",
 ];
 
 export const INFRA_FALSE_POSITIVES = [
   "Ad infrastructure is shown to very large numbers of people; most contact is incidental exposure.",
   "Security researchers, sandboxes and link scanners routinely contact documented infrastructure.",
   "Domains may have been re-registered by unrelated parties after publication.",
+];
+
+export const INFRA_FALSE_POSITIVES_NB = [
+  "Annonseinfrastruktur vises for svært mange mennesker; det meste av kontakten er tilfeldig eksponering.",
+  "Sikkerhetsforskere, sandkasser og lenkeskannere kontakter rutinemessig dokumentert infrastruktur.",
+  "Domener kan ha blitt registrert på nytt av urelaterte parter etter publiseringen.",
 ];
 
 /** Indicator matches for an event that is the first sighting of its request. */

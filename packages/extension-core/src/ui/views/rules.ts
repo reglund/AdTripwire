@@ -8,7 +8,8 @@ import {
   pluralize,
   severityLabel,
 } from "../format.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
+import { ruleText } from "../detection-text.js";
 import { rpc } from "../rpc.js";
 import { bulletList, type View } from "./common.js";
 
@@ -20,13 +21,14 @@ interface RuleEntry {
 
 function ruleItem(entry: RuleEntry): HTMLElement {
   const r = entry.definition;
+  const text = ruleText(r, currentLanguage());
   return h(
     "details",
     { class: "rule" },
     h(
       "summary",
       null,
-      h("span", { class: "rule-name" }, r.name),
+      h("span", { class: "rule-name" }, text.name),
       " ",
       h("code", null, r.id),
       " ",
@@ -49,15 +51,15 @@ function ruleItem(entry: RuleEntry): HTMLElement {
         null,
         t("Confidence basis ({level}): ", { level: confidenceLabel(r.confidence) }),
       ),
-      r.confidenceBasis,
+      text.confidenceBasis,
     ),
-    h("p", null, r.description),
+    h("p", null, text.description),
     h("h4", null, t("Required evidence")),
     bulletList(r.requiredEvidence, t("None listed.")),
     h("h4", null, t("Limitations")),
-    bulletList(r.limitations, t("None listed.")),
+    bulletList(text.limitations, t("None listed.")),
     h("h4", null, t("False-positive considerations")),
-    bulletList(r.falsePositiveConsiderations, t("None listed.")),
+    bulletList(text.falsePositiveConsiderations, t("None listed.")),
     r.references.length > 0
       ? h(
           "div",

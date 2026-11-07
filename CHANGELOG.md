@@ -5,6 +5,27 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+### Added
+
+- **Norwegian detection and rule text**: every rule writes bokmål next to the English
+  (`Detection.nb`, `RuleDefinition.nb`), with the same hostnames and counts; the dashboard,
+  popup and Rules view show it when the language is Norwegian, and older detections say they
+  are shown in English. Exports stay English (`nb` is stripped). Terminology reviewed by a
+  native reader (Gate 11). A Norwegian verdict-word guard runs over all rule text, the hand-off
+  text and the UI strings. `pnpm nb:review` writes `docs/phase-11-nb-review.md`.
+- **Share with a specialist**: a sheet before the hand-off export shows the redaction profile,
+  what is included, what the recipient can and cannot conclude, an optional note (never
+  stored) and where to send it (Access Now, your IT security/CERT, Citizen Lab). The package
+  carries a cover note (English, optionally Norwegian), also downloadable as `.md`.
+
+### Changed
+
+- Hand-off package under the strict profile: the embedded STIX part is pseudonymised with the
+  same salt as the evidence part, and analyst notes are left out.
+- Assist screen: more Norwegian verdict sentences are removed (smittet, rammet, fri for
+  spionvare, uten fare, filler words with æ/ø/å, "ikke bare infisert"); a negated verb that is
+  not about knowing ("vil ikke skjule at …") no longer counts as a caveat.
+
 ## [0.4.0] — 2026-11-07
 
 ### Added

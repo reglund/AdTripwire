@@ -241,3 +241,23 @@ describe("redactDetection", () => {
     expect(() => redactDetection(makeDetection(), "strict")).toThrow();
   });
 });
+
+describe("redactDetection drops Norwegian display text", () => {
+  const nb = {
+    summary: `Observert trafikk til ${SUBJECT}.`,
+    significance: "s",
+    confidenceRationale: "c",
+    alternativeExplanations: ["a"],
+    recommendedActions: ["r"],
+    limitations: ["l"],
+    missingVisibility: ["m"],
+  };
+  it("never exports nb, in either profile, and strict leaves no raw subject hostname in it", () => {
+    const d = makeDetection({ nb });
+    expect("nb" in redactDetection(d, "default")).toBe(false);
+    const strict = redactDetection(d, "strict", { keepHostnames: new Set(), salt: SALT });
+    expect("nb" in strict).toBe(false);
+    expect(JSON.stringify(strict)).not.toContain("Observert trafikk");
+    expect(d.nb).toBe(nb);
+  });
+});

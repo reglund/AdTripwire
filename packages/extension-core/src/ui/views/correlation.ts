@@ -18,11 +18,22 @@ import {
   pluralize,
   severityLabel,
 } from "../format.js";
-import { t } from "../i18n.js";
+import { currentLanguage, t } from "../i18n.js";
+import { detectionRuleName, detectionText } from "../detection-text.js";
 import { clusterHash } from "../route.js";
+import { shareSheet } from "./share-sheet.js";
 import { rpc } from "../rpc.js";
 import { assistPanel } from "../assist/panel.js";
-import { bulletList, card, detectionsTable, kv, tableWrap, timeEl, type View } from "./common.js";
+import {
+  bulletList,
+  card,
+  detectionsTable,
+  kv,
+  loadRuleNames,
+  tableWrap,
+  timeEl,
+  type View,
+} from "./common.js";
 
 const PRIORITY_LABEL: Record<SuggestedAction["priority"], string> = {
   now: "Now",
@@ -138,7 +149,27 @@ export function actionsSection(detail: ClusterDetail): HTMLElement {
   );
 }
 
-export function timelineSection(detail: ClusterDetail): HTMLElement {
+/**
+ * In nb mode a detection step is rebuilt from the nb rule name and summary; the correlation
+ * package's English step text is used when the detection has no nb text.
+ */
+function stepText(
+  s: ClusterDetail["timeline"]["steps"][number],
+  detail: ClusterDetail,
+  ruleNames: ReadonlyMap<string, string>,
+): string {
+  if (currentLanguage() !== "nb" || s.kind !== "detection" || !s.severity) return s.text;
+  const d = detail.detections.find((x) => x.detectionId === s.detectionId);
+  if (!d) return s.text;
+  const text = detectionText(d, "nb");
+  if (text.fallback) return s.text;
+  return `${detectionRuleName(d, ruleNames)} (${severityLabel(s.severity)}): ${text.summary}`;
+}
+
+export function timelineSection(
+  detail: ClusterDetail,
+  ruleNames: ReadonlyMap<string, string> = new Map(),
+): HTMLElement {
   const tl = detail.timeline;
   return card(
     t("Timeline summary"),
@@ -175,7 +206,7 @@ export function timelineSection(detail: ClusterDetail): HTMLElement {
                       ? severityBadge(s.severity, severityLabel(s.severity))
                       : h("span", { class: "badge kind" }, t("event")),
                   ),
-                  h("td", { class: "wrap" }, s.text),
+                  h("td", { class: "wrap" }, stepText(s, detail, ruleNames)),
                 ),
               ),
             ),
@@ -186,9 +217,10 @@ export function timelineSection(detail: ClusterDetail): HTMLElement {
 }
 
 export async function renderClusterDetail(clusterId: string): Promise<Node> {
-  const [detail, settings] = await Promise.all([
+  const [detail, settings, ruleNames] = await Promise.all([
     rpc<ClusterDetail | null>({ type: "get_cluster", clusterId }),
     rpc<Settings>({ type: "get_settings" }),
+    loadRuleNames(),
   ]);
   const back = h("p", null, h("a", { href: "#correlation" }, t("← All related activity")));
   if (!detail) {
@@ -252,7 +284,8 @@ export async function renderClusterDetail(clusterId: string): Promise<Node> {
       ]),
     ),
     detectionsTable(detail.detections, t("Detections in this group")),
-    timelineSection(detail),
+    card(t("Share with a specialist"), shareSheet({ detectionIds: c.detectionIds })),
+    timelineSection(detail, ruleNames),
     actionsSection(detail),
     assistPanel({ clusterId }, settings),
   );
