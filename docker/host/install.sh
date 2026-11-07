@@ -31,7 +31,12 @@ if [ "$remove" = yes ]; then
   exit 0
 fi
 $sudo mkdir -p "$dir"
-$sudo cp "$here/adtripwire-exposure-docker.service" "$here/adtripwire-exposure-docker.timer" "$dir/"
+# The unit runs compose from this checkout's docker/ directory, wherever it was cloned.
+compose_dir=$(cd "$here/.." && pwd)
+sed "s#^WorkingDirectory=.*#WorkingDirectory=$compose_dir#" "$here/adtripwire-exposure-docker.service" |
+  $sudo tee "$dir/adtripwire-exposure-docker.service" >/dev/null
+$sudo cp "$here/adtripwire-exposure-docker.timer" "$dir/"
+echo "unit runs in $compose_dir"
 $sc daemon-reload
 $sc enable --now adtripwire-exposure-docker.timer
 $sc list-timers adtripwire-exposure-docker.timer --no-pager
