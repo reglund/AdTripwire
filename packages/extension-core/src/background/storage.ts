@@ -19,6 +19,9 @@ const KEY_DETECTIONS = "detections";
 const KEY_EVENTS = "events";
 const KEY_EXPOSURE = "exposure";
 const KEY_METRICS = "metrics";
+/** Seen-alongside store and its third-party-domain baseline (hostnames and day keys only). */
+const KEY_ALONGSIDE = "alongside.v1";
+const KEY_ALONGSIDE_BASELINE = "alongside.baseline.v1";
 const KEY_IMPORTED_SETS = "importedIndicatorSets";
 const KEY_NOTES = "detectionNotes";
 const KEY_SIGNED_BUNDLE = "signedIndicatorBundle";
@@ -392,6 +395,15 @@ export class LocalStore {
 
   async setExposureSnapshot(s: unknown): Promise<void> {
     await browser.storage.local.set({ [KEY_EXPOSURE]: s });
+  }
+
+  async getAlongsideSnapshot(): Promise<{ store: unknown; baseline: unknown }> {
+    const d = await browser.storage.local.get([KEY_ALONGSIDE, KEY_ALONGSIDE_BASELINE]);
+    return { store: d[KEY_ALONGSIDE], baseline: d[KEY_ALONGSIDE_BASELINE] };
+  }
+
+  async setAlongsideSnapshot(store: unknown, baseline: unknown): Promise<void> {
+    await browser.storage.local.set({ [KEY_ALONGSIDE]: store, [KEY_ALONGSIDE_BASELINE]: baseline });
   }
 
   async getMetrics(): Promise<Metrics> {

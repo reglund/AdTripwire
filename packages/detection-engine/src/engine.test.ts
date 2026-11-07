@@ -529,6 +529,16 @@ describe("DetectionEngine scenarios", () => {
       );
       expect(out.some((d) => d.ruleId === "exposure.repeated_surveillance_contact")).toBe(false);
     });
+    it("exposure store prunes days older than a cut-off and drops emptied hosts", () => {
+      const s = new MemoryExposureStore();
+      s.record("a", "2026-01-01");
+      s.record("a", "2026-03-01");
+      s.record("b", "2026-01-02");
+      s.pruneBefore("2026-02-01");
+      expect(s.distinctDays("a")).toBe(1);
+      expect(s.distinctDays("b")).toBe(0);
+      expect(s.size).toBe(1);
+    });
     it("exposure store is serialisable and bounded", () => {
       const s = new MemoryExposureStore({ maxHosts: 3, maxDaysPerHost: 2 });
       s.record("a", "2026-11-01");

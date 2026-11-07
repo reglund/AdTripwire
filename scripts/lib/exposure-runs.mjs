@@ -114,18 +114,62 @@ export function readRegularFile(path, { maxBytes = MAX_FILE_BYTES, onSkip } = {}
   }
 }
 
+/** Caps on the per-site "seen alongside" fields; the harness truncates to them, the reader enforces them. */
+export const ALONGSIDE_MAX_ENTRIES = 200;
+export const THIRD_PARTY_LIST_MAX = 1000;
+export const ALONGSIDE_ANCHORS_MAX = 1_000_000;
+
+/** A bare hostname: no scheme, path, query or port. Applied to every published host. */
+export const HOSTNAME_RE = /^[a-z0-9]([a-z0-9._-]{0,251}[a-z0-9])?$/;
+/** An indicator id, or the indicator's hostname when the harness could resolve it. */
+const ANCHOR_RE = /^[A-Za-z0-9._:-]{1,253}$/;
+
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/** Valid optional `alongside`, `thirdPartyDomainsList` and `alongsideAnchors` of one result row. */
+function validAlongsideFields(row) {
+  if (row.alongside !== undefined) {
+    if (!Array.isArray(row.alongside) || row.alongside.length > ALONGSIDE_MAX_ENTRIES) return false;
+    const ok = row.alongside.every(
+      (a) =>
+        isObject(a) &&
+        typeof a.host === "string" &&
+        HOSTNAME_RE.test(a.host) &&
+        typeof a.anchor === "string" &&
+        ANCHOR_RE.test(a.anchor) &&
+        (a.scope === "frame" || a.scope === "page"),
+    );
+    if (!ok) return false;
+  }
+  if (row.thirdPartyDomainsList !== undefined) {
+    const l = row.thirdPartyDomainsList;
+    if (
+      !Array.isArray(l) ||
+      l.length > THIRD_PARTY_LIST_MAX ||
+      !l.every((d) => typeof d === "string" && HOSTNAME_RE.test(d))
+    )
+      return false;
+  }
+  if (row.alongsideAnchors !== undefined) {
+    const n = row.alongsideAnchors;
+    if (!Number.isInteger(n) || n < 0 || n > ALONGSIDE_ANCHORS_MAX) return false;
+  }
+  return true;
+}
 
 /**
  * True when a run has the shape the readers below rely on: an object whose `results` are objects
  * with a string `site`, whose `detections` (when present) are arrays of objects with string
- * `ruleId` and `severity`, and whose `hostnames` (when present) are arrays of strings.
+ * `ruleId` and `severity`, and whose `hostnames` (when present) are arrays of strings. The
+ * optional "seen alongside" fields (`alongside`, `thirdPartyDomainsList`, `alongsideAnchors`)
+ * must be well-formed, hostname-only and length-capped when present.
  */
 export function validRunShape(j) {
   if (!isObject(j) || typeof j.browser !== "string" || !j.browser || !Array.isArray(j.results))
     return false;
   return j.results.every((row) => {
     if (!isObject(row) || typeof row.site !== "string") return false;
+    if (!validAlongsideFields(row)) return false;
     if (row.detections === undefined) return true;
     return (
       Array.isArray(row.detections) &&

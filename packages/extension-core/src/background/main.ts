@@ -53,11 +53,16 @@ import {
   type FinalisedPage,
 } from "./daily.js";
 import {
+  AlongsideStore,
+  AlongsideTracker,
   badgeFor,
   buildAssistContext,
   clusterDetections,
   clusterDomain,
+  listAlongside,
+  listAlongsideAll,
   summarizeExposure,
+  type AlongsideListing,
   type ExposureSummary,
   type IndicatorInfo,
   renderPrompt,
@@ -97,6 +102,9 @@ export interface SensorAdapter {
 const SESSION_KEY_ENGINE = "engineSnapshot";
 const PAGE_SENSOR_ID = "adtripwire-page-sensor";
 const ALARM_RETENTION = "adtripwire-retention";
+/** UTC day key (YYYY-MM-DD); the alongside store and baseline use UTC days like the exposure store. */
+const utcDay = (ts: number): string => new Date(ts).toISOString().slice(0, 10);
+
 const log = (level: "info" | "warn" | "error", msg: string) => {
   const line = `[AdTripwire] ${msg}`;
   if (level === "error") console.error(line);
@@ -116,6 +124,15 @@ class Background {
   private static readonly THIRD_PARTY_DOMAINS_MAX = 20_000;
   private readonly sensor: ReturnType<SensorAdapter["createSensor"]>;
   private exposure = new MemoryExposureStore();
+  /**
+   * "Seen alongside" collection. Reads events after the engine has ingested them and has no
+   * write path into the engine, so it can never change a detection.
+   */
+  private alongside = new AlongsideTracker({ matcher: () => this.matcher });
+  /** Day counter of third-party registrable domains: the denominator for the alongside share. */
+  private alongsideBaseline = new MemoryExposureStore({ maxHosts: 2000, maxDaysPerHost: 60 });
+  private alongsideDirty = false;
+  private lastAlongsideDev = "";
   private metrics: Metrics = { ...EMPTY_METRICS };
   private snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly ready: Promise<void>;
@@ -220,6 +237,17 @@ class Background {
       }
     }
     this.exposure = exposure;
+
+    try {
+      const snap = await this.store.getAlongsideSnapshot();
+      this.alongside = new AlongsideTracker({
+        matcher: () => this.matcher,
+        store: AlongsideStore.fromJSON(snap.store),
+      });
+      this.alongsideBaseline = MemoryExposureStore.fromJSON(snap.baseline);
+    } catch (e) {
+      log("warn", `alongside snapshot ignored: ${String(e)}`);
+    }
 
     const engineOpts = this.engineOptions(this.store.getSettings().monitoring);
     let restored = false;
@@ -627,6 +655,27 @@ class Background {
     }
   }
 
+  /**
+   * The "seen alongside" listing plus indicator id → documented hostname, so the dashboard can
+   * name the anchors without holding the indicator list. Hostnames and ids only.
+   */
+  private alongsideListing(): AlongsideListing & { anchorHosts: Record<string, string> } {
+    const listing = listAlongside(this.alongside.store, this.alongsideBaseline);
+    const wanted = new Set<string>();
+    for (const r of [...listing.rows, ...listing.pageOnly])
+      for (const a of r.anchors) wanted.add(a);
+    const anchorHosts: Record<string, string> = {};
+    if (wanted.size > 0) {
+      for (const set of this.activeSets()) {
+        for (const rec of set.indicators) {
+          if (!wanted.has(rec.id) || rec.id in anchorHosts) continue;
+          if (rec.indicatorType !== "url_path") anchorHosts[rec.id] = rec.indicator;
+        }
+      }
+    }
+    return { ...listing, anchorHosts };
+  }
+
   /** STIX / SIEM / hand-off exports over the selected detections and their events. */
   private exportResearch(
     req: Extract<UiRequest, { type: "export_stix" | "export_siem" | "export_handoff" }>,
@@ -645,6 +694,10 @@ class Background {
       rulesetVersion: this.eng.rulesetVersion,
       browser: this.capabilities,
       now: new Date(),
+      // Candidates are not tied to detections: a filtered export (selected detections) omits them.
+      ...(req.detectionIds
+        ? {}
+        : { alongside: listAlongside(this.alongside.store, this.alongsideBaseline) }),
     });
   }
 
@@ -823,6 +876,17 @@ class Background {
       if (this.thirdPartyDomains.size < Background.THIRD_PARTY_DOMAINS_MAX)
         this.thirdPartyDomains.add(domain);
       if (typeof ev.tabId === "number" && ev.tabId >= 0) this.pages.onThirdParty(ev.tabId, domain);
+      // The page's own site is never a candidate, so it is not part of the denominator either;
+      // without a known top hostname the domain cannot be told apart and is skipped.
+      const top = ev.frameContext.topHostname;
+      if (
+        ev.eventType !== "page_signal" &&
+        top !== undefined &&
+        top !== "" &&
+        domain !== clusterDomain(top) &&
+        this.alongsideBaseline.record(domain, utcDay(ev.timestamp))
+      )
+        this.alongsideDirty = true;
     }
     try {
       const { detections, updated } = engine.ingest(ev);
@@ -847,11 +911,35 @@ class Background {
       }
       if (detections.length || updated.length)
         void this.store.setExposureSnapshot(this.exposure.toJSON());
+      this.observeAlongside(ev, engine);
       this.scheduleSnapshot();
     } catch (e) {
       log("error", `ingest failed: ${String(e)}`);
     } finally {
       this.metrics.ingestMsTotal += performance.now() - t0;
+    }
+  }
+
+  /**
+   * DEV-only: the browser-level tests read the extension's console, so the tracked hosts are
+   * logged (hostname and scope only) from the same listing the `all` request returns.
+   */
+  private logAlongsideDev(): void {
+    const all = listAlongsideAll(this.alongside.store, this.alongsideBaseline);
+    const line = `alongside: ${all.hosts
+      .map((h) => `${h.hostname}@${h.frameHits > 0 ? "frame" : "page"}`)
+      .join(",")}`;
+    if (line === this.lastAlongsideDev) return;
+    this.lastAlongsideDev = line;
+    log("info", line);
+  }
+
+  /** After ingest; a failure here must never affect detection handling. */
+  private observeAlongside(ev: NormalizedEvent, engine: DetectionEngine): void {
+    try {
+      if (this.alongside.observe(ev, () => engine.window.recent())) this.alongsideDirty = true;
+    } catch (e) {
+      log("warn", `alongside: ${String(e)}`);
     }
   }
 
@@ -864,6 +952,8 @@ class Background {
 
   private onTopLevelNavigation(ev: NormalizedEvent): void {
     if (typeof ev.tabId !== "number" || ev.tabId < 0) return;
+    // A new page: the previous page's open "seen alongside" anchors must not carry over.
+    this.alongside.onNavigation(ev.tabId, ev.timestamp);
     const { counted, finalised } = this.pages.onNavigation(ev.tabId, ev.timestamp, ev.requestId);
     if (counted) this.recordDay(ev.timestamp, applyPageStarted);
     if (finalised) this.recordFinalisedPage(finalised);
@@ -911,6 +1001,13 @@ class Background {
     this.snapshotTimer = setTimeout(() => {
       this.snapshotTimer = undefined;
       void this.store.flushDaily();
+      if (this.alongsideDirty && !this.deleting) {
+        this.alongsideDirty = false;
+        if (__ADTRIPWIRE_DEV__) this.logAlongsideDev();
+        void this.store
+          .setAlongsideSnapshot(this.alongside.store.toJSON(), this.alongsideBaseline.toJSON())
+          .catch((e) => log("warn", `alongside persist: ${String(e)}`));
+      }
       if (!this.engine) return;
       this.engine.pruneWindow();
       browser.storage.session
@@ -924,6 +1021,13 @@ class Background {
     // Retention runs at start and hourly; refresh the badge so expired contacts drop off it.
     this.scheduleBadge();
     const removed = this.store.applyRetention(Date.now(), this.store.getSettings().retention);
+    const minDay = utcDay(
+      Date.now() - this.store.getSettings().retention.detectionRetentionDays * 86_400_000,
+    );
+    this.alongside.store.pruneBefore(minDay);
+    this.alongsideBaseline.pruneBefore(minDay);
+    this.alongsideDirty = true;
+    this.scheduleSnapshot();
     void this.store.flushDaily();
     if (removed.removedDetections || removed.removedEvents)
       log(
@@ -1067,6 +1171,9 @@ class Background {
         this.deleting = true;
         try {
           this.exposure = new MemoryExposureStore();
+          this.alongside = new AlongsideTracker({ matcher: () => this.matcher });
+          this.alongsideBaseline = new MemoryExposureStore({ maxHosts: 2000, maxDaysPerHost: 60 });
+          this.alongsideDirty = false;
           this.engine = new DetectionEngine(
             this.engineOptions(this.store.getSettings().monitoring),
           );
@@ -1121,6 +1228,10 @@ class Background {
         return this.exportResearch(req);
       case "get_exposure":
         return this.exposure_();
+      case "get_alongside":
+        return req.all
+          ? listAlongsideAll(this.alongside.store, this.alongsideBaseline)
+          : this.alongsideListing();
       case "get_digest":
         return buildDigest(this.store.listDays(), Date.now());
       case "get_clusters":

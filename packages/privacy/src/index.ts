@@ -12,4 +12,9 @@ export {
   pseudonymiseHostnamesInText,
 } from "./redact.js";
 export type { RedactOptions, RedactionProfile } from "./redact.js";
-export { buildEvidenceExport, serializeExport, EXPORT_DISCLAIMER } from "./export.js";
+export {
+  buildEvidenceExport,
+  serializeExport,
+  EXPORT_DISCLAIMER,
+  SEEN_ALONGSIDE_DISCLAIMER,
+} from "./export.js";

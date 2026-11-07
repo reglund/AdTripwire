@@ -754,4 +754,28 @@ export const NB: Record<string, string> = {
   "Blocking ads also means AdTripwire has less to observe. Fewer recorded contacts after that is the intended effect, not a sign that the risk was never there.":
     "Når annonser blokkeres, har AdTripwire også mindre å observere. Færre registrerte kontakter etterpå er den tilsiktede effekten, ikke et tegn på at risikoen aldri var der.",
   "Security Planner: personalised advice": "Security Planner: personlige råd",
+  "Seen alongside": "Sett sammen med",
+  "Hostnames that appeared in the same ad frame as a documented host. These are not detections and say nothing about the hosts themselves; they are leads for researchers. The list fills slowly: documented hosts are rare.":
+    "Vertsnavn som dukket opp i samme annonseramme som en dokumentert vert. Dette er ikke deteksjoner og sier ingenting om selve vertene; de er spor for forskere. Listen fylles sakte: dokumenterte verter er sjeldne.",
+  "No request to a documented host has been recorded since this list started collecting, so there is nothing to compare against yet. Documented hosts are rare; the list fills as they are observed.":
+    "Ingen forespørsel til en dokumentert vert er registrert siden denne listen begynte å samle inn, så det finnes ingenting å sammenligne med ennå. Dokumenterte verter er sjeldne; listen fylles etter hvert som de observeres.",
+  "{n} request(s) to documented hosts were recorded, but only from the top document of a page, not from an ad frame. Hostnames loaded by those pages are listed below as page scope; they do not count toward the ranking.":
+    "{n} forespørsel/forespørsler til dokumenterte verter ble registrert, men bare fra toppdokumentet på en side, ikke fra en annonseramme. Vertsnavn lastet av disse sidene er listet under som sidenivå; de teller ikke med i rangeringen.",
+  "{n} request(s) to documented hosts were recorded from ad frames, but no other hostname was seen in the same frames so far.":
+    "{n} forespørsel/forespørsler til dokumenterte verter ble registrert fra annonserammer, men ingen andre vertsnavn er sett i de samme rammene så langt.",
+  "{hosts} hostname(s) were seen alongside documented hosts in an ad frame, but none on {min} or more different days yet. A hostname is listed once it reaches {min} days.":
+    "{hosts} vertsnavn ble sett sammen med dokumenterte verter i en annonseramme, men ingen på {min} eller flere ulike dager ennå. Et vertsnavn listes når det når {min} dager.",
+  "{n} request(s) to documented hosts recorded on {days} day(s): {frame} from ad frames, {page} from the top document of a page. {tracked} hostname(s) tracked.":
+    "{n} forespørsel/forespørsler til dokumenterte verter registrert på {days} dag(er): {frame} fra annonserammer, {page} fra toppdokumentet på en side. {tracked} vertsnavn følges.",
+  "Coverage depends on the browser: Firefox exposes the full frame ancestry, while browsers without it record fewer relations.":
+    "Dekningen avhenger av nettleseren: Firefox viser hele rammehierarkiet, mens nettlesere uten det registrerer færre sammenhenger.",
+  "Seen alongside in an ad frame": "Sett sammen med i en annonseramme",
+  "Page scope only": "Bare sidenivå",
+  "These hostnames were seen only while a documented host was requested by the top document of a page, so they are not tied to an ad frame. They are kept apart and do not count toward the list above.":
+    "Disse vertsnavnene ble bare sett mens en dokumentert vert ble forespurt av toppdokumentet på en side, så de er ikke knyttet til en annonseramme. De holdes adskilt og teller ikke med i listen over.",
+  "Days at page scope": "Dager på sidenivå",
+  "Days alongside": "Dager sammen med",
+  "Documented host(s)": "Dokumentert(e) vert(er)",
+  "{n} day(s)": "{n} dag(er)",
+  "{a} of {b} days": "{a} av {b} dager",
 };

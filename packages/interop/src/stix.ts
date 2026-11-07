@@ -18,7 +18,7 @@ import type {
   IndicatorSet,
   NormalizedEvent,
 } from "@adtripwire/shared";
-import { EXPORT_DISCLAIMER } from "@adtripwire/privacy";
+import { EXPORT_DISCLAIMER, SEEN_ALONGSIDE_DISCLAIMER } from "@adtripwire/privacy";
 import { applyRedaction, indexIndicators, safePath } from "./common.js";
 import type { RedactionChoice } from "./common.js";
 import { scoId, stixId } from "./uuid.js";
@@ -405,4 +405,107 @@ export function detectionsToStix(
     id: stixId("bundle", `detections:${reportId}`),
     objects: [...objects.values()],
   };
+}
+
+/** Structural subset of a "seen alongside" row (the correlation package's `AlongsideRow`). */
+export interface StixAlongsideRow {
+  hostname: string;
+  alongsideDays: number;
+  seenDays: number;
+  share: number;
+  /** AdTripwire indicator ids of the documented hosts it was seen alongside. */
+  anchors: readonly string[];
+  /** Newest UTC day key, YYYY-MM-DD. */
+  lastSeen: string;
+}
+
+const ALONGSIDE_HOST = /^[a-z0-9]([a-z0-9._-]{0,251}[a-z0-9])?$/;
+const ALONGSIDE_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Adds "seen alongside" candidates to a bundle: per row one `observed-data` plus a
+ * `domain-name` SCO, and a `related-to` relationship to the anchor's indicator SDO for every
+ * anchor whose indicator is already in the bundle. Never creates an `indicator`: a candidate is
+ * an observation, not an indicator. Rows with a malformed hostname or day are skipped, so only
+ * hostnames ever leave. Returns the bundle (mutated) for chaining.
+ */
+export function addAlongsideToStix(
+  bundle: StixBundle,
+  rows: readonly StixAlongsideRow[],
+  indicatorSets: readonly IndicatorSet[],
+  opts: StixExportOptions,
+): StixBundle {
+  const valid = rows.filter(
+    (r) =>
+      ALONGSIDE_HOST.test(r.hostname) &&
+      ALONGSIDE_DAY.test(r.lastSeen) &&
+      r.alongsideDays > 0 &&
+      r.hostname.includes("."),
+  );
+  if (valid.length === 0) return bundle;
+  const identityId = resolveIdentity(opts);
+  const present = new Set(bundle.objects.map((o) => o.id));
+  const indicators = indexIndicators(indicatorSets);
+  const modified = stixTimestamp(opts.producedAt);
+  const added: StixObject[] = [];
+  const add = (o: StixObject): void => {
+    if (present.has(o.id)) return;
+    present.add(o.id);
+    added.push(o);
+  };
+  if (!present.has(identityId)) add(identityObject(identityId));
+  for (const row of [...valid].sort((a, b) => (a.hostname < b.hostname ? -1 : 1))) {
+    const created = dayStart(row.lastSeen) < modified ? dayStart(row.lastSeen) : modified;
+    const scoRef = scoId("domain-name", { value: row.hostname });
+    add({ type: "domain-name", spec_version: "2.1", id: scoRef, value: row.hostname });
+    const observedId = stixId("observed-data", `alongside:${row.hostname}`);
+    add({
+      type: "observed-data",
+      spec_version: "2.1",
+      id: observedId,
+      created,
+      modified,
+      created_by_ref: identityId,
+      first_observed: dayStart(row.lastSeen),
+      last_observed: dayEnd(row.lastSeen),
+      number_observed: 1,
+      object_refs: [scoRef],
+      labels: ["adtripwire:seen-alongside"],
+      object_marking_refs: [TLP_CLEAR_MARKING_ID],
+      x_adtripwire_note: `Observation, not an indicator. ${SEEN_ALONGSIDE_DISCLAIMER}`,
+      x_adtripwire_alongside_days: row.alongsideDays,
+      x_adtripwire_seen_days: row.seenDays,
+      x_adtripwire_share: Math.round(row.share * 1000) / 1000,
+    });
+    const description = [
+      `An observation, not an indicator: ${row.hostname} appeared in the same ad frame as a documented host on ${row.alongsideDays} of ${row.seenDays} days it was seen (most recent ${row.lastSeen}).`,
+      SEEN_ALONGSIDE_DISCLAIMER,
+    ].join(" ");
+    for (const anchorId of [...new Set(row.anchors)].sort()) {
+      const hit = indicators.get(anchorId);
+      if (!hit) continue;
+      const targetId = stixIndicatorId(hit.setId, hit.record.id);
+      if (!present.has(targetId)) continue;
+      add({
+        type: "relationship",
+        spec_version: "2.1",
+        id: stixId("relationship", `${observedId}:related-to:${targetId}`),
+        created,
+        modified,
+        created_by_ref: identityId,
+        relationship_type: "related-to",
+        source_ref: observedId,
+        target_ref: targetId,
+        description,
+        object_marking_refs: [TLP_CLEAR_MARKING_ID],
+      });
+    }
+  }
+  bundle.objects.push(...added);
+  for (const o of bundle.objects) {
+    if (o.type !== "report" || !Array.isArray(o["object_refs"])) continue;
+    const refs = o["object_refs"] as string[];
+    for (const a of added) if (!refs.includes(a.id)) refs.push(a.id);
+  }
+  return bundle;
 }

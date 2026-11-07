@@ -1,6 +1,7 @@
 export {
   indicatorSetToStix,
   detectionsToStix,
+  addAlongsideToStix,
   stixToIndicatorSet,
   stixIndicatorId,
   stixPatternFor,
@@ -14,6 +15,7 @@ export type {
   StixObject,
   StixExportOptions,
   StixDetectionExportOptions,
+  StixAlongsideRow,
   StixImportOptions,
   StixImportResult,
 } from "./stix.js";

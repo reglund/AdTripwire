@@ -1,16 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { EXPORT_DISCLAIMER } from "@adtripwire/privacy";
+import { EXPORT_DISCLAIMER, SEEN_ALONGSIDE_DISCLAIMER } from "@adtripwire/privacy";
 import type { IndicatorSet } from "@adtripwire/shared";
 import {
   ADTRIPWIRE_IDENTITY_ID,
+  addAlongsideToStix,
   detectionsToStix,
   indicatorSetToStix,
   stixIndicatorId,
   stixToIndicatorSet,
   TLP_CLEAR_MARKING_ID,
 } from "./stix.js";
-import type { StixBundle, StixObject } from "./stix.js";
+import type { StixAlongsideRow, StixBundle, StixObject } from "./stix.js";
 import { parseDomainPattern } from "./stix-import.js";
 import { INITIATOR, TOP_SITE, makeDetection, makeEvents, makeSet } from "./test-fixtures.js";
 
@@ -225,6 +226,111 @@ describe("detectionsToStix", () => {
     const empty = detectionsToStix([], [], [], { producedAt });
     checkCommon(empty);
     expect((byType(empty, "report")[0]!.object_refs as string[]).length).toBeGreaterThan(0);
+  });
+});
+
+describe("addAlongsideToStix", () => {
+  const set = makeSet();
+  const row = (over: Partial<StixAlongsideRow> = {}): StixAlongsideRow => ({
+    hostname: "creative.synthetic-cdn.test",
+    alongsideDays: 3,
+    seenDays: 4,
+    share: 0.75,
+    anchors: ["s-1", "not-in-sets"],
+    lastSeen: "2026-11-05",
+    ...over,
+  });
+  const base = (): StixBundle => {
+    const b = detectionsToStix([makeDetection()], makeEvents(), [set], { producedAt });
+    // Like export_stix with includeIndicators: every indicator of the set is in the bundle.
+    const ib = indicatorSetToStix(set, { producedAt });
+    const seen = new Set(b.objects.map((o) => o.id));
+    for (const o of ib.objects) if (!seen.has(o.id)) b.objects.push(o);
+    return b;
+  };
+
+  it("adds observed-data, a domain-name SCO and a related-to relationship, and validates", () => {
+    const b = base();
+    const indicatorsBefore = byType(b, "indicator").map((o) => o.id);
+    addAlongsideToStix(b, [row()], [set], { producedAt });
+    checkCommon(b);
+    const obs = byType(b, "observed-data").find(
+      (o) => o["labels"] && (o["labels"] as string[]).includes("adtripwire:seen-alongside"),
+    )!;
+    expect(obs.x_adtripwire_alongside_days).toBe(3);
+    expect(obs.x_adtripwire_seen_days).toBe(4);
+    const sco = b.objects.find((o) => o.id === (obs.object_refs as string[])[0])!;
+    expect(sco).toMatchObject({ type: "domain-name", value: "creative.synthetic-cdn.test" });
+    const rels = byType(b, "relationship");
+    expect(rels).toHaveLength(1);
+    expect(rels[0]).toMatchObject({
+      relationship_type: "related-to",
+      source_ref: obs.id,
+      target_ref: stixIndicatorId("syn-set", "s-1"),
+    });
+    expect(rels[0]!.description as string).toContain("An observation, not an indicator");
+    expect(rels[0]!.description as string).toContain(SEEN_ALONGSIDE_DISCLAIMER);
+    const report = byType(b, "report")[0]!;
+    expect(report.object_refs as string[]).toEqual(
+      expect.arrayContaining([obs.id, sco.id, rels[0]!.id]),
+    );
+    expect(indicatorsBefore.length).toBeGreaterThan(0);
+  });
+
+  it("never creates an indicator for a candidate", () => {
+    const b = base();
+    const before = byType(b, "indicator");
+    addAlongsideToStix(b, [row(), row({ hostname: "other.synthetic-cdn.test" })], [set], {
+      producedAt,
+    });
+    const after = byType(b, "indicator");
+    expect(after.map((o) => o.id)).toEqual(before.map((o) => o.id));
+    expect(JSON.stringify(after)).not.toContain("synthetic-cdn.test");
+    expect(byType(b, "observed-data").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("omits the relationship when the anchor indicator is not in the bundle", () => {
+    const b = detectionsToStix([], [], [set], { producedAt });
+    addAlongsideToStix(b, [row()], [set], { producedAt });
+    checkCommon(b);
+    expect(byType(b, "relationship")).toHaveLength(0);
+    expect(byType(b, "observed-data")).toHaveLength(1);
+    expect(byType(b, "indicator")).toHaveLength(0);
+  });
+
+  it("is deterministic and idempotent for the same input", () => {
+    const a = base();
+    const c = base();
+    addAlongsideToStix(a, [row()], [set], { producedAt });
+    addAlongsideToStix(c, [row()], [set], { producedAt });
+    expect(JSON.stringify(a)).toBe(JSON.stringify(c));
+    const n = a.objects.length;
+    addAlongsideToStix(a, [row()], [set], { producedAt });
+    expect(a.objects.length).toBe(n);
+  });
+
+  it("carries only hostnames: malformed rows are skipped, no paths, queries or URLs", () => {
+    const b = base();
+    addAlongsideToStix(
+      b,
+      [
+        row(),
+        row({ hostname: "evil.test/path?x=1" }),
+        row({ hostname: "https://u.test" }),
+        row({ hostname: "localhost" }),
+        row({ lastSeen: "yesterday" }),
+      ],
+      [set],
+      { producedAt },
+    );
+    const added = byType(b, "observed-data").filter((o) =>
+      (o["labels"] as string[] | undefined)?.includes("adtripwire:seen-alongside"),
+    );
+    expect(added).toHaveLength(1);
+    const hosts = byType(b, "domain-name").map((o) => o.value as string);
+    for (const v of hosts) expect(v).toMatch(/^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/);
+    expect(hosts).toContain("creative.synthetic-cdn.test");
+    expect(JSON.stringify(added)).not.toMatch(/[?=]|https?:/);
   });
 });
 

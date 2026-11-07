@@ -42,6 +42,10 @@ export function parseUiRequest(raw: unknown): UiRequest | null {
     case "list_rules":
     case "get_digest":
       return { type: r.type };
+    case "get_alongside":
+      if (r.all === undefined) return { type: "get_alongside" };
+      if (typeof r.all !== "boolean") return null;
+      return r.all ? { type: "get_alongside", all: true } : { type: "get_alongside" };
     case "list_detections": {
       const f = r.filter;
       if (f === undefined) return { type: "list_detections" };

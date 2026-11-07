@@ -95,6 +95,9 @@ export type UiRequest =
   | { type: "update_ui_settings"; patch: Partial<Settings["ui"]> }
   // Exposure overview: documented-infrastructure contacts grouped per host
   | { type: "get_exposure" }
+  // Seen alongside: hostnames observed in the same frame lineage as a documented host (read-only; never a detection)
+  // `all: true` also returns every tracked host with its hit counters (for delta readers such as the rig).
+  | { type: "get_alongside"; all?: boolean }
   // Phase 7: per-day counts (no URLs, no per-page records) for the morning line and calendar
   | { type: "get_digest" }
   // Phase 6: signed indicator bundles (offline, file-based)

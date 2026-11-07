@@ -7,6 +7,16 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Seen alongside**: a dashboard tab listing hostnames that appeared in the same ad frame as
+  a host from the indicator set (surveillance or malicious, currently valid). Ranked by the
+  share of days a host was seen alongside a documented host out of the days its domain was
+  seen at all. Not a detection and never a severity; the page's own site is never recorded
+  (fail closed without a known top document; anchors close on navigation). Included in the
+  hand-off package (omitted under the strict profile) and in the STIX export as
+  `observed-data`, never as `indicator`. The exposure harness records per-site deltas
+  (`alongside`, `thirdPartyDomainsList`, `alongsideAnchors`) and the observatory page gets a
+  "Seen alongside documented hosts" section. Plan: `docs/seen-alongside-plan.md`.
+
 - **If you are concerned**: the Exposure view and the README list the steps the Citizen Lab
   report recommends to people who may be targeted (advertising ID, ad blocking), with a link
   to Security Planner, and say that AdTripwire itself only observes.

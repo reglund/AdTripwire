@@ -27,6 +27,8 @@ describe("parseHash", () => {
   it("parses correlation routes and validates cluster ids", () => {
     expect(parseHash("#correlation")).toEqual({ name: "correlation" });
     expect(parseHash("#exposure")).toEqual({ name: "exposure" });
+    expect(parseHash("#alongside")).toEqual({ name: "alongside" });
+    expect(routeTab({ name: "alongside" })).toBe("alongside");
     expect(parseHash(clusterHash("c-0123abcd"))).toEqual({ name: "cluster", id: "c-0123abcd" });
     expect(parseHash("#cluster/<script>")).toEqual({ name: "correlation" });
     expect(routeTab({ name: "cluster", id: "c-0123abcd" })).toBe("correlation");

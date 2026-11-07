@@ -6,8 +6,15 @@ import type {
   SensorCapabilities,
   UiRequest,
 } from "@adtripwire/shared";
-import { EXPORT_DISCLAIMER, buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
 import {
+  EXPORT_DISCLAIMER,
+  SEEN_ALONGSIDE_DISCLAIMER,
+  buildEvidenceExport,
+  serializeExport,
+} from "@adtripwire/privacy";
+import type { AlongsideListing, AlongsideRow } from "@adtripwire/correlation";
+import {
+  addAlongsideToStix,
   detectionsToEcsNdjson,
   detectionsToStix,
   eventsToEcsNdjson,
@@ -23,12 +30,51 @@ export interface ResearchExportInput {
   rulesetVersion: string;
   browser: SensorCapabilities;
   now: Date;
+  /** "Seen alongside" listing; omitted means the sections are empty. */
+  alongside?: AlongsideListing;
 }
 
 export type ResearchExportRequest = Extract<
   UiRequest,
   { type: "export_stix" | "export_siem" | "export_handoff" }
 >;
+
+/** Hand-off section: hostnames, counts and indicator ids only. Never a detection. */
+function seenAlongsideSection(
+  listing: AlongsideListing | undefined,
+  profile: "default" | "strict",
+) {
+  const row = (r: AlongsideRow, scope: "frame" | "page") => ({
+    hostname: r.hostname,
+    scope,
+    alongsideDays: r.alongsideDays,
+    seenDays: r.seenDays,
+    share: Math.round(r.share * 1000) / 1000,
+    anchors: [...r.anchors],
+    frameDays: r.frameDays,
+    pageDays: r.pageDays,
+    lastSeen: r.lastSeen,
+  });
+  if (profile === "strict")
+    // The strict profile pseudonymises/removes names; hostnames of unknown third parties are
+    // omitted entirely rather than exported in the clear. Counts remain.
+    return {
+      disclaimer: SEEN_ALONGSIDE_DISCLAIMER,
+      note: "The strict redaction profile omits the hostnames in this section; use the default profile to include them.",
+      omitted: true,
+      totals: listing?.totals ?? null,
+      rows: [],
+      pageOnly: [],
+    };
+  return {
+    disclaimer: SEEN_ALONGSIDE_DISCLAIMER,
+    omitted: false,
+    note: "Anchors are AdTripwire indicator ids of documented hosts. Frame-scope rows count toward the ranking; page-scope rows were loaded by the top document and are listed separately.",
+    totals: listing?.totals ?? null,
+    rows: (listing?.rows ?? []).map((r) => row(r, "frame")),
+    pageOnly: (listing?.pageOnly ?? []).map((r) => row(r, "page")),
+  };
+}
 
 const stamp = (now: Date) => now.toISOString().replace(/[:.]/g, "-");
 
@@ -47,6 +93,7 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
           for (const o of ib.objects) if (!seen.has(o.id)) bundle.objects.push(o);
         }
       }
+      addAlongsideToStix(bundle, input.alongside?.rows ?? [], indicatorSets, stixOpts);
       return {
         filename: `adtripwire-${stamp(now)}.stix.json`,
         mediaType: "application/stix+json",
@@ -96,7 +143,8 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
         "",
         "Contents: evidence (sanitized detections and the events that support them), stix (the same",
         "detections as a STIX 2.1 bundle), notes (analyst notes typed by the user), capabilities (what",
-        "the sensor could and could not observe).",
+        "the sensor could and could not observe), observations.seenAlongside (hostnames seen in the",
+        "same ad frame as a documented host; leads, not detections).",
         "",
         "How to read it: each detection lists what was observed, why it matters, which rule fired,",
         "the evidence, benign explanations, limitations and references. Severity is an investigation",
@@ -116,6 +164,7 @@ export function exportResearch(req: ResearchExportRequest, input: ResearchExport
         evidence,
         stix,
         notes,
+        observations: { seenAlongside: seenAlongsideSection(input.alongside, req.profile) },
         capabilities: input.browser,
       };
       return {

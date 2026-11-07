@@ -135,8 +135,8 @@ extension (`packages/correlation/data/observatory-snapshot.json`, refreshed per 
 `pnpm observatory:snapshot`); each contact card in the Exposure view says on how many measured
 days, last when and on which sites the public observatory saw that host, in generic automated
 profiles, with a link to the page. No network: the snapshot ships with the build. Plan:
-`docs/observatory-in-extension-plan.md`. Still open: signed bundles per merge and co-occurrence
-observations.
+`docs/observatory-in-extension-plan.md`. Co-occurrence ("Seen alongside") implemented 2026-11-07, unreleased
+(`docs/seen-alongside-plan.md`). Still open: signed bundles per merge.
 
 **The moment.** On a Monday the weekly refresh opens a pull request: upstream added nine
 hosts. You merge, sign, and every installation that imports the bundle is current. In the

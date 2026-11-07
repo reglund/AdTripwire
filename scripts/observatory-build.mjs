@@ -43,6 +43,7 @@ import {
   validRigName,
   variantSlug,
 } from "./lib/exposure-runs.mjs";
+import { registrable, sameSite } from "./lib/registrable.mjs";
 
 export { scrub };
 
@@ -93,6 +94,97 @@ export function assignNames(runs) {
 
 const validCountry = (c) => (typeof c === "string" && /^[A-Z]{2}$/.test(c) ? c : null);
 const validNetwork = (n) => (RIG_NETWORKS.includes(n) ? n : null);
+
+/** Minimum distinct site-days alongside before a host is ranked. */
+export const ALONGSIDE_MIN_SITE_DAYS = 2;
+/** Most rows kept in each "seen alongside" table of the index. */
+const ALONGSIDE_TABLE_MAX = 200;
+
+/**
+ * "Seen alongside documented hosts", aggregated over every run of every rig.
+ *
+ * A site-day is a distinct (date, site) pair across rigs and variants: the same site seen by
+ * two rigs on one day is one site-day. Only rows that carry `alongside` count as having data;
+ * the denominator (site-days the host's registrable domain was seen) only counts rows that
+ * carry `thirdPartyDomainsList`, and is never below the numerator. Frame scope is ranked;
+ * page scope (the anchor sat in the top document) is counted separately and never ranked.
+ * Nothing here is a detection; the anchors are indicator ids or documented hostnames.
+ */
+export function buildAlongside(runs) {
+  const frame = new Map();
+  const page = new Map();
+  let runsWithData = 0;
+  let visitsWithData = 0;
+  let anchorVisits = 0;
+  const listDays = []; // [siteDay, Set<registrable>]
+  const add = (m, host, siteDay, anchor, rig) => {
+    const e = m.get(host) ?? { days: new Set(), anchors: new Set(), rigs: new Set() };
+    e.days.add(siteDay);
+    e.anchors.add(anchor);
+    e.rigs.add(rig);
+    m.set(host, e);
+  };
+  for (const r of runs) {
+    const rig = rigOf(r);
+    let any = false;
+    for (const row of r.results) {
+      const siteDay = `${r.date}|${row.site}`;
+      if (Array.isArray(row.thirdPartyDomainsList))
+        listDays.push([siteDay, new Set(row.thirdPartyDomainsList)]);
+      if (!Array.isArray(row.alongside)) continue;
+      any = true;
+      visitsWithData += 1;
+      let kept = 0;
+      for (const a of row.alongside) {
+        // The visited site's own registrable domain is never a candidate.
+        if (typeof row.site === "string" && sameSite(a.host, row.site)) continue;
+        add(a.scope === "frame" ? frame : page, a.host, siteDay, a.anchor, rig);
+        kept += 1;
+      }
+      if ((row.alongsideAnchors ?? 0) > 0 || kept > 0) anchorVisits += 1;
+    }
+    if (any) runsWithData += 1;
+  }
+  const domains = new Set([...frame.keys(), ...page.keys()].map(registrable));
+  const seenDays = new Map([...domains].map((d) => [d, new Set()]));
+  for (const [siteDay, set] of listDays) for (const d of set) seenDays.get(d)?.add(siteDay);
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const rows = [...frame]
+    .filter(([, e]) => e.days.size >= ALONGSIDE_MIN_SITE_DAYS)
+    .map(([host, e]) => {
+      const seen = Math.max(seenDays.get(registrable(host))?.size ?? 0, e.days.size);
+      return {
+        host,
+        siteDays: e.days.size,
+        seenSiteDays: seen,
+        share: e.days.size / seen,
+        anchors: [...e.anchors].sort(),
+        rigs: [...e.rigs].sort(),
+      };
+    })
+    .sort((a, b) => b.share - a.share || b.siteDays - a.siteDays || cmp(a.host, b.host))
+    .slice(0, ALONGSIDE_TABLE_MAX);
+  const pageOnly = [...page]
+    .filter(([host]) => !frame.has(host))
+    .map(([host, e]) => ({
+      host,
+      siteDays: e.days.size,
+      anchors: [...e.anchors].sort(),
+      rigs: [...e.rigs].sort(),
+    }))
+    .sort((a, b) => b.siteDays - a.siteDays || cmp(a.host, b.host))
+    .slice(0, ALONGSIDE_TABLE_MAX);
+  return {
+    minSiteDays: ALONGSIDE_MIN_SITE_DAYS,
+    runsWithData,
+    runsTotal: runs.length,
+    visitsWithData,
+    anchorVisits,
+    frameHosts: frame.size,
+    rows,
+    pageOnly,
+  };
+}
 
 /**
  * The index.json content. extras maps a run's `file` key to { evidence, report } booleans (which
@@ -185,6 +277,7 @@ export function buildIndex(
     runs: entries,
     hosts: hostTable(allContacts),
     contacts: allContacts,
+    alongside: buildAlongside(runs),
   };
 }
 
@@ -241,6 +334,61 @@ function table(head, rows, { cls = "" } = {}) {
 
 const uniq = (xs) => [...new Set(xs)];
 const hostsText = (c) => (c.hostnames ? c.hostnames.join(", ") : "(not recorded in this run)");
+
+export const ALONGSIDE_DISCLAIMER =
+  "Hostnames that appeared in the same ad frame as a documented host. These are not detections and say nothing about the hosts themselves; they are leads for researchers. The list fills slowly: documented hosts are rare.";
+
+function renderAlongside(a, out) {
+  out.push(`<h2>Seen alongside documented hosts</h2>`);
+  out.push(`<p class="note">${esc(ALONGSIDE_DISCLAIMER)}</p>`);
+  if (!a || a.runsWithData === 0) {
+    out.push(
+      `<p>No run in this period recorded this measurement yet (it needs a rig running a build that reports it), so there is nothing to list. That is not a result.</p>`,
+    );
+    return;
+  }
+  out.push(
+    `<p class="muted">${esc(
+      `${a.anchorVisits} anchor site-visit(s) (a documented host was requested) in ${a.visitsWithData} site visit(s) from ${a.runsWithData} of ${a.runsTotal} run(s). Ranked: frame scope only, at least ${a.minSiteDays} site-days, share = site-days alongside / site-days the host's registrable domain was seen. A site-day is one site on one day, across rigs and variants.`,
+    )}</p>`,
+  );
+  if (a.rows.length === 0)
+    out.push(
+      `<p>No hostname has been seen alongside a documented host on ${a.minSiteDays} or more site-days in frame scope${a.anchorVisits === 0 ? ", and no documented host was requested in the recorded visits" : ""}. Hostnames seen in a single site-day are not listed.</p>`,
+    );
+  else
+    out.push(
+      table(
+        [
+          "Host",
+          ["Site-days alongside", "n"],
+          ["Site-days seen", "n"],
+          ["Share", "n"],
+          "Documented host(s)",
+          "Rigs",
+        ],
+        a.rows.map((e) => [
+          e.host,
+          [e.siteDays, "n"],
+          [e.seenSiteDays, "n"],
+          [`${Math.round(e.share * 100)}%`, "n"],
+          e.anchors.join(", "),
+          e.rigs.join(", "),
+        ]),
+      ),
+    );
+  if (a.pageOnly.length > 0) {
+    out.push(
+      `<p class="muted">Page scope (the documented host was requested by the top document, so everything the page loaded is alongside it). Counted separately and not ranked.</p>`,
+    );
+    out.push(
+      table(
+        ["Host", ["Site-days", "n"], "Documented host(s)", "Rigs"],
+        a.pageOnly.map((e) => [e.host, [e.siteDays, "n"], e.anchors.join(", "), e.rigs.join(", ")]),
+      ),
+    );
+  }
+}
 
 /** The whole index.html as a string. Pure function of the index object. */
 export function renderHtml(index) {
@@ -372,6 +520,9 @@ export function renderHtml(index) {
           ]),
       ),
     );
+
+  // Seen alongside.
+  renderAlongside(index.alongside, out);
 
   // Rigs.
   out.push(`<h2>Rigs</h2>`);
@@ -603,6 +754,9 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`results[].article\` | Whether an article was opened. |
 | \`results[].events\` | Requests observed while this site was open. |
 | \`results[].thirdPartyDomains\` | Third-party registrable domains seen on this site. |
+| \`results[].thirdPartyDomainsList\` | Optional. The sorted third-party registrable domains behind the count (at most 1000); the baseline for "seen alongside". |
+| \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. |
+| \`results[].alongsideAnchors\` | Optional. Documented-host anchors opened during this site. |
 | \`results[].error\` | Optional. Why a step failed. |
 | \`results[].detections[]\` | Detections raised on this site (below). |
 
@@ -631,6 +785,7 @@ A detection always has \`ruleId\` and \`severity\` (\`informational\`, \`suspici
 | \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`rig\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
 | \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`, \`rigs[]\`. |
 | \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`. |
+| \`alongside\` | "Seen alongside documented hosts" (observations, not detections): \`minSiteDays\`, \`runsWithData\`, \`runsTotal\`, \`visitsWithData\`, \`anchorVisits\`, \`frameHosts\`, ranked \`rows[]\` (frame scope) and \`pageOnly[]\`. |
 
 A contact is a detection from a \`known_infra.*\` or \`correlation.*\` rule, or at elevated or above.
 \`strong\` counts contacts from \`correlation.*\` rules or at elevated or above.

@@ -18,6 +18,7 @@ import {
 } from "./format.js";
 import { SINCE_OPTIONS } from "./filter.js";
 import { SINCE_OPTIONS as TIMELINE_SINCE_OPTIONS } from "./timeline.js";
+import { SEEN_ALONGSIDE_DISCLAIMER } from "@adtripwire/privacy";
 import { resolveLanguage, setLanguage, t } from "./i18n.js";
 import { NB } from "./i18n.nb.js";
 import { TABS } from "./route.js";
@@ -172,6 +173,19 @@ describe("verify-yourself card strings", () => {
       expect(key).not.toMatch(/\b(safe|clean|infected|spied)\b/i);
       expect(NB[key], key).toBeDefined();
       expect(NB[key]).not.toMatch(FORBIDDEN);
+    }
+  });
+});
+
+describe("seen-alongside strings", () => {
+  it("keeps the dashboard header in sync with the export disclaimer and carries no verdict wording", () => {
+    const keys = [...extractKeys().entries()]
+      .filter(([, file]) => file.endsWith("alongside.ts"))
+      .map(([k]) => k);
+    expect(keys).toContain(SEEN_ALONGSIDE_DISCLAIMER);
+    for (const key of keys) {
+      expect(key).not.toMatch(/\b(safe|clean|infected|spied|all clear|compromised)\b/i);
+      expect(NB[key], key).toBeDefined();
     }
   });
 });

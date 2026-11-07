@@ -22,6 +22,8 @@ const H = {
   c2: `c2.synthetic-adfection.test:${port}`,
   validator: `validator.synthetic-adfection.test:${port}`,
   staging: `staging.synthetic-dsp.test:${port}`,
+  // Not an indicator: a creative host in the ad frame, the "seen alongside" positive case.
+  creative: `creative.synthetic-cdn.test:${port}`,
 };
 
 // Scenario pages reload themselves every 30 s so that a sensor registered after the first
@@ -71,9 +73,14 @@ const routes = {
     if (mode === "benign")
       return page("Creative", `<script src="http://${H.ads}/ad.js?w=300&h=250&slot=top"></script>`);
     const idfa = "00000000-0000-0000-0000-000000000000";
+    // Only the "selected" scenario loads the non-indicator creative host inside the ad frame.
+    const alongside =
+      mode === "selected"
+        ? `<img src="http://${H.creative}/pixel.gif?c=1" width="1" height="1" alt="">`
+        : "";
     return page(
       "Creative",
-      `<div id="ad-wrapper"><script src="http://${H.noas}/getAd?idfa=${idfa}&ipv4=192.0.2.1&dom=publisher.synthetic-site.test&devicemodel=test&os=test&mode=${esc(mode)}"></script></div>`,
+      `${alongside}<div id="ad-wrapper"><script src="http://${H.noas}/getAd?idfa=${idfa}&ipv4=192.0.2.1&dom=publisher.synthetic-site.test&devicemodel=test&os=test&mode=${esc(mode)}"></script></div>`,
     );
   },
   "/ad.js": () => ({

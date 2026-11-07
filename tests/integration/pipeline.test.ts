@@ -30,6 +30,7 @@ import {
   type StreamFilterLike,
 } from "@adtripwire/sensor-firefox";
 import { buildEvidenceExport, serializeExport } from "@adtripwire/privacy";
+import { AlongsideTracker, listAlongside } from "@adtripwire/correlation";
 import syntheticJson from "../fixtures/indicators/synthetic.json";
 
 const synthetic = (() => {
@@ -37,6 +38,8 @@ const synthetic = (() => {
   if (!v.ok) throw new Error(v.errors.join("; "));
   return v.set as IndicatorSet;
 })();
+
+const matcher = new IndicatorMatcher([synthetic]);
 
 const FIREFOX_CAPS: SensorCapabilities = {
   browser: "firefox",
@@ -68,11 +71,15 @@ class Harness {
   readonly detections: Detection[] = [];
   readonly updated: Detection[] = [];
   readonly events: NormalizedEvent[] = [];
+  /** Optional "seen alongside" tracker, fed after every ingest (like the background does). */
+  readonly tracker: AlongsideTracker | undefined;
+  /** Set when the tracker changed an event it was handed (it must never). */
+  trackerMutatedEvent = false;
   now = T0;
   private reqCounter = 1;
   constructor(
     caps: SensorCapabilities = FIREFOX_CAPS,
-    opts: { matcher?: IndicatorMatcher; windowMs?: number } = {},
+    opts: { matcher?: IndicatorMatcher; windowMs?: number; tracker?: boolean } = {},
   ) {
     this.engine = new DetectionEngine({
       matcher: opts.matcher ?? new IndicatorMatcher([synthetic]),
@@ -84,10 +91,16 @@ class Harness {
       exposure: new MemoryExposureStore(),
       now: () => this.now,
     });
+    if (opts.tracker) this.tracker = new AlongsideTracker({ matcher: () => matcher });
   }
   ingest(ev: NormalizedEvent | null): void {
     if (!ev) throw new Error("event could not be built");
     const r = this.engine.ingest(ev);
+    if (this.tracker) {
+      const before = JSON.stringify(r.event);
+      this.tracker.observe(r.event, () => this.engine.window.recent());
+      if (JSON.stringify(r.event) !== before) this.trackerMutatedEvent = true;
+    }
     this.events.push(r.event);
     this.detections.push(...r.detections);
     this.updated.push(...r.updated);
@@ -529,5 +542,98 @@ describe("synthetic pipeline scenarios", () => {
       profile: "strict",
     });
     expect(serializeExport(strict)).not.toContain("news.synthetic-publisher.test");
+  });
+});
+
+describe("seen alongside (observation only)", () => {
+  const CREATIVE = "https://creative.synthetic-cdn.test/pixel.gif?c=1";
+
+  /** The /selected scenario plus the non-indicator creative host inside the ad frame. */
+  async function selectedScenario(h: Harness): Promise<void> {
+    await h.request(NOAS, SELECTED_JS);
+    h.now += 500;
+    await h.request(CREATIVE, "GIF89a", { type: "image" }, "image/gif");
+    h.now += 500;
+    await h.request(
+      "https://staging.synthetic-dsp.test/iframe?impid=x",
+      "<html></html>",
+      { type: "sub_frame" },
+      "text/html",
+    );
+    h.now += 1000;
+    await h.request(
+      "https://validator.synthetic-adfection.test/check.js?q=c3ludGhldGlj",
+      "/* ok */",
+    );
+    await h.request("https://ads.synthetic-benign.test/ad.js?w=300", "x=1;");
+  }
+
+  /** Event ids and timestamps are random/clock-bound; everything a user sees is compared. */
+  const shape = (ds: Detection[]) =>
+    ds
+      .map((d) => ({
+        ruleId: d.ruleId,
+        severity: d.severity,
+        confidence: d.confidence,
+        summary: d.summary,
+        dedupKey: d.dedupKey,
+        occurrenceCount: d.occurrenceCount,
+        eventCount: d.eventIds.length,
+        indicators: [...d.matchedIndicatorIds].sort(),
+        subjects: [...d.subjectHostnames].sort(),
+      }))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+  it("never changes a detection: identical with and without the tracker", async () => {
+    const without = new Harness();
+    const withT = new Harness(FIREFOX_CAPS, { tracker: true });
+    await selectedScenario(without);
+    await selectedScenario(withT);
+    expect(withT.detections.length).toBeGreaterThan(0);
+    expect(shape(withT.detections)).toEqual(shape(without.detections));
+    expect(withT.trackerMutatedEvent).toBe(false);
+    expect(withT.tracker!.store.totals.anchorsSeen).toBeGreaterThan(0);
+  });
+
+  it("lists the non-indicator creative host alongside the NOAS anchor, never indicator hosts", async () => {
+    const h = new Harness(FIREFOX_CAPS, { tracker: true });
+    await selectedScenario(h);
+    const store = h.tracker!.store;
+    expect(store.get("creative.synthetic-cdn.test")?.frameDays).toHaveLength(1);
+    expect(store.get("creative.synthetic-cdn.test")?.anchors).toContain("syn-0003");
+    // Two UTC days of the same observation make it eligible for the ranked list.
+    store.record("creative.synthetic-cdn.test", "syn-0003", "frame", "2025-12-31");
+    const out = listAlongside(store, { distinctDays: () => 2 });
+    const row = out.rows.find((r) => r.hostname === "creative.synthetic-cdn.test");
+    expect(row?.anchors).toContain("syn-0003");
+    expect(row?.frameDays).toBe(2);
+    for (const [host] of store.entries()) {
+      expect(matcher.match(host).length).toBe(0);
+      expect(host).not.toBe("staging.synthetic-dsp.test");
+      expect(host).not.toBe("c2.synthetic-adfection.test");
+    }
+    // Privacy: hostnames only, none of the page hosts, no path/query characters.
+    const json = JSON.stringify(store.toJSON());
+    expect(json).not.toContain("news.synthetic-publisher.test");
+    expect(json).not.toContain("pixel.gif");
+    expect(
+      [...json.matchAll(/"([^"]*)"/g)].map((m) => m[1]!).filter((v) => /[/?=]/.test(v)),
+    ).toEqual([]);
+  });
+
+  it("/benign records nothing", async () => {
+    const h = new Harness(FIREFOX_CAPS, { tracker: true });
+    await h.request("https://ads.synthetic-benign.test/ad.js?w=300&h=250&slot=top", "x=1;");
+    await h.request("https://cdn.synthetic-benign.test/lib.min.js", "!function(e){e.x=1}(window);");
+    expect(h.tracker!.store.size).toBe(0);
+    expect(h.tracker!.store.totals.anchorsSeen).toBe(0);
+  });
+
+  it("a heuristic-only detection (redirect chain, no indicator) opens no anchor", async () => {
+    const h = new Harness(FIREFOX_CAPS, { tracker: true });
+    await h.request("https://ads.synthetic-benign.test/getAd?slot=top&page=home&dom=x", "x=1;");
+    await h.request("https://cdn.synthetic-benign.test/lib.min.js", "x=1;");
+    expect(h.tracker!.store.totals.anchorsSeen).toBe(0);
+    expect(h.tracker!.store.size).toBe(0);
   });
 });

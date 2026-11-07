@@ -9,3 +9,4 @@ export * from "./messages.js";
 export * from "./ids.js";
 export * from "./correlation.js";
 export * from "./digest.js";
+export * from "./lineage.js";

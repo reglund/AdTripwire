@@ -1039,3 +1039,11 @@ button.day {
 .cal-days summary {
   cursor: pointer;
 }
+
+/* Seen alongside: the page-scope section is secondary; no colour coding of rows. */
+.alongside-secondary {
+  color: var(--text-muted);
+}
+.alongside-secondary table.data {
+  font-size: 0.85rem;
+}

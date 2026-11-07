@@ -37,6 +37,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { registrable, sameSite } from "./lib/registrable.mjs";
+import { ALONGSIDE_MAX_ENTRIES, THIRD_PARTY_LIST_MAX } from "./lib/exposure-runs.mjs";
 
 const arg = (k, d) =>
   (process.argv.find((a) => a.startsWith(`--${k}=`)) ?? `--${k}=${d}`).slice(k.length + 3);
@@ -212,30 +214,6 @@ async function pickArticle(page, siteHost) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Registrable domain from the bundled Public Suffix List (same data the extension uses), so the
-// third-party count is measured by the runner itself from the page's own requests and does not
-// depend on extension state (a Firefox event page can be suspended, which resets in-memory sets).
-const PSL = JSON.parse(readFileSync("packages/indicators/data/public-suffix-list.json", "utf8"));
-const PSL_RULES = new Set(PSL.rules ?? []);
-function registrable(host) {
-  const labels = host.toLowerCase().replace(/\.$/, "").split(".");
-  if (labels.length < 2 || /^\d+(?:\.\d+){3}$/.test(host)) return host.toLowerCase();
-  let suffixLen = 1;
-  for (let i = 0; i < labels.length; i++) {
-    const cand = labels.slice(i).join(".");
-    if (PSL_RULES.has(`!${cand}`)) {
-      suffixLen = labels.length - i - 1;
-      break;
-    }
-    const wild = ["*", ...labels.slice(i + 1)].join(".");
-    if (PSL_RULES.has(cand) || (i + 1 < labels.length && PSL_RULES.has(wild))) {
-      suffixLen = labels.length - i;
-      break;
-    }
-  }
-  return labels.slice(Math.max(0, labels.length - suffixLen - 1)).join(".");
-}
-
 let initialPages = [];
 
 async function launch() {
@@ -331,6 +309,50 @@ async function rpc(dash, req) {
   }, req);
 }
 
+/**
+ * Per-site delta of the extension's "seen alongside" state. The extension reports cumulative
+ * hit counters per host (the day sets cannot show a second sighting on the same UTC day), so the
+ * counters are diffed between two reads. A counter that went down (an event page restored from a
+ * stale snapshot) becomes the new baseline: a delta is never negative.
+ * Returns null when the extension does not answer get_alongside (older build).
+ */
+async function readAlongside(dash) {
+  const res = await rpc(dash, { type: "get_alongside", all: true });
+  if (!res?.ok || !Array.isArray(res.data?.hosts)) return null;
+  return {
+    anchors: res.data.totals?.anchorsSeen ?? 0,
+    hosts: new Map(res.data.hosts.map((h) => [h.hostname, h])),
+  };
+}
+
+/**
+ * The delta between two reads as [{host, anchor, scope}] plus the number of anchors opened.
+ * anchor = the indicator hostname when `names` can resolve the id, else the indicator id.
+ * Of a host's anchor ids, those matched by this site's own detections are preferred, else
+ * the newest one the host is recorded against.
+ */
+function alongsideDelta(prevSnap, cur, siteDetections, names, site) {
+  const matched = new Set(siteDetections.flatMap((d) => d.matchedIndicatorIds ?? []));
+  const out = [];
+  for (const [host, h] of cur.hosts) {
+    // The site being visited is never a candidate: drop its own registrable domain.
+    if (sameSite(host, site)) continue;
+    const p = prevSnap?.hosts.get(host);
+    for (const scope of ["frame", "page"]) {
+      const now = scope === "frame" ? h.frameHits : h.pageHits;
+      const before = p ? (scope === "frame" ? p.frameHits : p.pageHits) : 0;
+      if (!(now > before)) continue;
+      const ids = h.anchors ?? [];
+      const id = ids.filter((x) => matched.has(x)).pop() ?? ids[ids.length - 1];
+      if (typeof id !== "string") continue;
+      out.push({ host, anchor: names.get(id) ?? id, scope });
+    }
+  }
+  out.sort((a, b) => (a.host + a.scope).localeCompare(b.host + b.scope));
+  const anchors = Math.max(0, cur.anchors - Math.min(prevSnap?.anchors ?? 0, cur.anchors));
+  return { entries: out.slice(0, ALONGSIDE_MAX_ENTRIES), anchors };
+}
+
 async function status(dash) {
   const res = await rpc(dash, { type: "get_status" });
   if (!res?.ok) throw new Error(`get_status failed: ${res?.error}`);
@@ -364,6 +386,9 @@ async function main() {
     (await rpc(dash, { type: "list_detections" })).data.map((d) => d.detectionId),
   );
 
+  // Indicator id -> hostname for the ids this run's own detections matched (cheap, no extra call).
+  const indicatorNames = new Map();
+  let alongsidePrev = await readAlongside(dash).catch(() => null);
   const results = [];
   let presentation = null;
   let prev = start;
@@ -462,6 +487,23 @@ async function main() {
         summary: d.summary,
         evidence: d.evidence.map((e) => e.observed),
       });
+    }
+    // Seen alongside: delta of the extension's state, and the registrable domains this site
+    // contacted (the baseline for "how often was this domain seen at all").
+    row.thirdPartyDomainsList = [...seenThirdParty].sort().slice(0, THIRD_PARTY_LIST_MAX);
+    for (const d of row.detections)
+      if (d.matchedIndicatorIds?.length === 1 && d.hostnames?.length === 1)
+        indicatorNames.set(d.matchedIndicatorIds[0], d.hostnames[0]);
+    try {
+      const snap = await readAlongside(dash);
+      if (snap) {
+        const delta = alongsideDelta(alongsidePrev, snap, row.detections, indicatorNames, row.site);
+        row.alongside = delta.entries;
+        row.alongsideAnchors = delta.anchors;
+        alongsidePrev = snap;
+      }
+    } catch {
+      /* best effort: the run never fails on this */
     }
     prev = cur;
     results.push(row);

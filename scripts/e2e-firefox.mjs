@@ -23,6 +23,7 @@ const DOMAINS = [
   "c2.synthetic-adfection.test",
   "validator.synthetic-adfection.test",
   "staging.synthetic-dsp.test",
+  "creative.synthetic-cdn.test",
 ];
 const EXPECTED = [
   "[AdTripwire] ready:",
@@ -40,6 +41,9 @@ const EXPECTED = [
   "[AdTripwire] dashboard rendered detections",
   "page sensor registered",
   "detection page.hidden_iframe_after_load",
+  // Seen alongside (DEV console line from the background): the non-indicator creative host in
+  // the /selected ad frame is recorded at frame scope next to the NOAS anchor (frame lineage).
+  "creative.synthetic-cdn.test@frame",
 ];
 const FORBIDDEN = [/infected/i, /spied/i, /is safe/i, /are safe/i];
 
@@ -171,6 +175,20 @@ for (const re of FORBIDDEN) {
 if (!log.includes("[AdTripwire] ready:")) {
   console.log("\nThe extension never reported ready. Last log lines:");
   for (const l of log.trim().split("\n").slice(-15)) console.log("  " + l.slice(0, 200));
+}
+// An indicator host (already documented) is never listed as seen alongside.
+if (/alongside: [^\n]*(?:staging|noas|c2|validator)\.synthetic-[a-z]+\.test@/.test(log)) {
+  console.log("FAIL  an indicator host was listed as seen alongside");
+  failed = true;
+} else {
+  console.log("PASS  no documented host listed as seen alongside");
+}
+// The page's own site (first-party wrapper frames, first-party requests) is never a candidate.
+if (/alongside: [^\n]*publisher\.synthetic-site\.test@/.test(log)) {
+  console.log("FAIL  the page's own site was listed as seen alongside");
+  failed = true;
+} else {
+  console.log("PASS  the page's own site is not listed as seen alongside");
 }
 // A dashboard view that rendered its error state must fail the run, not pass as "rendered".
 if (/dashboard rendered [a-z_]+ \(error state\)/.test(log)) {

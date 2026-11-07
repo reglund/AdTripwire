@@ -45,6 +45,15 @@ export class MemoryExposureStore implements ExposureStore {
     return this.#hosts.get(hostname)?.length ?? 0;
   }
 
+  /** Drops day keys older than `minDay` (YYYY-MM-DD) and hosts left without any day. */
+  pruneBefore(minDay: string): void {
+    for (const [h, days] of [...this.#hosts]) {
+      const kept = days.filter((d) => d >= minDay);
+      if (kept.length === 0) this.#hosts.delete(h);
+      else if (kept.length !== days.length) this.#hosts.set(h, kept);
+    }
+  }
+
   get size(): number {
     return this.#hosts.size;
   }

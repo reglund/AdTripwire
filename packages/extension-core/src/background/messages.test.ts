@@ -226,6 +226,25 @@ describe("parseUiRequest exposure", () => {
   });
 });
 
+describe("parseUiRequest alongside", () => {
+  it("accepts get_alongside without parameters", () => {
+    expect(parseUiRequest({ type: "get_alongside" })).toEqual({ type: "get_alongside" });
+    expect(parseUiRequest({ type: "get_alongside", extra: 1 })).toEqual({ type: "get_alongside" });
+  });
+
+  it("accepts a boolean all flag and rejects anything else", () => {
+    expect(parseUiRequest({ type: "get_alongside", all: true })).toEqual({
+      type: "get_alongside",
+      all: true,
+    });
+    expect(parseUiRequest({ type: "get_alongside", all: false })).toEqual({
+      type: "get_alongside",
+    });
+    expect(parseUiRequest({ type: "get_alongside", all: "yes" })).toBeNull();
+    expect(parseUiRequest({ type: "get_alongside", all: 1 })).toBeNull();
+  });
+});
+
 describe("parseUiRequest digest", () => {
   it("accepts get_digest without parameters", () => {
     expect(parseUiRequest({ type: "get_digest" })).toEqual({ type: "get_digest" });

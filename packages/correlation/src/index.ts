@@ -37,3 +37,29 @@ export type {
   ObservatorySummary,
   ObservatoryValidation,
 } from "./observatory.js";
+export {
+  AlongsideTracker,
+  AlongsideStore,
+  listAlongside,
+  listAlongsideAll,
+  ALONGSIDE_WINDOW_MS,
+  ALONGSIDE_MAX_OPEN_ANCHORS,
+  ALONGSIDE_MAX_HOSTS,
+  ALONGSIDE_MAX_DAYS,
+  ALONGSIDE_MAX_ANCHORS_PER_HOST,
+  ALONGSIDE_MIN_DAYS,
+  ALONGSIDE_STORAGE_KEY,
+} from "./alongside.js";
+export type {
+  AlongsideScope,
+  AlongsideHostRecord,
+  AlongsideTotals,
+  AlongsideSnapshot,
+  AlongsideRow,
+  AlongsideListing,
+  AlongsideAllRow,
+  AlongsideAllListing,
+  ListAlongsideOptions,
+  AlongsideTrackerOptions,
+  DayCounter,
+} from "./alongside.js";

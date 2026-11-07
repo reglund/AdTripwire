@@ -13,6 +13,13 @@ import type { RedactionProfile } from "./redact.js";
 export const EXPORT_DISCLAIMER =
   "AdTripwire records observable indicators only. Absence of detections is not evidence that a device is free of spyware. Infrastructure matches describe exposure to documented infrastructure, not confirmed compromise.";
 
+/**
+ * Text that travels with every "seen alongside" listing (dashboard, hand-off package, STIX).
+ * The dashboard repeats it as a literal t("...") key; a test keeps the two in sync.
+ */
+export const SEEN_ALONGSIDE_DISCLAIMER =
+  "Hostnames that appeared in the same ad frame as a documented host. These are not detections and say nothing about the hosts themselves; they are leads for researchers. The list fills slowly: documented hosts are rare.";
+
 const LIMITATION_SENTENCES: Record<ObservationLimitation, string> = {
   no_response_body_access: "Response bodies could not be read for some requests.",
   response_body_truncated: "Only a prefix of some response bodies was analysed.",

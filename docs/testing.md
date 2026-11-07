@@ -87,7 +87,7 @@ snap or Chrome for Testing (`CHROME_BIN=...`). Snap Chromium needs the profile u
    `--firefox-profile=$HOME/snap/firefox/common/adtripwire-dev --profile-create-if-missing`:
    ```bash
    pnpm exec web-ext run -s apps/extension-firefox/dist \
-     --pref network.dns.localDomains=publisher.synthetic-site.test,ads.synthetic-benign.test,noas.synthetic-adfection.test,c2.synthetic-adfection.test,validator.synthetic-adfection.test,staging.synthetic-dsp.test
+     --pref network.dns.localDomains=publisher.synthetic-site.test,ads.synthetic-benign.test,noas.synthetic-adfection.test,c2.synthetic-adfection.test,validator.synthetic-adfection.test,staging.synthetic-dsp.test,creative.synthetic-cdn.test
    ```
 4. Visit, in order, and check the popup / dashboard after each:
    - `http://publisher.synthetic-site.test:8787/benign` → no detections.

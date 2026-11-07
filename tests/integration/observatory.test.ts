@@ -16,10 +16,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { SEEN_ALONGSIDE_DISCLAIMER } from "@adtripwire/privacy";
+import { sameSite } from "../../scripts/lib/registrable.mjs";
 import { contactsOf, loadRuns, scrub, variantSlug } from "../../scripts/lib/exposure-runs.mjs";
 import {
+  ALONGSIDE_DISCLAIMER,
   MAX_CALENDAR_DAYS,
   build,
+  buildAlongside,
   buildIndex,
   dayRange,
   esc,
@@ -35,6 +39,7 @@ import {
 } from "../../scripts/observatory-reproduce.mjs";
 
 type Det = { ruleId: string; severity: string; hostnames?: string[] };
+type Alongside = { host: string; anchor: string; scope: string };
 type Row = {
   site: string;
   loaded: boolean;
@@ -44,6 +49,9 @@ type Row = {
   thirdPartyDomains: number;
   detections: Det[];
   error?: string;
+  alongside?: Alongside[];
+  thirdPartyDomainsList?: string[];
+  alongsideAnchors?: number;
 };
 
 const row = (site: string, detections: Det[] = [], extra: Partial<Row> = {}): Row => ({
@@ -783,5 +791,185 @@ describe("reproduce helpers", () => {
     });
     expect(flagsForSlug("chromium-pixel-5").device).toBe("Pixel 5");
     expect(flagsForSlug("firefox").device).toBe("");
+  });
+});
+
+describe("seen alongside", () => {
+  const fr = (host: string, anchor = "tracker.example"): Alongside => ({
+    host,
+    anchor,
+    scope: "frame",
+  });
+  const withRuns = (runs: ReturnType<typeof run>[]) =>
+    runs.map((r, i) => ({ file: `r-${i}.json`, variant: "chromium", ...r }));
+
+  describe("validRunShape", () => {
+    const dir = () => tmp();
+    const load = (extra: Partial<Row>) => {
+      const d = dir();
+      writeFileSync(join(d, "a.json"), JSON.stringify(run({}, [row("a.example", [], extra)])));
+      return loadRuns(d).length;
+    };
+    it("accepts runs without the fields and runs with well-formed ones", () => {
+      expect(load({})).toBe(1);
+      expect(
+        load({
+          alongside: [
+            fr("creative.cdn-x.test"),
+            { host: "p.test", anchor: "syn-0001", scope: "page" },
+          ],
+          thirdPartyDomainsList: ["cdn-x.test", "a.example"],
+          alongsideAnchors: 2,
+        }),
+      ).toBe(1);
+      expect(load({ alongside: [], thirdPartyDomainsList: [], alongsideAnchors: 0 })).toBe(1);
+    });
+    it("rejects malformed, non-hostname, mis-scoped and over-long fields", () => {
+      const bad: Partial<Row>[] = [
+        { alongside: "x" as never },
+        { alongside: [null as never] },
+        { alongside: [{ host: "a.test/path", anchor: "x", scope: "frame" }] },
+        { alongside: [{ host: "a.test?q=1", anchor: "x", scope: "frame" }] },
+        { alongside: [{ host: "a.test", anchor: "x", scope: "top" }] },
+        { alongside: [{ host: "a.test", anchor: 5 as never, scope: "frame" }] },
+        { alongside: Array.from({ length: 201 }, () => fr("a.test")) },
+        { thirdPartyDomainsList: "a.test" as never },
+        { thirdPartyDomainsList: [5 as never] },
+        { thirdPartyDomainsList: ["a.test/x"] },
+        { thirdPartyDomainsList: Array.from({ length: 1001 }, () => "a.test") },
+        { alongsideAnchors: -1 },
+        { alongsideAnchors: 1.5 },
+        { alongsideAnchors: "1" as never },
+      ];
+      for (const b of bad) expect(load(b)).toBe(0);
+    });
+  });
+
+  it("ranks frame scope by share, applies the two site-day minimum and counts page scope apart", () => {
+    const runs = withRuns([
+      run({ date: "2026-11-02", rig: "rig-1" }, [
+        row("s1.example", [], {
+          alongside: [
+            fr("lead.rare-cdn.test"),
+            fr("ads.big.test"),
+            { host: "pg.test", anchor: "a", scope: "page" },
+          ],
+          alongsideAnchors: 1,
+          thirdPartyDomainsList: ["rare-cdn.test", "big.test", "pg.test"],
+        }),
+        row("s2.example", [], {
+          alongside: [],
+          alongsideAnchors: 0,
+          thirdPartyDomainsList: ["big.test"],
+        }),
+        row("s3.example", [], { alongside: [], thirdPartyDomainsList: ["big.test"] }),
+      ]),
+      run({ date: "2026-11-03", rig: "rig-2" }, [
+        row("s1.example", [], {
+          alongside: [fr("lead.rare-cdn.test"), fr("ads.big.test"), fr("once.test")],
+          alongsideAnchors: 1,
+          thirdPartyDomainsList: ["rare-cdn.test", "big.test", "once.test"],
+        }),
+        row("s4.example", [], { alongside: [], thirdPartyDomainsList: ["big.test"] }),
+      ]),
+    ]);
+    const a = buildAlongside(runs);
+    expect(a.runsWithData).toBe(2);
+    expect(a.anchorVisits).toBe(2);
+    expect(a.rows.map((r: { host: string }) => r.host)).toEqual([
+      "lead.rare-cdn.test",
+      "ads.big.test",
+    ]);
+    expect(a.rows[0]).toMatchObject({ siteDays: 2, seenSiteDays: 2, share: 1 });
+    // big.test: alongside on 2 of the 6 site-days it was seen (s1 x2 days, s2, s3, s4).
+    expect(a.rows[1]).toMatchObject({ siteDays: 2, seenSiteDays: 5 });
+    expect(a.rows[1].share).toBeLessThan(1);
+    expect(a.rows.some((r: { host: string }) => r.host === "once.test")).toBe(false);
+    expect(a.pageOnly.map((r: { host: string }) => r.host)).toEqual(["pg.test"]);
+  });
+
+  it("counts a site-day once across rigs and variants and lists the rigs", () => {
+    const mk = (rig: string, variant: string) => ({
+      file: `${rig}-${variant}.json`,
+      variant,
+      ...run({ rig }, [
+        row("s1.example", [], {
+          alongside: [fr("h.test")],
+          thirdPartyDomainsList: ["h.test"],
+        }),
+      ]),
+    });
+    const same = buildAlongside([mk("rig-1", "v1"), mk("rig-2", "v2")]);
+    expect(same.rows).toEqual([]);
+    const other = {
+      file: "x.json",
+      variant: "v1",
+      ...run({ rig: "rig-2", date: "2026-11-03" }, [
+        row("s1.example", [], { alongside: [fr("h.test")], thirdPartyDomainsList: ["h.test"] }),
+      ]),
+    };
+    const two = buildAlongside([mk("rig-1", "v1"), mk("rig-2", "v2"), other]);
+    expect(two.rows[0]).toMatchObject({ host: "h.test", siteDays: 2, rigs: ["rig-1", "rig-2"] });
+  });
+
+  it("drops entries on the visited site's own registrable domain (never a candidate)", () => {
+    expect(sameSite("www.s1.example", "s1.example")).toBe(true);
+    expect(sameSite("cdn.s1.example", "s1.example")).toBe(true);
+    expect(sameSite("lead.cdn.test", "s1.example")).toBe(false);
+    const runs = withRuns(
+      ["2026-11-02", "2026-11-03"].map((date) =>
+        run({ date }, [
+          row("s1.example", [], {
+            alongside: [
+              fr("www.s1.example"),
+              fr("static.s1.example"),
+              { host: "s1.example", anchor: "a", scope: "page" },
+              fr("lead.cdn.test"),
+            ],
+            alongsideAnchors: 1,
+            thirdPartyDomainsList: ["cdn.test", "s1.example"],
+          }),
+        ]),
+      ),
+    );
+    const a = buildAlongside(runs);
+    expect(a.rows.map((r: { host: string }) => r.host)).toEqual(["lead.cdn.test"]);
+    expect(a.pageOnly).toEqual([]);
+    expect(a.frameHosts).toBe(1);
+  });
+
+  it("the page's disclaimer is the same text as the extension's", () => {
+    expect(ALONGSIDE_DISCLAIMER).toBe(SEEN_ALONGSIDE_DISCLAIMER);
+  });
+
+  it("builds from runs without the fields and shows an explanatory empty state", () => {
+    const runs = withRuns([run()]);
+    const idx = buildIndex(runs);
+    expect(idx.alongside).toMatchObject({ runsWithData: 0, rows: [], pageOnly: [] });
+    const html = renderHtml(idx);
+    expect(html).toContain("Seen alongside documented hosts");
+    expect(html).toContain("not detections");
+    expect(html).toContain("No run in this period recorded this measurement yet");
+    expect(html).not.toMatch(/<script/i);
+  });
+
+  it("renders the table with the disclaimer and the anchor note, escaped", () => {
+    const runs = withRuns(
+      ["2026-11-02", "2026-11-03"].map((date) =>
+        run({ date }, [
+          row("s.example", [], {
+            alongside: [fr("lead.cdn.test", "tracker.example")],
+            alongsideAnchors: 1,
+            thirdPartyDomainsList: ["cdn.test"],
+          }),
+        ]),
+      ),
+    );
+    const html = renderHtml(buildIndex(runs));
+    expect(html).toContain("lead.cdn.test");
+    expect(html).toContain("tracker.example");
+    expect(html).toContain("2 anchor site-visit(s)");
+    expect(html).toContain("leads for researchers");
+    expect(html).not.toMatch(/infected|spied|is safe|are safe/i);
   });
 });
