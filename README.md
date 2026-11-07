@@ -68,6 +68,8 @@ pnpm build                 # packages, then apps/extension-firefox/dist and apps
 pnpm ext:run               # Firefox with the extension temporarily loaded
 ```
 
+To run the daily exposure rig in Docker on a server instead: `docs/rig-docker.md`.
+
 - **Firefox**, manually: open `about:debugging#/runtime/this-firefox`, choose **Load Temporary
   Add-on…**, select `apps/extension-firefox/dist/manifest.json`. `pnpm ext:package` builds a zip
   for signing.

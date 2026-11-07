@@ -1,0 +1,10 @@
+[Unit]
+Description=AdTripwire daily exposure run (Docker container)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/adtripwire/docker
+ExecStart=/usr/bin/docker compose run --rm exposure
+TimeoutStartSec=8h

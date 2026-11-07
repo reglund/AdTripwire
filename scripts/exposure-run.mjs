@@ -16,6 +16,11 @@
  * file; --rig-country (ISO 3166-1 alpha-2) and --rig-network are self-declared, optional and
  * written as `rigCountry` and `rigNetwork` only when given. No IP address is ever recorded.
  *
+ * ADTRIPWIRE_CHROME_ARGS (Chromium only): extra command-line flags, whitespace separated. Used by
+ * docker/compose.yml to pass `--no-sandbox --disable-dev-shm-usage`; container-only: the sandbox
+ * is off there because the container runs as a non-root user without user namespaces. Do not
+ * set it on a desktop.
+ *
  * Build the evaluation bundle first (production indicators, dashboard opens on install):
  *   node apps/extension-<browser>/build.mjs --eval --out=<dir>
  * Nothing here contacts known malicious infrastructure on purpose; the sites are mainstream
@@ -254,6 +259,9 @@ async function launch() {
         "--no-default-browser-check",
         "--disable-component-update",
         "--disable-sync",
+        ...(process.env.ADTRIPWIRE_CHROME_ARGS
+          ? process.env.ADTRIPWIRE_CHROME_ARGS.split(/\s+/).filter(Boolean)
+          : []),
         ...(MOBILE ? [] : ["--window-size=1366,900"]),
       ],
     });

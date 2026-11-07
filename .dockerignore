@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+dist
+**/dist
+dist-release
+web-ext-artifacts
+.git
+.claude
+docs/evaluations
+docker/data
+docker/observatory.env

@@ -5,7 +5,12 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Docker rig**: `docker/` (Dockerfile with Debian Chromium and Firefox from Mozilla's apt
+  repository, entrypoint with a `smoke` mode, compose file, host systemd timer and installer) and
+  `docs/rig-docker.md` for moving the daily exposure run to a home server. `exposure-run.mjs`
+  reads `ADTRIPWIRE_CHROME_ARGS` (container-only Chromium flags such as `--no-sandbox`).
 
 ## [0.3.0] — 2026-11-06
 

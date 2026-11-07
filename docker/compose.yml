@@ -1,0 +1,22 @@
+# Run the daily exposure rig:  docker compose run --rm exposure   (or `... exposure smoke`)
+# docker/observatory.env is a copy of the maintainer's env file with container paths, e.g.
+#   GIT_SSH_COMMAND=ssh -i /data/adtripwire-observatory -o IdentitiesOnly=yes
+# It and ./data (profiles, results, the deploy key) are gitignored. See docs/rig-docker.md.
+name: adtripwire
+services:
+  exposure:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: adtripwire-rig
+    env_file: ./observatory.env
+    environment:
+      # Container only: Chromium's sandbox needs user namespaces, which a non-root container
+      # does not have, and /dev/shm is small. Never use these flags on a desktop.
+      - ADTRIPWIRE_CHROME_ARGS=--no-sandbox --disable-dev-shm-usage
+    volumes:
+      - ./data:/data
+    shm_size: 1g
+    mem_limit: 6g
+    init: false
+    restart: "no"

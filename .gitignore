@@ -6,3 +6,5 @@ coverage/
 .DS_Store
 dist-types/
 dist-release/
+docker/observatory.env
+docker/data/

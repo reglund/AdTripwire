@@ -134,6 +134,9 @@ Naming: files in `data/` are always `data/runs/<date>-<rig>-<slug>.json` (and `.
 and `rig` on every run and contact; the page has a Rigs table and a rig column wherever runs,
 contacts or hosts are listed. Sites built before rigs existed use `<date>-<slug>`.
 
+Running a rig in a container on a home server (Docker image, compose file, host timer, and how to
+move the history from a laptop): `docs/rig-docker.md`.
+
 Trust: every rig's deploy key can write the whole branch. Rigs are people the maintainer
 knows; see `docs/rig-setup.md`.
 
