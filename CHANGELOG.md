@@ -5,6 +5,8 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-07
+
 ### Added
 
 - **Knowledge-sector variant**: `firefox-norway-sector` in the daily run, over
@@ -27,6 +29,13 @@ semantic versioning for the extension packages.
   repository, entrypoint with a `smoke` mode, compose file, host systemd timer and installer) and
   `docs/rig-docker.md` for moving the daily exposure run to a home server. `exposure-run.mjs`
   reads `ADTRIPWIRE_CHROME_ARGS` (container-only Chromium flags such as `--no-sandbox`).
+
+### Fixed
+
+- README: Chrome and Chromium grant site access at install (no prompt); only Firefox asks in the
+  popup.
+- Seen alongside: navigations seen before the stored snapshot is restored at startup still close
+  the backward scan (the restored tracker inherits the per-tab navigation times).
 
 ## [0.3.0] — 2026-11-06
 

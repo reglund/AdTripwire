@@ -301,6 +301,15 @@ export class AlongsideTracker {
   }
 
   /**
+   * Copies the per-tab navigation times from `prev` (the tracker this one replaces, e.g. when the
+   * stored snapshot is restored after startup), so navigations seen before the swap still close
+   * the backward scan. Open anchors are not copied.
+   */
+  inheritNavigation(prev: AlongsideTracker): void {
+    for (const [tabId, ts] of prev.#navAt) this.onNavigation(tabId, ts);
+  }
+
+  /**
    * A top-level navigation started in `tabId` at `timestamp`: close that tab's open anchors and
    * ignore every earlier event of the tab from now on (a new page never inherits the previous
    * page's anchors, and the backward scan never reaches into the previous page).

@@ -240,10 +240,12 @@ class Background {
 
     try {
       const snap = await this.store.getAlongsideSnapshot();
-      this.alongside = new AlongsideTracker({
+      const restored = new AlongsideTracker({
         matcher: () => this.matcher,
         store: AlongsideStore.fromJSON(snap.store),
       });
+      restored.inheritNavigation(this.alongside);
+      this.alongside = restored;
       this.alongsideBaseline = MemoryExposureStore.fromJSON(snap.baseline);
     } catch (e) {
       log("warn", `alongside snapshot ignored: ${String(e)}`);

@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "source": "https://reglund.github.io/adtripwire-observatory/data/index.json",
-  "generatedAt": "2026-11-06T05:18:45.652Z",
+  "generatedAt": "2026-11-06T14:50:18.102Z",
   "period": {
     "from": "2026-11-02",
-    "to": "2026-11-05",
-    "days": 4
+    "to": "2026-11-06",
+    "days": 5
   },
   "rigs": 1,
-  "runs": 19,
+  "runs": 27,
   "hosts": [
     {
       "host": "events.myweb3id.io",

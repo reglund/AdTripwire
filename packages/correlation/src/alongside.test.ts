@@ -326,7 +326,7 @@ describe("AlongsideTracker page-site isolation", () => {
     const t = mkTracker();
     feed(t, [mk({ host: "noas.alpha.test", frame: 3, t: 0, top: "site-a.test" })]);
     expect(t.openAnchors).toBe(1);
-    t.onNavigation(1, 5000);
+    t.onNavigation(1, T0 + 5000);
     expect(t.openAnchors).toBe(0);
     feed(t, [mk({ host: "creative.cdn.test", frame: 3, t: 6000, top: "site-b.test" })]);
     expect(t.store.size).toBe(0);
@@ -334,12 +334,24 @@ describe("AlongsideTracker page-site isolation", () => {
 
   it("the backward scan ignores events from before the tab's navigation", () => {
     const t = mkTracker();
+    // Same page site on both sides, so only the navigation time can exclude the earlier event.
     const earlier = mk({ host: "old-site.cdn.test", frame: 3, t: 0, top: "site-a.test" });
-    t.onNavigation(1, 1000);
-    const anchor = mk({ host: "noas.alpha.test", frame: 3, t: 2000, top: "site-b.test" });
+    t.onNavigation(1, T0 + 1000);
+    const anchor = mk({ host: "noas.alpha.test", frame: 3, t: 2000, top: "site-a.test" });
     t.observe(anchor, () => [earlier, anchor]);
     expect(t.store.size).toBe(0);
     expect(t.store.totals.anchorsSeen).toBe(1);
+  });
+
+  it("a replacement tracker inherits navigation times (snapshot restore after startup)", () => {
+    const before = mkTracker();
+    const earlier = mk({ host: "old-site.cdn.test", frame: 3, t: 0, top: "site-a.test" });
+    before.onNavigation(1, T0 + 1000);
+    const t = mkTracker();
+    t.inheritNavigation(before);
+    const anchor = mk({ host: "noas.alpha.test", frame: 3, t: 2000, top: "site-a.test" });
+    t.observe(anchor, () => [earlier, anchor]);
+    expect(t.store.size).toBe(0);
   });
 
   it("another tab's anchors survive a navigation elsewhere", () => {

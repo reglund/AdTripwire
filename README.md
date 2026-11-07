@@ -78,8 +78,10 @@ To run the daily exposure rig in Docker on a server instead: `docs/rig-docker.md
   JavaScript-technique rules and the response branch of the NOAS rules are shown as **not
   evaluable**.
 
-The extension asks for access to all sites because ads appear everywhere; you can revoke and
-re-grant it at any time. Nothing is observed until it is granted.
+The extension needs access to all sites because ads appear everywhere. Firefox asks for it in
+the popup, and nothing is observed until it is granted. Chrome and Chromium grant it at
+install, so there is no prompt; you can restrict or revoke it under `chrome://extensions` →
+AdTripwire → Details → Site access at any time.
 
 ## Using it
 
