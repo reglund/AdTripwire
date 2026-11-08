@@ -3,7 +3,7 @@
  * Used by scripts/exposure-trend.mjs (Markdown trend) and scripts/observatory-build.mjs
  * (static site). Pure functions except loadRuns, which reads a directory.
  */
-import { ERROR_RE, OUTCOMES_MAX, outcomeText } from "./documented-hosts.mjs";
+import { ERROR_RE, OUTCOMES_MAX, VIA_MAX, outcomeText } from "./documented-hosts.mjs";
 import {
   closeSync,
   constants,
@@ -181,7 +181,12 @@ function validAlongsideFields(row) {
           (o.redirectTo === undefined ||
             (Array.isArray(o.redirectTo) &&
               o.redirectTo.length <= 10 &&
-              o.redirectTo.every((h) => typeof h === "string" && HOSTNAME_RE.test(h)))),
+              o.redirectTo.every((h) => typeof h === "string" && HOSTNAME_RE.test(h)))) &&
+          (o.via === undefined ||
+            (Array.isArray(o.via) &&
+              o.via.length <= VIA_MAX &&
+              o.via.every((h) => typeof h === "string" && HOSTNAME_RE.test(h)))) &&
+          (o.fromTop === undefined || (Number.isInteger(o.fromTop) && o.fromTop > 0)),
       )
     )
       return false;

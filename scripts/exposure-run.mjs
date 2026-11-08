@@ -38,7 +38,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { registrable, sameSite } from "./lib/registrable.mjs";
-import { documentedMatcher, outcomeRecorder } from "./lib/documented-hosts.mjs";
+import { documentedMatcher, frameOrigin, outcomeRecorder } from "./lib/documented-hosts.mjs";
 import {
   ALONGSIDE_MAX_ENTRIES,
   REPEAT_CONTACTS_MAX,
@@ -420,9 +420,18 @@ async function main() {
     // second witness next to the extension): status, declared size, redirect target, or error.
     const outcomes = outcomeRecorder(documented);
     const ended = new WeakSet();
+    // The issuing frame, looked up when the request ends and only for documented hosts.
+    const originOf = (req) => () => {
+      try {
+        return frameOrigin(req.frame(), page.mainFrame());
+      } catch {
+        return null; // frame gone or not supported
+      }
+    };
     const finish = (req) => {
       if (ended.has(req)) return;
       ended.add(req);
+      outcomes.origin(req.url(), originOf(req));
       const res = req.response();
       if (!res) return;
       const h = res.headers();
@@ -443,6 +452,7 @@ async function main() {
       try {
         if (ended.has(req)) return;
         ended.add(req);
+        outcomes.origin(req.url(), originOf(req));
         outcomes.failure(req.url(), req.failure()?.errorText);
       } catch {
         /* best effort */
@@ -458,6 +468,7 @@ async function main() {
           if (hop.response()) finish(hop);
           else {
             ended.add(hop);
+            outcomes.origin(hop.url(), originOf(hop));
             outcomes.redirect(hop.url(), req.url());
           }
         }

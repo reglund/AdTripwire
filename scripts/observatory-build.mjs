@@ -23,6 +23,8 @@ import { mkdirSync, writeFileSync, existsSync, lstatSync, readdirSync, rmSync } 
 import { join } from "node:path";
 import { homedir, userInfo } from "node:os";
 import { pathToFileURL } from "node:url";
+import { STAGES } from "./lib/documented-hosts.mjs";
+import { buildFlows, stageCounts } from "./lib/flows.mjs";
 import {
   DEFAULT_RIG,
   MAX_FILE_BYTES,
@@ -214,10 +216,11 @@ export function buildAlongside(runs) {
  */
 export function buildIndex(
   runs,
-  { generatedAt = new Date().toISOString(), extras = {}, rigMeta = {} } = {},
+  { generatedAt = new Date().toISOString(), extras = {}, rigMeta = {}, indicators } = {},
 ) {
   const names = assignNames(runs);
   const allContacts = [];
+  const outcomes = outcomeEntries(runs);
   const entries = runs.map((r) => {
     const name = names.get(r.file);
     const s = runStats(r);
@@ -298,21 +301,28 @@ export function buildIndex(
     runs: entries,
     hosts: hostTable(allContacts),
     contacts: allContacts,
-    outcomes: outcomesOf(runs).map((o) => ({
-      date: o.date,
-      rig: o.rig,
-      variant: o.variant,
-      site: o.site,
-      host: o.host,
-      indicator: o.indicator,
-      requests: o.requests,
-      statuses: o.statuses,
-      failures: o.failures,
-      ...(o.maxBytes !== undefined ? { maxBytes: o.maxBytes } : {}),
-      ...(o.redirectTo ? { redirectTo: o.redirectTo } : {}),
-    })),
+    outcomes,
+    flows: buildFlows(allContacts, outcomes, indicators ? { indicators } : {}),
     alongside: buildAlongside(runs),
   };
+}
+
+function outcomeEntries(runs) {
+  return outcomesOf(runs).map((o) => ({
+    date: o.date,
+    rig: o.rig,
+    variant: o.variant,
+    site: o.site,
+    host: o.host,
+    indicator: o.indicator,
+    requests: o.requests,
+    statuses: o.statuses,
+    failures: o.failures,
+    ...(o.maxBytes !== undefined ? { maxBytes: o.maxBytes } : {}),
+    ...(o.redirectTo ? { redirectTo: o.redirectTo } : {}),
+    ...(o.via ? { via: o.via } : {}),
+    ...(o.fromTop ? { fromTop: o.fromTop } : {}),
+  }));
 }
 
 const LEGEND =
@@ -340,7 +350,25 @@ td.day,th.day{text-align:center;padding:.3rem .25rem;min-width:1.6rem}
 td.hit{color:var(--hit);font-weight:700}
 td.miss,td.none{color:var(--muted)}
 .hosts td:first-child{position:sticky;left:0;background:var(--bg)}
-@media (max-width:40rem){main{padding:.75rem}h1{font-size:1.35rem}}
+.pipeline,.steps{display:flex;align-items:stretch;gap:.35rem}
+.stage,.step{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:.15rem;border:1px solid var(--line);border-radius:6px;padding:.45rem .55rem;background:var(--head);font-size:.85rem;overflow-wrap:anywhere}
+.stage small,.step small{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em}
+.stage span{color:var(--muted)}
+.stage strong{margin-top:auto;font-weight:600}
+.stage.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.stage.on strong{color:var(--accent)}
+.step code{font-size:.85em}
+.step.read{background:var(--bg)}
+.step.attn{border-color:var(--hit);box-shadow:inset 0 0 0 1px var(--hit)}
+.step.attn small{color:var(--hit)}
+.step.stage-spyware{border-color:var(--hit)}
+.arr{flex:0 0 auto;align-self:center;color:var(--muted);font-size:1.1rem}
+.arr::before{content:"\\2192"}
+.pipeline{margin:.5rem 0 1.25rem}
+.flows{list-style:none;padding:0;margin:0}
+.flow{margin:0 0 1.1rem;padding-top:.9rem;border-top:1px solid var(--line)}
+.flow p{margin:.3rem 0 0;font-size:.82rem}
+@media (max-width:40rem){main{padding:.75rem}h1{font-size:1.35rem}.pipeline,.steps{flex-direction:column}.arr::before{content:"\\2193"}}
 `;
 
 const inlineCode = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -371,6 +399,59 @@ const hostsText = (c) => (c.hostnames ? c.hostnames.join(", ") : "(not recorded 
 
 export const OUTCOMES_NOTE =
   "How each request to a documented host ended, from the browser's own network log: HTTP status, declared size, the domain a redirect went to, or the browser's network error (for example a name that no longer resolves). A response shows that something still answers at that name; it does not show what it delivered or to whom. Only hostnames, status codes, sizes and error codes are kept.";
+
+export const FLOWS_NOTE =
+  "Each finding drawn as a chain: the site, the frame that sent the request, the documented host and where it sits in the AdFection chain, how the request ended, and how to read it. Identical chains on several days are drawn once. A mark for a closer look is a reading aid for researchers, not a finding about any device.";
+
+const step = (label, body, cls = "") =>
+  `<div class="step${cls ? ` ${cls}` : ""}"><small>${esc(label)}</small>${body}</div>`;
+const ARROW = `<span class="arr" aria-hidden="true"></span>`;
+
+function renderFlows(flows, out) {
+  out.push(`<h2>How each finding flowed</h2>`);
+  out.push(`<p class="note">${esc(FLOWS_NOTE)}</p>`);
+  const counts = stageCounts(flows);
+  out.push(
+    `<div class="pipeline" role="list" aria-label="The AdFection chain">${STAGES.map((st) => {
+      const n = st.key === "auction" ? null : counts[st.key];
+      const cls = n ? "stage on" : "stage";
+      const tally = n === null ? "Context" : n ? `${n} finding(s) in this period` : "No finding";
+      return `<div class="${cls}" role="listitem"><small>${esc(st.n)}. ${esc(st.title)}</small><span>${esc(st.text)}</span><strong>${esc(tally)}</strong></div>`;
+    }).join(ARROW)}</div>`,
+  );
+  if (flows.length === 0) {
+    out.push(`<p>No finding to draw in this period.</p>`);
+    return;
+  }
+  const stageTitle = new Map(STAGES.map((st) => [st.key, `${st.n}. ${st.title}`]));
+  out.push(`<ol class="flows">`);
+  for (const f of flows) {
+    const frame =
+      `<strong>${esc(f.frame.title)}</strong>` +
+      (f.frame.hosts.length ? `<code>${esc(f.frame.hosts.join(", "))}</code>` : "");
+    const host = `<code>${esc(f.host)}</code><span>${esc(stageTitle.get(f.stage) ?? f.stage)}${
+      f.role ? ` (${esc(f.role)})` : ""
+    }</span>`;
+    out.push(
+      `<li class="flow"><div class="steps">${[
+        step("Site", `<strong>${esc(f.site)}</strong>`),
+        step("Frame", frame),
+        step("Documented host", host, `stage-${f.stage}`),
+        step("How it ended", `<span>${esc(f.outcome)}</span>`),
+        step(
+          f.reading.attention ? "Reading: worth a closer look" : "Reading",
+          `<span>${esc(f.reading.text)}</span>`,
+          f.reading.attention ? "read attn" : "read",
+        ),
+      ].join(ARROW)}</div><p class="muted">${esc(
+        `${f.dates.length} day(s): ${f.dates.join(", ")}. Rigs: ${f.rigs.join(", ")}. Variants: ${f.variants.join(", ")}.${
+          f.repeat ? " Includes repeat contacts in the same run." : ""
+        }`,
+      )}</p></li>`,
+    );
+  }
+  out.push(`</ol>`);
+}
 
 export const ALONGSIDE_DISCLAIMER =
   "Hostnames that appeared in the same ad frame as a documented host. These are not detections and say nothing about the hosts themselves; they are leads for researchers. The list fills slowly: documented hosts are rare.";
@@ -520,6 +601,9 @@ export function renderHtml(index) {
       ),
     );
   }
+
+  // Flows.
+  renderFlows(index.flows ?? [], out);
 
   // Sites.
   out.push(`<h2>Sites that carried documented hosts</h2>`);
@@ -817,7 +901,7 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`results[].thirdPartyDomainsList\` | Optional. The sorted third-party registrable domains behind the count (at most 1000); the baseline for "seen alongside". |
 | \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. The index collapses leading per-visit ID labels to \`*\`. |
 | \`results[].alongsideAnchors\` | Optional. Documented-host anchors opened during this site. |
-| \`results[].documentedOutcomes[]\` | Optional (at most 50, from 2026-11-08). How requests to documented hosts (surveillance or malicious, current) ended in the browser's own network log: \`host\`, \`indicator\`, \`requests\`, \`statuses\` (status code or \`3xx\` to count), \`failures\` (browser error code to count), optional \`maxBytes\` (largest declared size) and \`redirectTo[]\` (registrable domains). |
+| \`results[].documentedOutcomes[]\` | Optional (at most 50, from 2026-11-08). How requests to documented hosts (surveillance or malicious, current) ended in the browser's own network log: \`host\`, \`indicator\`, \`requests\`, \`statuses\` (status code or \`3xx\` to count), \`failures\` (browser error code to count), optional \`maxBytes\` (largest declared size) and \`redirectTo[]\` (registrable domains), and from 2026-11-09 optional \`via[]\` (at most 5 hostnames of the subframes that sent the requests, or of their nearest ancestor with an http(s) address) and \`fromTop\` (requests sent by the page's own document). |
 | \`results[].repeatContacts[]\` | Optional (at most 200). Contact-type detections that already existed when this site started and fired again on it (deduplicated by the engine, so absent from \`detections\`): \`ruleId\`, \`severity\`, \`detectionId\`, \`hostnames\`, \`matchedIndicatorIds\`, \`occurrences\` (added during this site). Not counted in the severity columns. |
 | \`results[].error\` | Optional. Why a step failed. |
 | \`results[].detections[]\` | Detections raised on this site (below). |
@@ -846,7 +930,8 @@ A detection always has \`ruleId\` and \`severity\` (\`informational\`, \`suspici
 | \`rigs[]\` | One entry per rig, sorted by name: \`rig\`, \`country\` and \`network\` (declared by the rig owner, or \`null\`), \`days\` (days with runs), \`runs\`, \`variants\`, \`contacts\`, \`hosts\` (distinct documented hosts). |
 | \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`rig\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
 | \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`, \`rigs[]\`. |
-| \`outcomes[]\` | One entry per run, site and documented host from \`results[].documentedOutcomes\`: \`date\`, \`rig\`, \`variant\`, \`site\`, \`host\`, \`indicator\`, \`requests\`, \`statuses\`, \`failures\`, optional \`maxBytes\`, \`redirectTo\`. |
+| \`outcomes[]\` | One entry per run, site and documented host from \`results[].documentedOutcomes\`: \`date\`, \`rig\`, \`variant\`, \`site\`, \`host\`, \`indicator\`, \`requests\`, \`statuses\`, \`failures\`, optional \`maxBytes\`, \`redirectTo\`, \`via\`, \`fromTop\`. |
+| \`flows[]\` | "How each finding flowed", newest first, at most 40: one group per \`site\`, documented \`host\`, frame and outcome class, with \`indicator\`, \`role\`, \`stage\` (\`tracking\`, \`selection\`, \`delivery\`, \`spyware\`), \`frame\` {\`title\`, \`hosts[]\`}, \`outcomeClass\`, \`outcome\` (text), \`reading\` {\`text\`, \`attention\`}, \`dates[]\`, \`rigs[]\`, \`variants[]\`, \`repeat\`. Built from \`contacts[]\` and \`outcomes[]\`; \`attention\` is a reading aid, not a finding about a device. |
 | \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`, and \`repeat: true\` when the engine merged this site's contact into an earlier site's detection in the same run (from \`results[].repeatContacts\`, or reconstructed from \`alongside\` anchors for older runs). |
 | \`alongside\` | "Seen alongside documented hosts" (observations, not detections): \`minSiteDays\`, \`runsWithData\`, \`runsTotal\`, \`visitsWithData\`, \`anchorVisits\`, \`frameHosts\`, ranked \`rows[]\` (frame scope) and \`pageOnly[]\`. |
 

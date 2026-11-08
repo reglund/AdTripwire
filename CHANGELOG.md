@@ -7,6 +7,21 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Observatory "How each finding flowed"**: each finding drawn as a chain (site → frame that
+  sent the request → documented host and its stage in the AdFection chain → how the request
+  ended → how to read it), under an overview of the five stages (ad auction, tracking and ID
+  sync, ad selection, delivery and staging, spyware infrastructure) with the number of findings
+  per stage. Identical chains on several days are drawn once; at most 40, newest first. Reading
+  texts are conservative; "worth a closer look" marks answered ad-selection, delivery and
+  spyware-infrastructure contacts and is a reading aid, not a finding about a device. Static
+  HTML and CSS, light and dark, vertical on phones. Index field `flows[]`.
+- **Exposure harness: the frame that sent each request to a documented host**
+  (`documentedOutcomes[].via[]`, at most 5 hostnames, and `fromTop` for the page's own
+  document). The frame is looked up when the request ends, because Firefox (WebDriver BiDi) can
+  report a new frame's address only after its first requests; an about:blank ad frame is named
+  by its nearest ancestor with an address. Hostnames only. Verified in Chromium and Firefox
+  against a local page (5 runs each).
+
 - **How requests to documented hosts ended**: the exposure harness records, from the browser's
   own network log, the HTTP status, declared size, redirect target domain or network error of
   every request to a documented (surveillance or malicious, current) host, per site
