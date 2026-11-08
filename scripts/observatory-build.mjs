@@ -30,6 +30,7 @@ import {
   RIG_NETWORKS,
   SEV,
   contactsOf,
+  severityText,
   hostTable,
   isRealDir,
   isStrong,
@@ -231,6 +232,7 @@ export function buildIndex(
         ruleId: c.ruleId,
         severity: c.severity,
         ...(Array.isArray(c.hostnames) ? { hostnames: c.hostnames } : {}),
+        ...(c.repeat ? { repeat: true } : {}),
       });
     const x = extras[r.file] ?? {};
     return {
@@ -494,7 +496,7 @@ export function renderHtml(index) {
           c.variant,
           c.site,
           raw(`<code>${esc(c.ruleId)}</code>`),
-          c.severity,
+          severityText(c),
           hostsText(c),
         ]),
       ),
@@ -774,6 +776,7 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`results[].thirdPartyDomainsList\` | Optional. The sorted third-party registrable domains behind the count (at most 1000); the baseline for "seen alongside". |
 | \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. The index collapses leading per-visit ID labels to \`*\`. |
 | \`results[].alongsideAnchors\` | Optional. Documented-host anchors opened during this site. |
+| \`results[].repeatContacts[]\` | Optional (at most 200). Contact-type detections that already existed when this site started and fired again on it (deduplicated by the engine, so absent from \`detections\`): \`ruleId\`, \`severity\`, \`detectionId\`, \`hostnames\`, \`matchedIndicatorIds\`, \`occurrences\` (added during this site). Not counted in the severity columns. |
 | \`results[].error\` | Optional. Why a step failed. |
 | \`results[].detections[]\` | Detections raised on this site (below). |
 
@@ -801,7 +804,7 @@ A detection always has \`ruleId\` and \`severity\` (\`informational\`, \`suspici
 | \`rigs[]\` | One entry per rig, sorted by name: \`rig\`, \`country\` and \`network\` (declared by the rig owner, or \`null\`), \`days\` (days with runs), \`runs\`, \`variants\`, \`contacts\`, \`hosts\` (distinct documented hosts). |
 | \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`rig\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
 | \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`, \`rigs[]\`. |
-| \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`. |
+| \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`, and \`repeat: true\` when the engine merged this site's contact into an earlier site's detection in the same run (from \`results[].repeatContacts\`, or reconstructed from \`alongside\` anchors for older runs). |
 | \`alongside\` | "Seen alongside documented hosts" (observations, not detections): \`minSiteDays\`, \`runsWithData\`, \`runsTotal\`, \`visitsWithData\`, \`anchorVisits\`, \`frameHosts\`, ranked \`rows[]\` (frame scope) and \`pageOnly[]\`. |
 
 A contact is a detection from a \`known_infra.*\` or \`correlation.*\` rule, or at elevated or above.

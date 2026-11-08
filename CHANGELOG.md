@@ -5,9 +5,18 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Observatory undercounted sites that carried a documented host**: within one run the engine
+  merges later contacts with the same host into the first detection (deduplication), so only the
+  first site showed. The harness now records these as `repeatContacts` per site (from
+  occurrenceCount rises), and the observatory lists them as "repeat contact in the same run";
+  for older runs they are reconstructed from seen-alongside anchors (2026-11-07: 5 contacts
+  instead of 2). Severity columns are unchanged.
+
 ### Changed
 
-- **Observatory "Seen alongside"**: leading per-visit ID labels (long numbers, long hex, UUIDs)
+- **Observatory "Seen alongside": leading per-visit ID labels (long numbers, long hex, UUIDs)
   are collapsed to `*`, so `5654…120.cm.a.mts.ru` counts as `*.cm.a.mts.ru` instead of one
   single-day row per visit. The registrable domain is never collapsed; rig data is unchanged.
 

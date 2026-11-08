@@ -38,7 +38,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { registrable, sameSite } from "./lib/registrable.mjs";
-import { ALONGSIDE_MAX_ENTRIES, THIRD_PARTY_LIST_MAX } from "./lib/exposure-runs.mjs";
+import {
+  ALONGSIDE_MAX_ENTRIES,
+  REPEAT_CONTACTS_MAX,
+  THIRD_PARTY_LIST_MAX,
+  isContactDetection,
+} from "./lib/exposure-runs.mjs";
 
 const arg = (k, d) =>
   (process.argv.find((a) => a.startsWith(`--${k}=`)) ?? `--${k}=${d}`).slice(k.length + 3);
@@ -382,9 +387,11 @@ async function main() {
     `extension ${start.productVersion}, ${start.indicatorSets.length} indicator set(s), monitoring=${start.monitoring}, caps=${start.capabilities.capabilities.join(",")}`,
   );
   if (!start.monitoring) console.warn("WARNING: monitoring is not active (host permission?)");
-  const knownDetections = new Set(
-    (await rpc(dash, { type: "list_detections" })).data.map((d) => d.detectionId),
-  );
+  const startList = (await rpc(dash, { type: "list_detections" })).data;
+  const knownDetections = new Set(startList.map((d) => d.detectionId));
+  // occurrenceCount per known detection: a rise during a later site is a repeat contact that the
+  // engine merged into the existing detection (deduplication), so it never shows up as new.
+  const knownCounts = new Map(startList.map((d) => [d.detectionId, d.occurrenceCount ?? 1]));
 
   // Indicator id -> hostname for the ids this run's own detections matched (cheap, no extra call).
   const indicatorNames = new Map();
@@ -472,9 +479,25 @@ async function main() {
     );
     row.thirdPartyDomains = seenThirdParty.size;
     const list = (await rpc(dash, { type: "list_detections" })).data;
+    const repeats = [];
     for (const d of list) {
-      if (knownDetections.has(d.detectionId)) continue;
+      const count = d.occurrenceCount ?? 1;
+      if (knownDetections.has(d.detectionId)) {
+        const before = knownCounts.get(d.detectionId) ?? count;
+        knownCounts.set(d.detectionId, count);
+        if (count > before && isContactDetection(d) && repeats.length < REPEAT_CONTACTS_MAX)
+          repeats.push({
+            ruleId: d.ruleId,
+            severity: d.severity,
+            detectionId: d.detectionId,
+            hostnames: d.subjectHostnames,
+            matchedIndicatorIds: d.matchedIndicatorIds,
+            occurrences: count - before,
+          });
+        continue;
+      }
       knownDetections.add(d.detectionId);
+      knownCounts.set(d.detectionId, count);
       row.detections.push({
         ruleId: d.ruleId,
         severity: d.severity,
@@ -488,6 +511,7 @@ async function main() {
         evidence: d.evidence.map((e) => e.observed),
       });
     }
+    row.repeatContacts = repeats;
     // Seen alongside: delta of the extension's state, and the registrable domains this site
     // contacted (the baseline for "how often was this domain seen at all").
     row.thirdPartyDomainsList = [...seenThirdParty].sort().slice(0, THIRD_PARTY_LIST_MAX);

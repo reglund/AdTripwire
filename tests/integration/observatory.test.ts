@@ -39,7 +39,13 @@ import {
   resolveRig,
 } from "../../scripts/observatory-reproduce.mjs";
 
-type Det = { ruleId: string; severity: string; hostnames?: string[] };
+type Det = {
+  ruleId: string;
+  severity: string;
+  hostnames?: string[];
+  matchedIndicatorIds?: string[];
+  detectionId?: string;
+};
 type Alongside = { host: string; anchor: string; scope: string };
 type Row = {
   site: string;
@@ -53,6 +59,7 @@ type Row = {
   alongside?: Alongside[];
   thirdPartyDomainsList?: string[];
   alongsideAnchors?: number;
+  repeatContacts?: Det[];
 };
 
 const row = (site: string, detections: Det[] = [], extra: Partial<Row> = {}): Row => ({
@@ -171,6 +178,100 @@ describe("loadRuns", () => {
     });
     expect(runs.map((r: { file: string }) => r.file)).toEqual(["good.json"]);
     expect(skipped).toBe(2);
+  });
+});
+
+describe("repeat contacts", () => {
+  const MATCHED: Det = {
+    ...KNOWN,
+    detectionId: "d1",
+    matchedIndicatorIds: ["adf-0081", "adf-0116"],
+  };
+  const anchorRow = (site: string, anchor = "adf-0081") =>
+    row(site, [], {
+      alongside: [{ host: "ads.other.test", anchor, scope: "frame" }],
+      alongsideAnchors: 1,
+    });
+
+  it("lists recorded repeatContacts as repeat contacts, contact-type rules only", () => {
+    const r = run({ variant: "v" }, [
+      row("a.example", [MATCHED]),
+      row("b.example", [], {
+        repeatContacts: [
+          MATCHED,
+          { ruleId: "page.hidden_iframe_after_load", severity: "suspicious" },
+        ],
+      }),
+    ]);
+    const c = contactsOf([r]);
+    expect(c.map((x: { site: string; repeat?: boolean }) => [x.site, x.repeat ?? false])).toEqual([
+      ["a.example", false],
+      ["b.example", true],
+    ]);
+  });
+
+  it("reconstructs repeats for older runs from alongside anchors, resolving the hostname", () => {
+    const r = run({}, [row("ria.example", [MATCHED]), anchorRow("gazeta.example")]);
+    const c = contactsOf([r]);
+    expect(c).toHaveLength(2);
+    expect(c[1]).toMatchObject({
+      site: "gazeta.example",
+      ruleId: KNOWN.ruleId,
+      hostnames: ["tracker.example"],
+      repeat: true,
+    });
+  });
+
+  it("reconstructs nothing when the row has its own contact, recorded repeats, no anchors or an unresolvable anchor", () => {
+    const own = run({}, [
+      row("a.example", [MATCHED]),
+      { ...anchorRow("b.example"), detections: [KNOWN] },
+    ]);
+    expect(contactsOf([own])).toHaveLength(2);
+    const recorded = run({}, [
+      row("a.example", [MATCHED]),
+      { ...anchorRow("b.example"), repeatContacts: [] },
+    ]);
+    expect(contactsOf([recorded])).toHaveLength(1);
+    const none = run({}, [
+      row("a.example", [MATCHED]),
+      { ...anchorRow("b.example"), alongsideAnchors: 0 },
+    ]);
+    expect(contactsOf([none])).toHaveLength(1);
+    const unknown = run({}, [row("a.example", [MATCHED]), anchorRow("b.example", "adf-9999")]);
+    expect(contactsOf([unknown])).toHaveLength(1);
+    const noSource = run({}, [anchorRow("b.example")]);
+    expect(contactsOf([noSource])).toEqual([]);
+  });
+
+  it("marks repeats in the index, trend and page, and rejects malformed repeatContacts", () => {
+    const r = {
+      file: "x.json",
+      variant: "v",
+      ...run({}, [row("a.example", [MATCHED]), anchorRow("b.example")]),
+    };
+    const index = buildIndex([r], { generatedAt: "2026-11-08T00:00:00.000Z" });
+    expect(index.contacts.map((c: { repeat?: boolean }) => c.repeat ?? false)).toEqual([
+      false,
+      true,
+    ]);
+    expect(index.hosts[0].sites).toEqual(["a.example", "b.example"]);
+    expect(renderHtml(index)).toContain("suspicious (repeat contact in the same run)");
+    const dir = tmp();
+    const put = (f: string, rc: unknown) =>
+      writeFileSync(
+        join(dir, f),
+        JSON.stringify(run({}, [row("a.example", [], { repeatContacts: rc as Det[] })])),
+      );
+    put("ok.json", [MATCHED]);
+    put("notarr.json", { ruleId: "x" });
+    put("badhost.json", [{ ...KNOWN, hostnames: ["a b"] }]);
+    put("norule.json", [{ severity: "suspicious" }]);
+    put(
+      "toomany.json",
+      Array.from({ length: 201 }, () => KNOWN),
+    );
+    expect(loadRuns(dir).map((x: { file: string }) => x.file)).toEqual(["ok.json"]);
   });
 });
 

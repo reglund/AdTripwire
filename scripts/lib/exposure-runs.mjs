@@ -118,6 +118,8 @@ export function readRegularFile(path, { maxBytes = MAX_FILE_BYTES, onSkip } = {}
 export const ALONGSIDE_MAX_ENTRIES = 200;
 export const THIRD_PARTY_LIST_MAX = 1000;
 export const ALONGSIDE_ANCHORS_MAX = 1_000_000;
+/** Most repeat contacts kept per site row. */
+export const REPEAT_CONTACTS_MAX = 200;
 
 /** A bare hostname: no scheme, path, query or port. Applied to every published host. */
 export const HOSTNAME_RE = /^[a-z0-9]([a-z0-9._-]{0,251}[a-z0-9])?$/;
@@ -126,7 +128,7 @@ const ANCHOR_RE = /^[A-Za-z0-9._:-]{1,253}$/;
 
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
-/** Valid optional `alongside`, `thirdPartyDomainsList` and `alongsideAnchors` of one result row. */
+/** Valid optional `alongside`, `thirdPartyDomainsList`, `alongsideAnchors` and `repeatContacts` of one result row. */
 function validAlongsideFields(row) {
   if (row.alongside !== undefined) {
     if (!Array.isArray(row.alongside) || row.alongside.length > ALONGSIDE_MAX_ENTRIES) return false;
@@ -153,6 +155,23 @@ function validAlongsideFields(row) {
   if (row.alongsideAnchors !== undefined) {
     const n = row.alongsideAnchors;
     if (!Number.isInteger(n) || n < 0 || n > ALONGSIDE_ANCHORS_MAX) return false;
+  }
+  if (row.repeatContacts !== undefined) {
+    const l = row.repeatContacts;
+    if (
+      !Array.isArray(l) ||
+      l.length > REPEAT_CONTACTS_MAX ||
+      !l.every(
+        (d) =>
+          isObject(d) &&
+          typeof d.ruleId === "string" &&
+          typeof d.severity === "string" &&
+          (d.hostnames === undefined ||
+            (Array.isArray(d.hostnames) &&
+              d.hostnames.every((h) => typeof h === "string" && HOSTNAME_RE.test(h)))),
+      )
+    )
+      return false;
   }
   return true;
 }
@@ -223,21 +242,76 @@ export function loadRuns(dir, { maxBytes = Infinity, maxRuns = Infinity, onSkip 
   return runs;
 }
 
-/** Detections that count as a contact: documented infrastructure, correlations, elevated+. */
+/** True for a detection that counts as a contact: documented infrastructure, correlations, elevated+. */
+export function isContactDetection(d) {
+  return (
+    typeof d?.ruleId === "string" &&
+    (d.ruleId.startsWith("known_infra.") ||
+      d.ruleId.startsWith("correlation.") ||
+      ["elevated", "high_priority"].includes(d.severity))
+  );
+}
+
+/**
+ * Repeat contacts a run recorded before `repeatContacts` existed, reconstructed from "seen
+ * alongside": a site that opened documented-host anchors (`alongsideAnchors` > 0) without a
+ * known_infra detection of its own had its contact merged into an earlier site's detection by the
+ * engine's deduplication. The anchor ids resolve to the earlier known_infra detection of the same
+ * run that matched them; anchors that resolve to nothing are left out.
+ */
+function inferredRepeats(r, row, byIndicator) {
+  if (Array.isArray(row.repeatContacts) || !(row.alongsideAnchors > 0)) return [];
+  const rows = Array.isArray(row.detections) ? row.detections : [];
+  if (rows.some((d) => d?.ruleId?.startsWith?.("known_infra."))) return [];
+  const out = new Map();
+  for (const a of Array.isArray(row.alongside) ? row.alongside : []) {
+    const src = byIndicator.get(a.anchor);
+    if (src && !out.has(src.detectionId ?? src.ruleId)) out.set(src.detectionId ?? src.ruleId, src);
+  }
+  return [...out.values()].map((d) => ({
+    ruleId: d.ruleId,
+    severity: d.severity,
+    ...(Array.isArray(d.hostnames) ? { hostnames: d.hostnames } : {}),
+  }));
+}
+
+/**
+ * Contacts: detections that count as a contact (isContactDetection), plus repeat contacts marked
+ * `repeat: true` - sites where the engine merged the contact into an earlier site's detection of
+ * the same run (deduplication), from `repeatContacts` or, for older runs, reconstructed from
+ * "seen alongside" (inferredRepeats).
+ */
 export function contactsOf(runs) {
   const contacts = [];
-  for (const r of runs)
-    for (const row of Array.isArray(r?.results) ? r.results : [])
+  for (const r of runs) {
+    const results = Array.isArray(r?.results) ? r.results : [];
+    // Indicator id or documented hostname -> the run's known_infra detection that matched it.
+    const byIndicator = new Map();
+    for (const row of results)
       for (const d of Array.isArray(row?.detections) ? row.detections : [])
-        if (
-          typeof d?.ruleId === "string" &&
-          (d.ruleId.startsWith("known_infra.") ||
-            d.ruleId.startsWith("correlation.") ||
-            ["elevated", "high_priority"].includes(d.severity))
-        )
-          contacts.push({ date: r.date, variant: r.variant, site: row.site, ...d });
+        if (d?.ruleId?.startsWith?.("known_infra."))
+          for (const k of [
+            ...(Array.isArray(d.matchedIndicatorIds) ? d.matchedIndicatorIds : []),
+            ...(Array.isArray(d.hostnames) ? d.hostnames : []),
+          ])
+            if (typeof k === "string" && !byIndicator.has(k)) byIndicator.set(k, d);
+    for (const row of results) {
+      if (!isObject(row)) continue;
+      const base = { date: r.date, variant: r.variant, site: row.site };
+      for (const d of Array.isArray(row?.detections) ? row.detections : [])
+        if (isContactDetection(d)) contacts.push({ ...base, ...d });
+      for (const d of Array.isArray(row?.repeatContacts) ? row.repeatContacts : [])
+        if (isContactDetection(d)) contacts.push({ ...base, ...d, repeat: true });
+      for (const d of inferredRepeats(r, row, byIndicator))
+        contacts.push({ ...base, ...d, repeat: true });
+    }
+  }
   return contacts;
 }
+
+/** Severity text for a contact; repeat contacts say so. */
+export const severityText = (c) =>
+  c.repeat ? `${c.severity} (repeat contact in the same run)` : c.severity;
 
 /** Contacts that are stronger than plain contact with documented infrastructure. */
 export function isStrong(c) {
@@ -312,6 +386,7 @@ export function readingNotes() {
     "Runs before 2026-11-03 used the pre-retune redirect_chain rule and an unreliable third-party counter; compare severities and counts from later runs only.",
     "The profiles do not disguise themselves: desktop Chromium runs present as HeadlessChrome and Firefox runs set navigator.webdriver, so sites and ad exchanges that filter automated visitors may show them fewer or no auctions; the phone emulations present the emulated device's user agent. Each run from 2026-11-07 records what it presented as (`presentation`).",
     `The severity columns leave out ${[...NOISY_RULES].map((r) => `\`${r}\``).join(", ")}: it fires on ordinary ad slots on most sites and is counted separately under "Hidden iframes". Any of those detections that is elevated or above still appears under "Signals that matter".`,
+    'Within one run the engine reports a documented host once per correlation window; later sites that contact it again are listed as "repeat contact in the same run" (recorded by the harness from 2026-11-08, reconstructed from seen-alongside anchors for 2026-11-07). Runs before 2026-11-07 cannot show repeats, so they may undercount the sites that carried a host.',
     "Absence of signals means the automated profiles were not shown the documented infrastructure in these auctions; it says nothing about other profiles or devices.",
   ];
 }
@@ -345,7 +420,7 @@ export function renderTrendMarkdown(runs, { dirLabel, now = new Date() }) {
     L.push("|---|---|---|---|---|---|");
     for (const c of contacts)
       L.push(
-        `| ${c.date} | ${c.variant} | ${c.site} | \`${c.ruleId}\` | ${c.severity} | ${c.hostnames ? c.hostnames.join(", ") : "(not recorded in this run)"} |`,
+        `| ${c.date} | ${c.variant} | ${c.site} | \`${c.ruleId}\` | ${severityText(c)} | ${c.hostnames ? c.hostnames.join(", ") : "(not recorded in this run)"} |`,
       );
   }
   L.push("");
