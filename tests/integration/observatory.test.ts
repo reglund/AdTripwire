@@ -25,6 +25,7 @@ import {
   build,
   buildAlongside,
   buildIndex,
+  collapseIdLabels,
   dayRange,
   esc,
   renderHtml,
@@ -886,6 +887,34 @@ describe("seen alongside", () => {
     expect(a.rows[1].share).toBeLessThan(1);
     expect(a.rows.some((r: { host: string }) => r.host === "once.test")).toBe(false);
     expect(a.pageOnly.map((r: { host: string }) => r.host)).toEqual(["pg.test"]);
+  });
+
+  it("collapses leading per-visit ID labels, never the registrable domain", () => {
+    expect(collapseIdLabels("5654093961794050096120.cm.a.mts.ru")).toBe("*.cm.a.mts.ru");
+    expect(collapseIdLabels("78dc3ab0-37c4-42d3-812d-1f1a3d795204.dsp.mts.ru")).toBe(
+      "*.dsp.mts.ru",
+    );
+    expect(collapseIdLabels("0123456789abcdef0123.x.example")).toBe("*.x.example");
+    expect(collapseIdLabels("ads.betweendigital.com")).toBe("ads.betweendigital.com");
+    expect(collapseIdLabels("cdn123.example")).toBe("cdn123.example");
+    expect(collapseIdLabels("123456789012.example")).toBe("123456789012.example");
+    expect(collapseIdLabels("12345.cm.example")).toBe("12345.cm.example");
+    const runs = withRuns(
+      ["2026-11-02", "2026-11-03"].map((date, i) =>
+        run({ date }, [
+          row("s1.example", [], {
+            alongside: [
+              fr(`${["5654093961794050096120", "1945977951794053448564"][i]}.cm.mts.test`),
+            ],
+            alongsideAnchors: 1,
+            thirdPartyDomainsList: ["mts.test"],
+          }),
+        ]),
+      ),
+    );
+    const a = buildAlongside(runs);
+    expect(a.rows).toHaveLength(1);
+    expect(a.rows[0]).toMatchObject({ host: "*.cm.mts.test", siteDays: 2 });
   });
 
   it("counts a site-day once across rigs and variants and lists the rigs", () => {

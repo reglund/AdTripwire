@@ -110,6 +110,23 @@ const ALONGSIDE_TABLE_MAX = 200;
  * page scope (the anchor sat in the top document) is counted separately and never ranked.
  * Nothing here is a detection; the anchors are indicator ids or documented hostnames.
  */
+const ID_LABEL =
+  /^(?:\d{12,}|[0-9a-f]{16,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/**
+ * Collapse leading per-visit ID labels (long digit runs, long hex, UUIDs) into "*", so
+ * "5654093961794050096120.cm.a.mts.ru" and "78dc3ab0-...-208fc5002e5a.dsp.mts.ru" count as
+ * "*.cm.a.mts.ru" and "*.dsp.mts.ru" instead of one row per visit. The registrable domain is
+ * never collapsed.
+ */
+export function collapseIdLabels(host) {
+  const labels = host.split(".");
+  const keep = registrable(host).split(".").length;
+  let i = 0;
+  while (i < labels.length - keep && ID_LABEL.test(labels[i])) i += 1;
+  return i === 0 ? host : ["*", ...labels.slice(i)].join(".");
+}
+
 export function buildAlongside(runs) {
   const frame = new Map();
   const page = new Map();
@@ -138,7 +155,7 @@ export function buildAlongside(runs) {
       for (const a of row.alongside) {
         // The visited site's own registrable domain is never a candidate.
         if (typeof row.site === "string" && sameSite(a.host, row.site)) continue;
-        add(a.scope === "frame" ? frame : page, a.host, siteDay, a.anchor, rig);
+        add(a.scope === "frame" ? frame : page, collapseIdLabels(a.host), siteDay, a.anchor, rig);
         kept += 1;
       }
       if ((row.alongsideAnchors ?? 0) > 0 || kept > 0) anchorVisits += 1;
@@ -349,7 +366,7 @@ function renderAlongside(a, out) {
   }
   out.push(
     `<p class="muted">${esc(
-      `${a.anchorVisits} anchor site-visit(s) (a documented host was requested) in ${a.visitsWithData} site visit(s) from ${a.runsWithData} of ${a.runsTotal} run(s). Ranked: frame scope only, at least ${a.minSiteDays} site-days, share = site-days alongside / site-days the host's registrable domain was seen. A site-day is one site on one day, across rigs and variants.`,
+      `${a.anchorVisits} anchor site-visit(s) (a documented host was requested) in ${a.visitsWithData} site visit(s) from ${a.runsWithData} of ${a.runsTotal} run(s). Ranked: frame scope only, at least ${a.minSiteDays} site-days, share = site-days alongside / site-days the host's registrable domain was seen. Per-visit ID labels (long numbers, hex, UUIDs) at the start of a hostname are shown as *. A site-day is one site on one day, across rigs and variants.`,
     )}</p>`,
   );
   if (a.rows.length === 0)
@@ -755,7 +772,7 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`results[].events\` | Requests observed while this site was open. |
 | \`results[].thirdPartyDomains\` | Third-party registrable domains seen on this site. |
 | \`results[].thirdPartyDomainsList\` | Optional. The sorted third-party registrable domains behind the count (at most 1000); the baseline for "seen alongside". |
-| \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. |
+| \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. The index collapses leading per-visit ID labels to \`*\`. |
 | \`results[].alongsideAnchors\` | Optional. Documented-host anchors opened during this site. |
 | \`results[].error\` | Optional. Why a step failed. |
 | \`results[].detections[]\` | Detections raised on this site (below). |

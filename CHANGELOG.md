@@ -5,6 +5,12 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+### Changed
+
+- **Observatory "Seen alongside"**: leading per-visit ID labels (long numbers, long hex, UUIDs)
+  are collapsed to `*`, so `5654…120.cm.a.mts.ru` counts as `*.cm.a.mts.ru` instead of one
+  single-day row per visit. The registrable domain is never collapsed; rig data is unchanged.
+
 ## [0.5.0] — 2026-11-07
 
 ### Added
