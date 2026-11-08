@@ -30,6 +30,7 @@ import {
   RIG_NETWORKS,
   SEV,
   contactsOf,
+  outcomesOf,
   severityText,
   hostTable,
   isRealDir,
@@ -45,6 +46,7 @@ import {
   variantSlug,
 } from "./lib/exposure-runs.mjs";
 import { registrable, sameSite } from "./lib/registrable.mjs";
+import { outcomeText } from "./lib/documented-hosts.mjs";
 
 export { scrub };
 
@@ -296,6 +298,19 @@ export function buildIndex(
     runs: entries,
     hosts: hostTable(allContacts),
     contacts: allContacts,
+    outcomes: outcomesOf(runs).map((o) => ({
+      date: o.date,
+      rig: o.rig,
+      variant: o.variant,
+      site: o.site,
+      host: o.host,
+      indicator: o.indicator,
+      requests: o.requests,
+      statuses: o.statuses,
+      failures: o.failures,
+      ...(o.maxBytes !== undefined ? { maxBytes: o.maxBytes } : {}),
+      ...(o.redirectTo ? { redirectTo: o.redirectTo } : {}),
+    })),
     alongside: buildAlongside(runs),
   };
 }
@@ -353,6 +368,9 @@ function table(head, rows, { cls = "" } = {}) {
 
 const uniq = (xs) => [...new Set(xs)];
 const hostsText = (c) => (c.hostnames ? c.hostnames.join(", ") : "(not recorded in this run)");
+
+export const OUTCOMES_NOTE =
+  "How each request to a documented host ended, from the browser's own network log: HTTP status, declared size, the domain a redirect went to, or the browser's network error (for example a name that no longer resolves). A response shows that something still answers at that name; it does not show what it delivered or to whom. Only hostnames, status codes, sizes and error codes are kept.";
 
 export const ALONGSIDE_DISCLAIMER =
   "Hostnames that appeared in the same ad frame as a documented host. These are not detections and say nothing about the hosts themselves; they are leads for researchers. The list fills slowly: documented hosts are rare.";
@@ -537,6 +555,29 @@ export function renderHtml(index) {
             e.rigs.join(", "),
             e.variants.join(", "),
           ]),
+      ),
+    );
+
+  // Outcomes.
+  out.push(`<h2>How requests to documented hosts ended</h2>`);
+  out.push(`<p class="note">${esc(OUTCOMES_NOTE)}</p>`);
+  const outcomes = index.outcomes ?? [];
+  if (outcomes.length === 0)
+    out.push(
+      `<p>No run in this period recorded this measurement with a request to a documented host (it is recorded from 2026-11-08). That is not a result.</p>`,
+    );
+  else
+    out.push(
+      table(
+        ["Date", "Rig", "Variant", "Site", "Host", "Outcome"],
+        outcomes.map((o) => [
+          o.date,
+          o.rig ?? DEFAULT_RIG,
+          o.variant,
+          o.site,
+          o.host,
+          outcomeText(o),
+        ]),
       ),
     );
 
@@ -776,6 +817,7 @@ device, ETP setting and site list, for example \`chromium\`, \`chromium-pixel-5\
 | \`results[].thirdPartyDomainsList\` | Optional. The sorted third-party registrable domains behind the count (at most 1000); the baseline for "seen alongside". |
 | \`results[].alongside[]\` | Optional. Hostnames seen in the same ad frame as a documented host during this site: \`host\`, \`anchor\` (documented host or indicator id), \`scope\` (\`frame\` or \`page\`). Leads, not detections. The index collapses leading per-visit ID labels to \`*\`. |
 | \`results[].alongsideAnchors\` | Optional. Documented-host anchors opened during this site. |
+| \`results[].documentedOutcomes[]\` | Optional (at most 50, from 2026-11-08). How requests to documented hosts (surveillance or malicious, current) ended in the browser's own network log: \`host\`, \`indicator\`, \`requests\`, \`statuses\` (status code or \`3xx\` to count), \`failures\` (browser error code to count), optional \`maxBytes\` (largest declared size) and \`redirectTo[]\` (registrable domains). |
 | \`results[].repeatContacts[]\` | Optional (at most 200). Contact-type detections that already existed when this site started and fired again on it (deduplicated by the engine, so absent from \`detections\`): \`ruleId\`, \`severity\`, \`detectionId\`, \`hostnames\`, \`matchedIndicatorIds\`, \`occurrences\` (added during this site). Not counted in the severity columns. |
 | \`results[].error\` | Optional. Why a step failed. |
 | \`results[].detections[]\` | Detections raised on this site (below). |
@@ -804,6 +846,7 @@ A detection always has \`ruleId\` and \`severity\` (\`informational\`, \`suspici
 | \`rigs[]\` | One entry per rig, sorted by name: \`rig\`, \`country\` and \`network\` (declared by the rig owner, or \`null\`), \`days\` (days with runs), \`runs\`, \`variants\`, \`contacts\`, \`hosts\` (distinct documented hosts). |
 | \`runs[]\` | One entry per run: \`file\`, optional \`evidence\` and \`report\`, \`date\`, \`rig\`, \`variant\`, \`slug\`, \`browser\`, \`device\`, \`etpOff\`, \`siteList\`, \`seconds\`, \`sites\`, \`loaded\`, \`consent\`, \`requests\`, \`thirdPartyMedian\`, \`bySev\`, \`noisy\` (hidden-iframe detections, counted apart), \`contacts\`, \`strong\`. |
 | \`hosts[]\` | Documented hosts: \`host\`, \`first\`, \`last\`, \`days[]\`, \`variants[]\`, \`sites[]\`, \`rigs[]\`. |
+| \`outcomes[]\` | One entry per run, site and documented host from \`results[].documentedOutcomes\`: \`date\`, \`rig\`, \`variant\`, \`site\`, \`host\`, \`indicator\`, \`requests\`, \`statuses\`, \`failures\`, optional \`maxBytes\`, \`redirectTo\`. |
 | \`contacts[]\` | Contacts: \`date\`, \`rig\`, \`variant\`, \`slug\`, \`site\`, \`ruleId\`, \`severity\`, optional \`hostnames[]\`, and \`repeat: true\` when the engine merged this site's contact into an earlier site's detection in the same run (from \`results[].repeatContacts\`, or reconstructed from \`alongside\` anchors for older runs). |
 | \`alongside\` | "Seen alongside documented hosts" (observations, not detections): \`minSiteDays\`, \`runsWithData\`, \`runsTotal\`, \`visitsWithData\`, \`anchorVisits\`, \`frameHosts\`, ranked \`rows[]\` (frame scope) and \`pageOnly[]\`. |
 

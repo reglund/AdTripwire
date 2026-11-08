@@ -38,6 +38,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { registrable, sameSite } from "./lib/registrable.mjs";
+import { documentedMatcher, outcomeRecorder } from "./lib/documented-hosts.mjs";
 import {
   ALONGSIDE_MAX_ENTRIES,
   REPEAT_CONTACTS_MAX,
@@ -387,6 +388,7 @@ async function main() {
     `extension ${start.productVersion}, ${start.indicatorSets.length} indicator set(s), monitoring=${start.monitoring}, caps=${start.capabilities.capabilities.join(",")}`,
   );
   if (!start.monitoring) console.warn("WARNING: monitoring is not active (host permission?)");
+  const documented = documentedMatcher();
   const startList = (await rpc(dash, { type: "list_detections" })).data;
   const knownDetections = new Set(startList.map((d) => d.detectionId));
   // occurrenceCount per known detection: a rise during a later site is a repeat contact that the
@@ -414,7 +416,54 @@ async function main() {
     const page = await browser.newPage();
     const firstParty = registrable(host);
     const seenThirdParty = new Set();
+    // How requests to documented hosts end, from the browser's own network log (an independent
+    // second witness next to the extension): status, declared size, redirect target, or error.
+    const outcomes = outcomeRecorder(documented);
+    const ended = new WeakSet();
+    const finish = (req) => {
+      if (ended.has(req)) return;
+      ended.add(req);
+      const res = req.response();
+      if (!res) return;
+      const h = res.headers();
+      const len = Number.parseInt(h["content-length"] ?? "", 10);
+      outcomes.response(req.url(), res.status(), {
+        ...(Number.isInteger(len) ? { bytes: len } : {}),
+        ...(h.location ? { location: h.location } : {}),
+      });
+    };
+    page.on("requestfinished", (req) => {
+      try {
+        finish(req);
+      } catch {
+        /* best effort */
+      }
+    });
+    page.on("requestfailed", (req) => {
+      try {
+        if (ended.has(req)) return;
+        ended.add(req);
+        outcomes.failure(req.url(), req.failure()?.errorText);
+      } catch {
+        /* best effort */
+      }
+    });
     page.on("request", (req) => {
+      try {
+        outcomes.request(req.url());
+        // A redirect hop that never reported its own end (BiDi): record it from the chain.
+        const chain = req.redirectChain();
+        const hop = chain[chain.length - 1];
+        if (hop && !ended.has(hop)) {
+          if (hop.response()) finish(hop);
+          else {
+            ended.add(hop);
+            outcomes.redirect(hop.url(), req.url());
+          }
+        }
+      } catch {
+        /* best effort */
+      }
       try {
         const u = new URL(req.url());
         if (u.protocol !== "http:" && u.protocol !== "https:") return;
@@ -512,6 +561,7 @@ async function main() {
       });
     }
     row.repeatContacts = repeats;
+    row.documentedOutcomes = outcomes.rows();
     // Seen alongside: delta of the extension's state, and the registrable domains this site
     // contacted (the baseline for "how often was this domain seen at all").
     row.thirdPartyDomainsList = [...seenThirdParty].sort().slice(0, THIRD_PARTY_LIST_MAX);

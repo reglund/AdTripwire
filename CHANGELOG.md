@@ -5,6 +5,16 @@ semantic versioning for the extension packages.
 
 ## [Unreleased]
 
+### Added
+
+- **How requests to documented hosts ended**: the exposure harness records, from the browser's
+  own network log, the HTTP status, declared size, redirect target domain or network error of
+  every request to a documented (surveillance or malicious, current) host, per site
+  (`documentedOutcomes`), and the observatory lists them. This separates "the ad stack still
+  points at this host" from "this host still answers". Hostnames, status codes, sizes and error
+  codes only. First smoke run (2026-11-08, ria.ru): Yandex's ad frame still requested
+  `events.myweb3id.io`, which no longer resolves (`net::ERR_NAME_NOT_RESOLVED`).
+
 ### Fixed
 
 - **Observatory undercounted sites that carried a documented host**: within one run the engine

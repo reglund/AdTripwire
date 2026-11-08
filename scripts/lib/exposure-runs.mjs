@@ -3,6 +3,7 @@
  * Used by scripts/exposure-trend.mjs (Markdown trend) and scripts/observatory-build.mjs
  * (static site). Pure functions except loadRuns, which reads a directory.
  */
+import { ERROR_RE, OUTCOMES_MAX, outcomeText } from "./documented-hosts.mjs";
 import {
   closeSync,
   constants,
@@ -155,6 +156,35 @@ function validAlongsideFields(row) {
   if (row.alongsideAnchors !== undefined) {
     const n = row.alongsideAnchors;
     if (!Number.isInteger(n) || n < 0 || n > ALONGSIDE_ANCHORS_MAX) return false;
+  }
+  if (row.documentedOutcomes !== undefined) {
+    const l = row.documentedOutcomes;
+    const counts = (o) =>
+      isObject(o) &&
+      Object.keys(o).length <= 20 &&
+      Object.entries(o).every(([k, n]) => ERROR_RE.test(k) && Number.isInteger(n) && n > 0);
+    if (
+      !Array.isArray(l) ||
+      l.length > OUTCOMES_MAX ||
+      !l.every(
+        (o) =>
+          isObject(o) &&
+          typeof o.host === "string" &&
+          HOSTNAME_RE.test(o.host) &&
+          typeof o.indicator === "string" &&
+          ANCHOR_RE.test(o.indicator) &&
+          Number.isInteger(o.requests) &&
+          o.requests >= 0 &&
+          counts(o.statuses) &&
+          counts(o.failures) &&
+          (o.maxBytes === undefined || (Number.isInteger(o.maxBytes) && o.maxBytes >= 0)) &&
+          (o.redirectTo === undefined ||
+            (Array.isArray(o.redirectTo) &&
+              o.redirectTo.length <= 10 &&
+              o.redirectTo.every((h) => typeof h === "string" && HOSTNAME_RE.test(h)))),
+      )
+    )
+      return false;
   }
   if (row.repeatContacts !== undefined) {
     const l = row.repeatContacts;
@@ -309,6 +339,18 @@ export function contactsOf(runs) {
   return contacts;
 }
 
+/** How requests to documented hosts ended, one entry per (run, site, host), oldest first. */
+export function outcomesOf(runs) {
+  const out = [];
+  for (const r of runs)
+    for (const row of Array.isArray(r?.results) ? r.results : [])
+      for (const o of isObject(row) && Array.isArray(row.documentedOutcomes)
+        ? row.documentedOutcomes
+        : [])
+        out.push({ date: r.date, rig: rigOf(r), variant: r.variant, site: row.site, ...o });
+  return out;
+}
+
 /** Severity text for a contact; repeat contacts say so. */
 export const severityText = (c) =>
   c.repeat ? `${c.severity} (repeat contact in the same run)` : c.severity;
@@ -435,6 +477,17 @@ export function renderTrendMarkdown(runs, { dirLabel, now = new Date() }) {
       L.push(
         `| ${e.host} | ${e.first} | ${e.last} | ${e.days.length} | ${e.variants.join(", ")} | ${e.sites.join(", ")} |`,
       );
+    L.push("");
+  }
+
+  const outcomes = outcomesOf(runs);
+  if (outcomes.length) {
+    L.push("## How requests to documented hosts ended");
+    L.push("");
+    L.push("| Date | Variant | Site | Host | Outcome |");
+    L.push("|---|---|---|---|---|");
+    for (const o of outcomes)
+      L.push(`| ${o.date} | ${o.variant} | ${o.site} | ${o.host} | ${outcomeText(o)} |`);
     L.push("");
   }
 
