@@ -33,6 +33,12 @@ semantic versioning for the extension packages.
 
 ### Fixed
 
+- **A machine restart during the daily run broke later runs**: the browsers left their profile
+  locks behind, and Chromium refuses a lock that names another host (each container has a new
+  host name), so every later run with that profile failed to start. The harness now removes the
+  profile locks before launch; the daily script never runs two variants with one profile at once.
+  Verified: Chromium with a stale lock fails to start without the fix and runs with it.
+
 - **Observatory undercounted sites that carried a documented host**: within one run the engine
   merges later contacts with the same host into the first detection (deduplication), so only the
   first site showed. The harness now records these as `repeatContacts` per site (from
