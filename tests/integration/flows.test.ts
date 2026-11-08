@@ -138,6 +138,8 @@ describe("outcomeClass and reading", () => {
     expect(reading("selection", "failed").attention).toBe(false);
     expect(reading("delivery", "answered").attention).toBe(true);
     expect(reading("delivery", "failed").attention).toBe(false);
+    expect(reading("delivery", "not-recorded").attention).toBe(false);
+    expect(reading("spyware", "not-recorded").attention).toBe(true);
     expect(reading("spyware", "failed").attention).toBe(true);
     for (const st of ["tracking", "selection", "delivery", "spyware"])
       for (const c of ["content", "empty", "failed", "not-recorded"])

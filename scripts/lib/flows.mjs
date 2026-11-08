@@ -82,6 +82,11 @@ export function reading(stage, cls) {
         };
       return { text: `Exposure to an ad-selection server.${tail}`, attention: false };
     case "delivery":
+      if (cls === "not-recorded")
+        return {
+          text: "Contact with documented delivery or staging infrastructure. How the request ended was not recorded, so it cannot be read further.",
+          attention: false,
+        };
       return {
         text: `Contact with documented delivery or staging infrastructure.${tail || " Worth a closer look by a researcher."}`,
         attention: !nothingBack,

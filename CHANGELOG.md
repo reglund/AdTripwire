@@ -12,8 +12,9 @@ semantic versioning for the extension packages.
   ended → how to read it), under an overview of the five stages (ad auction, tracking and ID
   sync, ad selection, delivery and staging, spyware infrastructure) with the number of findings
   per stage. Identical chains on several days are drawn once; at most 40, newest first. Reading
-  texts are conservative; "worth a closer look" marks answered ad-selection, delivery and
-  spyware-infrastructure contacts and is a reading aid, not a finding about a device. Static
+  texts are conservative; "worth a closer look" marks answered ad-selection and delivery
+  contacts and any spyware-infrastructure contact (not delivery contacts whose outcome was not
+  recorded, as in runs before 2026-11-08) and is a reading aid, not a finding about a device. Static
   HTML and CSS, light and dark, vertical on phones. Index field `flows[]`.
 - **Exposure harness: the frame that sent each request to a documented host**
   (`documentedOutcomes[].via[]`, at most 5 hostnames, and `fromTop` for the page's own
