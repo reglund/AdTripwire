@@ -222,8 +222,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let initialPages = [];
 
+// Profile locks a browser leaves behind when it is killed (machine restart, container stopped).
+// Chromium refuses a lock naming another host, and every container has a new host name, so a
+// stale lock would fail every later run with that profile. The daily script never runs two
+// variants with one profile at once, so a lock present at launch is always stale.
+const STALE_LOCKS = {
+  chromium: ["SingletonLock", "SingletonCookie", "SingletonSocket"],
+  firefox: ["lock", ".parentlock"],
+};
+
 async function launch() {
   mkdirSync(PROFILE, { recursive: true });
+  for (const f of STALE_LOCKS[BROWSER] ?? []) rmSync(join(PROFILE, f), { force: true });
   if (BROWSER === "chromium") {
     // Chromium caches an unpacked extension's service-worker script in the profile and keeps
     // running it after the extension files change (even with a new version). Clear that cache
