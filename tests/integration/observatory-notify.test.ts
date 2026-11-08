@@ -144,6 +144,104 @@ describe("diffIndex", () => {
   });
 });
 
+describe("diffIndex: request outcomes and closer-look flows", () => {
+  const H = "events.example.test";
+  const outcome = (date: string, over: Record<string, unknown> = {}) => ({
+    date,
+    rig: "rig-1",
+    variant: "Chromium / Pixel 5",
+    site: "news.example.test",
+    host: H,
+    indicator: "adf-test",
+    requests: 1,
+    statuses: {},
+    failures: { "net::ERR_NAME_NOT_RESOLVED": 1 },
+    ...over,
+  });
+  const answered = { statuses: { "200": 1 }, failures: {}, maxBytes: 512 };
+  const withOutcomes = (outcomes: unknown[], flows: unknown[] = []) => ({
+    ...base,
+    outcomes,
+    flows,
+  });
+  const flow = (over: Record<string, unknown> = {}) => ({
+    site: "news.example.test",
+    host: H,
+    stage: "delivery",
+    outcomeClass: "content",
+    outcome: "Answered with content (up to 512 bytes declared)",
+    reading: { text: "…", attention: true },
+    dates: ["2026-11-05"],
+    rigs: ["rig-1"],
+    variants: ["Chromium / Pixel 5"],
+    ...over,
+  });
+
+  it("reports a host whose requests get an answer again, once", () => {
+    const { nextState: state } = diffIndex(withOutcomes([outcome("2026-11-04")]), null);
+    expect(state.replies).toEqual({ [H]: "silent" });
+    const next = withOutcomes([outcome("2026-11-04"), outcome("2026-11-05", answered)]);
+    const { messages, nextState } = diffIndex(next, state);
+    expect(messages[0]).toBe(
+      `${H} answers again: Answered with content (up to 512 bytes declared) on news.example.test (rig-1, Chromium / Pixel 5, 2026-11-05); before, its requests did not complete`,
+    );
+    expect(messages).toHaveLength(2);
+    expect(diffIndex(next, nextState).messages).toHaveLength(1);
+  });
+
+  it("reports a host that stops answering", () => {
+    const { nextState: state } = diffIndex(withOutcomes([outcome("2026-11-04", answered)]), null);
+    const next = withOutcomes([outcome("2026-11-04", answered), outcome("2026-11-05")]);
+    const { messages } = diffIndex(next, state);
+    expect(messages[0]).toMatch(
+      new RegExp(`^${H} no longer answers: Did not complete: the name no longer resolves`),
+    );
+  });
+
+  it("counts a day as answered when any request that day was answered", () => {
+    const { nextState: state } = diffIndex(withOutcomes([outcome("2026-11-04")]), null);
+    const next = withOutcomes([
+      outcome("2026-11-05", { site: "a.example.test" }),
+      outcome("2026-11-05", { site: "b.example.test", ...answered }),
+    ]);
+    const { messages } = diffIndex(next, state);
+    expect(messages[0]).toMatch(/answers again: .* on b\.example\.test/);
+  });
+
+  it("does not treat a request without a recorded end as a change", () => {
+    const { nextState: state } = diffIndex(withOutcomes([outcome("2026-11-04", answered)]), null);
+    const next = withOutcomes([
+      outcome("2026-11-04", answered),
+      outcome("2026-11-05", { failures: {}, statuses: {} }),
+    ]);
+    expect(diffIndex(next, state).messages).toHaveLength(1);
+  });
+
+  it("reports a new closer-look flow once, and ignores flows without the mark", () => {
+    const { nextState: state } = diffIndex(withOutcomes([]), null);
+    const next = withOutcomes(
+      [],
+      [flow(), flow({ site: "x.example.test", reading: { text: "…", attention: false } })],
+    );
+    const { messages, nextState } = diffIndex(next, state);
+    expect(messages[0]).toBe(
+      `Worth a closer look: ${H} on news.example.test (delivery and staging): Answered with content (up to 512 bytes declared) (rig-1, Chromium / Pixel 5, 2026-11-05)`,
+    );
+    expect(messages).toHaveLength(2);
+    expect(diffIndex(next, nextState).messages).toHaveLength(1);
+  });
+
+  it("extends a state saved before outcomes were tracked without reporting what is there", () => {
+    const { nextState: full } = diffIndex(base, null);
+    const { replies: _r, attention: _a, ...old } = full;
+    const next = withOutcomes([outcome("2026-11-05", answered)], [flow()]);
+    const { messages, nextState } = diffIndex(next, old);
+    expect(messages).toHaveLength(1);
+    expect(nextState.replies).toEqual({ [H]: "answers" });
+    expect(nextState.attention).toEqual([`${H}|news.example.test|content`]);
+  });
+});
+
 describe("observatory-notify CLI", () => {
   const dirs: string[] = [];
   afterEach(() => {

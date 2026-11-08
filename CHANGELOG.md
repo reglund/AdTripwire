@@ -7,6 +7,10 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Notifications on how documented hosts answer.** `observatory-notify.mjs` also reports a flow
+  newly marked "worth a closer look", and a documented host whose requests start getting an
+  answer again or stop getting one (for instance a delivery host whose name resolves again).
+  Older state files are extended silently.
 - **Exposure runs survive a reboot.** `exposure-daily.sh` skips variants that already finished
   that day (their JSON exists; the harness now writes its outputs whole or not at all), so a run
   started again measures only the rest; `ADTRIPWIRE_EXPOSURE_FRESH=1` measures everything again.

@@ -191,12 +191,23 @@ The text has one line per change and a closing summary:
 New documented host: <host>, first seen <date> on <site> (<rig>, <variant>)
 New site carrying <host>: <site> (<rig>, <variant>, <date>)
 Elevated or above: <ruleId> [<severity>] on <site> (<rig>, <variant>, <date>)
+Worth a closer look: <host> on <site> (<stage>): <outcome> (<rigs>, <variants>, <date>)
+<host> answers again: <outcome> on <site> (<rig>, <variant>, <date>); before, its requests did not complete
+<host> no longer answers: <outcome> on <site> (<rig>, <variant>, <date>); before, it answered
 Observatory <date>: <n> run(s), <n> contact(s), <n> documented host(s), <n> rig(s)
 ```
 
 A contact is exposure to a documented ad-delivery path; the lines say no more than that. The
 first run, with no state file yet, records the current index and sends only the summary and
 "Notification state initialised; future runs report changes only." The history is not replayed.
+
+"Worth a closer look" is a flow under "How each finding flowed" that carries that mark for the
+first time (by host, site and outcome). "Answers again" and "no longer answers" compare how a
+documented host's requests ended on the newest day that recorded an end with what the last
+notification saw: answered at all (any HTTP status, any request that day) or did not complete
+(a network error such as a name that no longer resolves). Requests without a recorded end change
+nothing. Both read the harness's request outcomes, recorded from 2026-11-08; a state file from
+before then is extended on the next run without reporting what is already there.
 
 | Variable                     | Effect                                                                                                                                                          |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
