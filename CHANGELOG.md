@@ -7,6 +7,13 @@ semantic versioning for the extension packages.
 
 ### Added
 
+- **Exposure runs survive a reboot.** `exposure-daily.sh` skips variants that already finished
+  that day (their JSON exists; the harness now writes its outputs whole or not at all), so a run
+  started again measures only the rest; `ADTRIPWIRE_EXPOSURE_FRESH=1` measures everything again.
+  It keeps `state/running` and `state/finished` markers. Docker host units:
+  `adtripwire-exposure-resume.service` restarts an interrupted run at boot, and
+  `adtripwire-exposure-watchdog.timer` notifies at 21:00 when no run finished that day.
+  Re-run `docker/host/install.sh` to install them.
 - **Observatory "How each finding flowed"**: each finding drawn as a chain (site → frame that
   sent the request → documented host and its stage in the AdFection chain → how the request
   ended → how to read it), under an overview of the five stages (ad auction, tracking and ID

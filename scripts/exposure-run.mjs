@@ -34,11 +34,21 @@
 // (the globals above are used only inside page.evaluate callbacks that run in the browser)
 import puppeteer, { KnownDevices } from "puppeteer-core";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { registrable, sameSite } from "./lib/registrable.mjs";
 import { documentedMatcher, frameOrigin, outcomeRecorder } from "./lib/documented-hosts.mjs";
+
+/**
+ * Writes a file whole or not at all (temporary file + rename), so a run killed mid-write never
+ * leaves a truncated JSON that exposure-daily.sh would take for a finished variant.
+ */
+function writeAtomic(path, text) {
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, text);
+  renameSync(tmp, path);
+}
 import {
   ALONGSIDE_MAX_ENTRIES,
   REPEAT_CONTACTS_MAX,
@@ -633,7 +643,7 @@ async function main() {
                 : null;
         if (text === null) throw new Error("unexpected export response shape");
         evidenceOut = JSON_OUT.replace(/\.json$/, "") + ".evidence.json";
-        writeFileSync(evidenceOut, text);
+        writeAtomic(evidenceOut, text);
       } catch (err) {
         evidenceOut = "";
         console.warn(
@@ -731,9 +741,9 @@ async function main() {
   L.push(
     "- Consent recognition is heuristic; sites where consent was not clicked ran fewer or no auctions.",
   );
-  writeFileSync(OUT, L.join("\n") + "\n");
+  writeAtomic(OUT, L.join("\n") + "\n");
   if (JSON_OUT)
-    writeFileSync(
+    writeAtomic(
       JSON_OUT,
       JSON.stringify(
         {

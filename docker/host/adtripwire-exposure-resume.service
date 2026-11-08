@@ -1,0 +1,13 @@
+[Unit]
+Description=AdTripwire: resume an exposure run that a reboot interrupted
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/adtripwire/docker
+Environment=SYSTEMCTL=systemctl
+ExecStart=/bin/sh host/rig-check.sh resume
+
+[Install]
+WantedBy=multi-user.target

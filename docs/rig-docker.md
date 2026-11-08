@@ -84,7 +84,19 @@ sites from a throwaway profile, but do not reuse this image or these flags for a
    `systemctl list-timers adtripwire-exposure-docker.timer`. This installs system units
    (`sudo`). `--user` installs user units instead (the user needs the `docker` group and
    `loginctl enable-linger`); `--remove` removes them. The unit runs
-   `docker compose run --rm exposure` in `/opt/adtripwire/docker`.
+   `docker compose run --rm exposure` in `/opt/adtripwire/docker`. It also installs two
+   safeguards (both read the markers in `docker/data/exposure/state/`):
+   - `adtripwire-exposure-resume.service`, at boot: when a run was started and never reached its
+     end (a reboot or power loss killed it), it starts the run service again. Variants that
+     already finished that day are skipped, so only the rest is measured, and the observatory is
+     published at the end as usual.
+   - `adtripwire-exposure-watchdog.timer`, at 21:00: when no run finished today, it sends a
+     notice through `ADTRIPWIRE_NOTIFY_CMD` (still running, stopped before its end, or never
+     started). Silent when the day's run finished.
+
+   Before a planned reboot during a run, nothing is needed: the run resumes at boot. To measure
+   every variant of the day again instead, start it with
+   `docker compose run --rm -e ADTRIPWIRE_EXPOSURE_FRESH=1 exposure`.
 
 6. **Switch the laptop off, so two primaries never run.** ON THE LAPTOP, once the smoke test has
    passed and the server's timer is installed: `sh scripts/install-exposure-timer.sh --remove`.
@@ -103,7 +115,8 @@ sites from a throwaway profile, but do not reuse this image or these flags for a
    `docker/data/exposure/notifications.log`).
 
 9. **Update**: `cd /opt/adtripwire && git pull && cd docker && docker compose build`. The next run
-   uses the new image. Indicator refreshes arrive with the pull.
+   uses the new image. Indicator refreshes arrive with the pull. When `docker/host/` changed (see the changelog),
+   run `sh /opt/adtripwire/docker/host/install.sh` again to install the new units.
 
 10. **Stop and remove.** Pause: `sudo systemctl disable --now adtripwire-exposure-docker.timer`.
     Remove the units: `sh /opt/adtripwire/docker/host/install.sh --remove`. Remove the image:

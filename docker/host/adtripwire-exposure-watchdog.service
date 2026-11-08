@@ -1,0 +1,10 @@
+[Unit]
+Description=AdTripwire: notify when today's exposure run has not finished
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/adtripwire/docker
+Environment=SYSTEMCTL=systemctl
+ExecStart=/bin/sh host/rig-check.sh watchdog

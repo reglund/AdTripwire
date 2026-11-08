@@ -22,6 +22,14 @@
 #   ADTRIPWIRE_NOTIFY_CMD         primary only: a shell command that receives the day's notification
 #                                 text on stdin (see docs/observatory.md, Notifications)
 #   ADTRIPWIRE_NOTIFY_ALWAYS      1: send the notification even when nothing changed
+#   ADTRIPWIRE_EXPOSURE_FRESH     1: measure every variant again even if it already finished today
+#
+# Resuming: a variant counts as finished when its JSON for today exists (exposure-run.mjs writes
+# it last, whole or not at all). Started again on the same day, for instance after a reboot
+# killed a run, the script skips finished variants and measures only the rest; the trend and the
+# observatory steps always run over everything. state/running holds the date of a run that has
+# started and not reached its end (docker/host/adtripwire-exposure-resume.service restarts the run
+# at boot when it exists); state/finished holds the date of the last run that did.
 #
 # A failing variant never stops the others (so no `set -e`); its status is only in the log line
 # "done <name> exit=<n>". The script's own exit status is that of the trend step. A failing
@@ -48,7 +56,7 @@ ROLE=${ADTRIPWIRE_OBSERVATORY_ROLE:-rig}
 case $P in '' | *[!0-9]*) P=2 ;; esac
 [ "$P" -lt 1 ] && P=1
 [ "$P" -gt 4 ] && P=4
-mkdir -p "$c/reports" "$c/live"
+mkdir -p "$c/reports" "$c/live" "$c/state"
 
 # run <name> <exposure-run flags...>: one variant; the name is used for the JSON, report and log.
 run() {
@@ -71,6 +79,10 @@ run() {
 # P is clamped to 4 because of memory.
 n=0
 launch() {
+  if [ "${ADTRIPWIRE_EXPOSURE_FRESH:-}" != 1 ] && [ -s "$c/$d-$1.json" ]; then
+    echo "skip $1: already measured today"
+    return
+  fi
   run "$@" &
   n=$((n + 1))
   if [ "$n" -ge "$P" ]; then
@@ -87,6 +99,7 @@ FPROF=$HOME/snap/firefox/common/adtripwire-exposure-profile
 
 start=$(date +%s)
 echo "exposure-daily $d parallel=$P seconds=$S dir=$c rig=$RIG role=$ROLE"
+echo "$d" >"$c/state/running"
 
 launch firefox --browser=firefox
 launch chromium --browser=chromium
@@ -130,5 +143,7 @@ else
   fi
 fi
 
+rm -f "$c/state/running"
+echo "$d" >"$c/state/finished"
 echo "exposure-daily finished in $(($(date +%s) - start)) s, trend exit=$t"
 exit $t

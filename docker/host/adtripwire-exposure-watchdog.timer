@@ -1,0 +1,9 @@
+[Unit]
+Description=Check in the evening that the AdTripwire exposure run finished
+
+[Timer]
+OnCalendar=*-*-* 21:00:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target
